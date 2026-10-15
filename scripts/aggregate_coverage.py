@@ -152,6 +152,15 @@ def dpg_project_repos():
    if not items['pageInfo']['hasNextPage']:return sorted(names)
    after=items['pageInfo']['endCursor']
  except Exception as e:print(f'WARN DPG project #{proj.get("number")}: {e}; using dpg_repositories from config',file=sys.stderr);return None
+def security_status(repo,branch,workflow):
+ """Latest completed run of the security workflow on `branch`."""
+ out={'state':'no workflow','run_url':None,'badge_url':None,'finished_at':None}
+ if not api(f'/repos/{ORG}/{repo}/actions/workflows/{workflow}'):return out
+ out['badge_url']=f'https://github.com/{ORG}/{repo}/actions/workflows/{workflow}/badge.svg?branch={branch}'
+ runs=(api(f'/repos/{ORG}/{repo}/actions/workflows/{workflow}/runs?branch={branch}&status=completed&per_page=1') or {}).get('workflow_runs',[])
+ if not runs:out['state']='no runs';return out
+ r=runs[0];out.update(state='passing' if r.get('conclusion')=='success' else 'failing',run_url=r.get('html_url'),finished_at=r.get('updated_at'))
+ return out
 def repo_targets(cfg,dpg):
  """Configured repos (objects or plain names) plus project-discovered ones, minus exclusions; first entry wins."""
  skip=set(cfg.get('exclude_repositories',[]));out={}

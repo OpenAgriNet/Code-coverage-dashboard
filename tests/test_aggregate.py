@@ -19,3 +19,26 @@ def test_plain_string_entry_uses_default_branch():
 def test_resolve_branch_reports_missing_branch(monkeypatch):
     monkeypatch.setattr(a, 'api', lambda path: None)  # GitHub 404 for the branch
     assert a.resolve_branch('network-adapter', 'devlopment') == ('devlopment', False)
+
+def fake_api(responses):
+    return lambda path: next((v for k, v in responses.items() if path.startswith(k)), None)
+
+def test_security_passing(monkeypatch):
+    monkeypatch.setattr(a, 'api', fake_api({
+        '/repos/OpenAgriNet/dss/actions/workflows/security.yml/runs': {'workflow_runs': [
+            {'status': 'completed', 'conclusion': 'success', 'html_url': 'u', 'updated_at': 't'}]},
+        '/repos/OpenAgriNet/dss/actions/workflows/security.yml': {'id': 1}}))
+    s = a.security_status('dss', 'main', 'security.yml')
+    assert s['state'] == 'passing' and s['run_url'] == 'u'
+    assert s['badge_url'] == 'https://github.com/OpenAgriNet/dss/actions/workflows/security.yml/badge.svg?branch=main'
+
+def test_security_never_ran_on_branch(monkeypatch):
+    monkeypatch.setattr(a, 'api', fake_api({
+        '/repos/OpenAgriNet/na/actions/workflows/security.yml/runs': {'workflow_runs': []},
+        '/repos/OpenAgriNet/na/actions/workflows/security.yml': {'id': 1}}))
+    assert a.security_status('na', 'development', 'security.yml')['state'] == 'no runs'
+
+def test_security_workflow_missing(monkeypatch):
+    monkeypatch.setattr(a, 'api', lambda path: None)
+    s = a.security_status('experience-api', 'main', 'security.yml')
+    assert s['state'] == 'no workflow' and s['badge_url'] is None
