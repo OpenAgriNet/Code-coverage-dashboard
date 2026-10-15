@@ -29,6 +29,9 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 header{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
 h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.15}
 .updated{color:var(--muted);font-size:13px}
+.refresh{display:flex;align-items:center;gap:12px}
+.btn{font-size:14px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:6px 12px;background:var(--surface);color:var(--ink)}
+.btn:hover{text-decoration:none;border-color:var(--muted)}
 .summary{font-size:18px;max-width:62ch;margin:14px 0 32px;color:var(--muted)}
 .summary strong{color:var(--ink);font-weight:600}
 
@@ -47,6 +50,9 @@ tbody tr:last-child td{border-bottom:0}
 .repo{font-weight:600;font-size:15px}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--good);color:var(--good);vertical-align:2px}
 .sub{font-size:13px;color:var(--muted);margin-top:3px}
+.switch{display:inline-flex;border:1px solid var(--line);border-radius:9px;padding:3px;background:var(--surface)}
+.switch button{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:6px;padding:6px 14px;background:none;color:var(--muted);cursor:pointer}
+.switch button[aria-pressed="true"]{background:var(--track);color:var(--ink)}
 .badge{display:inline-block;line-height:0}.badge img{height:20px}
 .empty{text-align:center;padding:32px;color:var(--muted)}
 .how{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 20px}
@@ -66,7 +72,10 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
 <main>
   <header>
     <h1>OpenAgriNet DPG repositories code coverage</h1>
-    <span class="updated" id="updated">Loading data…</span>
+    <div class="refresh">
+      <span class="updated" id="updated">Loading data…</span>
+      <a class="btn" href="https://github.com/OpenAgriNet/Code-coverage-dashboard/actions/workflows/deploy.yml" target="_blank" rel="noopener" title="Opens GitHub Actions. Click “Run workflow” there (needs write access). The page updates about two minutes after the run finishes.">Refresh data</a>
+    </div>
   </header>
   <p class="summary" id="summary">Reading the latest coverage reports.</p>
   <div class="controls"><input type="search" id="search" placeholder="Find a repository" aria-label="Find a repository"></div>
@@ -74,8 +83,13 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
   <section aria-labelledby="dev-title">
     <div class="sec-head"><div>
       <h2 id="dev-title">Development</h2>
-      <p class="sub">Each repository's working branch, set in <code>config/repos.json</code>.</p>
-    </div></div>
+      <p class="sub" id="dev-note">Each repository's working branch, set in <code>config/repos.json</code>.</p>
+    </div>
+      <div class="switch" role="group" aria-label="Branch to show">
+        <button type="button" id="view-dev" aria-pressed="true">Development</button>
+        <button type="button" id="view-main" aria-pressed="false">Main</button>
+      </div>
+    </div>
     <div class="table-wrap"><table>
       <thead><tr><th>Repository</th><th>Code coverage</th><th>Security</th></tr></thead>
       <tbody id="dev-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
@@ -99,12 +113,14 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
       <li><b>Branch.</b> Set per repository in <code>config/repos.json</code> (for example <code>development</code> for network-adapter, <code>main</code> for the AI repos). The latest-release table uses each repo's highest <code>release-*</code> branch.</li>
       <li><b>Code coverage.</b> The badge is Codecov's live badge for that branch. The line count underneath comes from the last refresh: Codecov first, otherwise the coverage file saved by the latest <code>CI</code> run on that branch. Partially covered lines count as not covered.</li>
       <li><b>Security.</b> The latest completed run of the repo's <code>security.yml</code> on that branch. <i>No runs on this branch</i> means the workflow does not run there; it is not a failure.</li>
+      <li><b>Refresh data</b> opens the refresh workflow on GitHub; click <i>Run workflow</i> there (needs write access to this repo). The badges are always live; line counts and run links update when the run finishes.</li>
       <li><b>No report</b> or an <i>unknown</i> badge means nothing was uploaded for that branch. It does not mean 0%. This dashboard never reruns tests.</li>
     </ul>
   </details>
 </main>
 <script>
-let data={repositories:[],releases:[]};
+let data={repositories:[],main:[],releases:[]},view='dev';
+try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isNum=v=>v!=null&&v!==''&&Number.isFinite(Number(v));
@@ -128,18 +144,29 @@ function fill(id,list,empty){
   const q=$('search').value.toLowerCase(),a=list.filter(r=>r.repository.toLowerCase().includes(q));
   $(id).innerHTML=a.length?a.map(row).join(''):`<tr><td colspan="3" class="empty">${q?'No repositories match.':empty}</td></tr>`;
 }
+const viewList=()=>(view==='main'?data.main:data.repositories)||[];
+function summary(){
+  const all=viewList(),has=all.filter(r=>isNum(r.coverage)).length,pass=all.filter(r=>(r.security||{}).state==='passing').length;
+  $('summary').innerHTML=all.length?`On their ${view==='main'?'main':'development'} branches, <strong>${has} of ${all.length}</strong> repositories report coverage and <strong>${pass}</strong> pass security.`:'No repositories are configured yet.';
+}
+function setView(v){
+  view=v;try{localStorage.setItem('branchView',v)}catch(e){}
+  $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
+  $('dev-title').textContent=v==='main'?'Main':'Development';
+  $('dev-note').innerHTML=v==='main'?'Each repository\'s default branch.':'Each repository\'s working branch, set in <code>config/repos.json</code>.';
+  summary();render();
+}
 function render(){
-  fill('dev-rows',data.repositories||[],'No repositories configured. Add them to config/repos.json.');
+  fill('dev-rows',viewList(),'No repositories configured. Add them to config/repos.json.');
   fill('rel-rows',data.releases||[],'No repository has a release branch yet.');
 }
 async function init(){
   try{
     const res=await fetch('./data/coverage.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
-    data=await res.json();const all=data.repositories||[];
-    const has=all.filter(r=>isNum(r.coverage)).length,pass=all.filter(r=>(r.security||{}).state==='passing').length;
+    data=await res.json();
     $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Not refreshed yet';
-    $('summary').innerHTML=all.length?`On their development branches, <strong>${has} of ${all.length}</strong> repositories report coverage and <strong>${pass}</strong> pass security.`:'No repositories are configured yet.';
-    render();
+    if(!data.main)data.main=data.repositories||[];
+    setView(view);
   }catch(e){
     $('updated').textContent='Data unavailable';
     $('summary').textContent='Coverage data could not be loaded. Run the refresh workflow and check its logs.';
@@ -147,6 +174,7 @@ async function init(){
   }
 }
 $('search').addEventListener('input',render);
+$('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
 init();
 </script>
 </body>
