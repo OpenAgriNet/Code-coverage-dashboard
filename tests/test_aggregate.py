@@ -60,3 +60,19 @@ def test_latest_release_picks_highest_version(monkeypatch):
 def test_latest_release_none_when_no_release_branch(monkeypatch):
     monkeypatch.setattr(a, 'api', lambda p: [{'name': 'main'}])
     assert a.latest_release_branch('kp', 'release-') is None
+
+def test_collect_adds_main_view_and_reuses_record_when_branch_is_default(monkeypatch):
+    calls = []
+    def fake_inspect(t):
+        calls.append((t['name'], t['branch']))
+        return {'repository': t['name'], 'branch': t['branch']}
+    monkeypatch.setattr(a, 'inspect', fake_inspect)
+    monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
+    monkeypatch.setattr(a, 'latest_release_branch', lambda repo, prefix: 'release-0.0.2' if repo == 'na' else None)
+    targets = [{'name': 'na', 'branch': 'development', 'security_workflow': 'security.yml'},
+               {'name': 'dss', 'branch': 'main', 'security_workflow': 'security.yml'}]
+    got = a.collect(targets, 'release-')
+    assert [r['branch'] for r in got['repositories']] == ['development', 'main']
+    assert [r['branch'] for r in got['main']] == ['main', 'main']
+    assert [r['branch'] for r in got['releases']] == ['release-0.0.2']
+    assert calls.count(('dss', 'main')) == 1  # main record reused, not measured twice

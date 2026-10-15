@@ -160,17 +160,22 @@ def repo_targets(cfg,dpg):
   if e['name'] in skip or e['name'] in out:continue
   out[e['name']]={'name':e['name'],'branch':e.get('branch'),'security_workflow':e.get('security_workflow','security.yml')}
  return list(out.values())
+def collect(targets,prefix):
+ """Configured-branch view, default-branch (main) view, and latest-release view for every target."""
+ dev,main,rel=[],[],[]
+ for t in targets:
+  r=inspect(t);dev.append(r);d=default_branch(t['name'])
+  main.append(r if r['branch']==d else inspect({**t,'branch':d}))
+  rb=latest_release_branch(t['name'],prefix)
+  if rb:rel.append(inspect({**t,'branch':rb}))
+ return {'repositories':dev,'main':main,'releases':rel}
 def main():
  dpg=dpg_project_repos()
  if dpg is None:dpg=CFG.get('dpg_repositories',[])
  else:print(f"DPG project lists {len(dpg)} repos: {', '.join(dpg)}")
  CFG['dpg_repositories']=dpg
- results=[inspect(t) for t in repo_targets(CFG,dpg)]
- prefix=CFG.get('release_branch_prefix','release-');releases=[]
- for t in repo_targets(CFG,dpg):
-  rb=latest_release_branch(t['name'],prefix)
-  if rb:releases.append(inspect({**t,'branch':rb}))
+ d=collect(repo_targets(CFG,dpg),CFG.get('release_branch_prefix','release-'));results=d['repositories']
  os.makedirs('data',exist_ok=True)
- with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'repositories':results,'releases':releases},f,indent=2);f.write('\n')
+ with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),**d},f,indent=2);f.write('\n')
  print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")
 if __name__=='__main__':main()
