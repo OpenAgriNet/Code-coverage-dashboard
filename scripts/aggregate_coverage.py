@@ -68,12 +68,10 @@ def codecov(repo,branch):
 def commit_date(repo,sha):
  c=api(f'/repos/{ORG}/{repo}/commits/{sha}') if sha else None
  return ((c or {}).get('commit') or {}).get('committer',{}).get('date')
-def details(repo):
- """Extra repo details: latest merged PR, dev branch, default-branch activity."""
- out={'default_branch':None,'dev_branches':[],'last_merged_pr':None,'main_last_commit':None,'main_commits_recent':None,'activity_days':CFG.get('activity_days',30)}
+def details(repo,branch):
+ """Extra repo details: latest merged PR and default-branch activity."""
+ out={'last_merged_pr':None,'main_last_commit':None,'main_commits_recent':None,'activity_days':CFG.get('activity_days',30)}
  try:
-  branch=default_branch(repo);out['default_branch']=branch
-  out['dev_branches']=[b for b in CFG.get('dev_branch_names',['dev','develop','development']) if api(f'/repos/{ORG}/{repo}/branches/{b}')]
   pulls=[p for p in (api(f'/repos/{ORG}/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=50') or []) if p.get('merged_at')]
   if pulls:
    p=max(pulls,key=lambda p:p['merged_at']);out['last_merged_pr']={'number':p['number'],'title':p['title'],'url':p['html_url'],'merged_at':p['merged_at'],'author':(p.get('user') or {}).get('login'),'base':(p.get('base') or {}).get('ref')}
@@ -82,33 +80,35 @@ def details(repo):
   out['main_commits_recent']=len(commits)
   last=commits[0] if commits else ((api(f'/repos/{ORG}/{repo}/commits?sha={branch}&per_page=1') or [None])[0])
   if last:out['main_last_commit']=((last.get('commit') or {}).get('committer') or {}).get('date')
-  for b in out['dev_branches']:
-   cc=codecov(repo,b)
-   if cc:out['dev_coverage']={'branch':b,'coverage':cc['coverage'],'commit':cc['commit'],'report_url':cc['report_url']};break
  except Exception as e:print(f'WARN details {repo}: {e}',file=sys.stderr)
  return out
 def default_branch(repo):
  return (api(f'/repos/{ORG}/{repo}') or {}).get('default_branch') or 'main'
 def inspect(repo):
- out=inspect_coverage(repo);out.update(details(repo));out['dpg']=repo in CFG.get('dpg_repositories',[]);return out
-def inspect_coverage(repo):
- """Coverage of the default branch: Codecov first, else artifacts of the latest default-branch CI run."""
  url=f'https://github.com/{ORG}/{repo}';branch=default_branch(repo)
- out={'owner':ORG,'repository':repo,'html_url':url,'coverage':None,'coverage_source':None,'coverage_branch':branch,'coverage_commit':None,'coverage_detail':None,'workflow_conclusion':None,'workflow_url':url+'/actions','updated_at':None}
+ devs=[b for b in CFG.get('dev_branch_names',['dev','develop','development']) if b!=branch and api(f'/repos/{ORG}/{repo}/branches/{b}')]
+ m=branch_coverage(repo,branch)
+ out={'owner':ORG,'repository':repo,'html_url':url,'dpg':repo in CFG.get('dpg_repositories',[]),'default_branch':branch,'dev_branches':devs,
+  'coverage':m['coverage'],'coverage_source':m['source'],'coverage_branch':branch,'coverage_commit':m['commit'],'coverage_detail':m['detail'],'updated_at':m['measured_at'],
+  'workflow_conclusion':m['workflow_conclusion'],'workflow_url':m['workflow_url'] or url+'/actions',
+  'dev_coverage':branch_coverage(repo,devs[0]) if devs else None}
+ out.update(details(repo,branch));return out
+def branch_coverage(repo,branch):
+ """Coverage of one branch: Codecov first, else artifacts of the latest CI run on that branch."""
+ out={'branch':branch,'coverage':None,'source':None,'commit':None,'detail':None,'measured_at':None,'workflow_conclusion':None,'workflow_url':None}
  cc=codecov(repo,branch)
- if cc:out.update(coverage=cc['coverage'],coverage_source='Codecov',coverage_commit=cc['commit'],coverage_detail={k:cc[k] for k in ('files','lines','hits','misses','partials','report_url')},updated_at=commit_date(repo,cc['commit']))
+ if cc:out.update(coverage=cc['coverage'],source='Codecov',commit=cc['commit'],detail={k:cc[k] for k in ('files','lines','hits','misses','partials','report_url')},measured_at=commit_date(repo,cc['commit']))
  try:
   d=api(f'/repos/{ORG}/{repo}/actions/runs?branch={branch}&per_page=100') or {};names=[n.lower() for n in CFG.get('workflow_names',[])]
   runs=sorted([r for r in d.get('workflow_runs',[]) if r.get('status')=='completed' and (not names or r.get('name','').lower() in names)],key=lambda r:r.get('updated_at',''),reverse=True)
   run=next((r for r in runs if r.get('conclusion')=='success'),runs[0] if runs else None)
   if not run:
    out['workflow_conclusion']='no completed run'
-   if not cc:out['coverage_source']=f'No Codecov upload or CI run on {branch}'
+   if not cc:out['source']=f'No Codecov upload or CI run on {branch}'
    return out
   out.update(workflow_conclusion=run.get('conclusion'),workflow_url=run.get('html_url'))
   if cc:return out
-  out['coverage_commit']=run.get('head_sha')
-  out['updated_at']=run.get('updated_at')
+  out.update(commit=run.get('head_sha'),measured_at=run.get('updated_at'))
   arts=(api(f"/repos/{ORG}/{repo}/actions/runs/{run['id']}/artifacts?per_page=100") or {}).get('artifacts',[])
   hints=CFG.get('artifact_name_hints',[])
   for a in arts:
@@ -119,10 +119,10 @@ def inspect_coverage(repo):
      for member in z.namelist():
       if member.endswith('/'):continue
       val=parse(member,z.read(member))
-      if val:out.update(coverage=round(val[0],2),coverage_source=f'{val[1]} · {a["name"]}',coverage_detail={'report_url':run.get('html_url'),'file':member});return out
-   except Exception as e:print(f'WARN {repo}/{a.get("name")}: {e}',file=sys.stderr)
-  out['coverage_source']=f'No coverage report in latest {branch} run'
- except Exception as e:out.update(workflow_conclusion='error',coverage_source=str(e)[:180]);print(f'ERROR {repo}: {e}',file=sys.stderr)
+      if val:out.update(coverage=round(val[0],2),source=f'{val[1]} · {a["name"]}',detail={'report_url':run.get('html_url'),'file':member});return out
+   except Exception as e:print(f'WARN {repo}@{branch}/{a.get("name")}: {e}',file=sys.stderr)
+  out['source']=f'No coverage report in latest {branch} run'
+ except Exception as e:out.update(workflow_conclusion='error',source=str(e)[:180]);print(f'ERROR {repo}@{branch}: {e}',file=sys.stderr)
  return out
 def main():
  repos=CFG.get('repositories',[]);results=[inspect(r) for r in repos]
