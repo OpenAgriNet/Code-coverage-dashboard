@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Aggregate supported coverage reports from existing GitHub Actions artifacts."""
 import io, json, os, re, sys, zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import requests
 import xml.etree.ElementTree as ET
 API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN')
@@ -62,7 +62,25 @@ def codecov(repo):
   j=r.json();c=(j.get('totals') or {}).get('coverage')
   return (float(c),j.get('updatestamp')) if c is not None else None
  except Exception as e:print(f'WARN codecov {repo}: {e}',file=sys.stderr);return None
+def details(repo):
+ """Extra repo details: latest merged PR, dev branch, default-branch activity."""
+ out={'default_branch':None,'dev_branches':[],'last_merged_pr':None,'main_last_commit':None,'main_commits_recent':None,'activity_days':CFG.get('activity_days',30)}
+ try:
+  meta=api(f'/repos/{ORG}/{repo}') or {};branch=meta.get('default_branch') or 'main';out['default_branch']=branch
+  out['dev_branches']=[b for b in CFG.get('dev_branch_names',['dev','develop','development']) if api(f'/repos/{ORG}/{repo}/branches/{b}')]
+  pulls=[p for p in (api(f'/repos/{ORG}/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=50') or []) if p.get('merged_at')]
+  if pulls:
+   p=max(pulls,key=lambda p:p['merged_at']);out['last_merged_pr']={'number':p['number'],'title':p['title'],'url':p['html_url'],'merged_at':p['merged_at'],'author':(p.get('user') or {}).get('login'),'base':(p.get('base') or {}).get('ref')}
+  since=(datetime.now(timezone.utc)-timedelta(days=out['activity_days'])).strftime('%Y-%m-%dT%H:%M:%SZ')
+  commits=api(f'/repos/{ORG}/{repo}/commits?sha={branch}&since={since}&per_page=100') or []
+  out['main_commits_recent']=len(commits)
+  last=commits[0] if commits else ((api(f'/repos/{ORG}/{repo}/commits?sha={branch}&per_page=1') or [None])[0])
+  if last:out['main_last_commit']=((last.get('commit') or {}).get('committer') or {}).get('date')
+ except Exception as e:print(f'WARN details {repo}: {e}',file=sys.stderr)
+ return out
 def inspect(repo):
+ out=inspect_coverage(repo);out.update(details(repo));return out
+def inspect_coverage(repo):
  url=f'https://github.com/{ORG}/{repo}';out={'owner':ORG,'repository':repo,'html_url':url,'coverage':None,'coverage_source':None,'workflow_conclusion':None,'workflow_url':url+'/actions','updated_at':None}
  cc=codecov(repo)
  if cc:out.update(coverage=round(cc[0],2),coverage_source='Codecov',updated_at=cc[1])

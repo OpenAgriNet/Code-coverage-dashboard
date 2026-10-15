@@ -1,7 +1,25 @@
 {
   "organization": "OpenAgriNet",
-  "repositories": ["knowledge-provider", "decision-support-system", "helmcharts", "network-adapter"],
+  "repositories": [
+    "knowledge-provider",
+    "decision-support-system",
+    "discovery-service",
+    "engineering-tracker",
+    "experience-api",
+    "experience-ui",
+    "helmcharts",
+    "infra-automation",
+    "network-adapter"
+  ],
   "artifact_name_hints": [],
-  "workflow_names": ["CI"],
-  "notes": "Starter list based on names visible in the screenshot. Add all repositories to track."
+  "workflow_names": [
+    "CI"
+  ],
+  "notes": "Starter list based on names visible in the screenshot. Add all repositories to track.",
+  "dev_branch_names": [
+    "dev",
+    "develop",
+    "development"
+  ],
+  "activity_days": 30
 }
