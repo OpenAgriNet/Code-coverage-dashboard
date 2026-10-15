@@ -51,22 +51,28 @@ def parse(name,raw):
     total=sum(int(x[1]) for x in lines);hit=sum(int(x[1]) for x in lines if int(x[2])>0);return (100*hit/total if total else 100.0),'Go coverprofile'
    except Exception:pass
  return None
-def codecov(repo):
+def codecov(repo,branch):
+ """Codecov totals for the latest uploaded commit on `branch`."""
  h={'Accept':'application/json'}
  if CODECOV_TOKEN:h['Authorization']='Bearer '+CODECOV_TOKEN
  try:
-  u=f'https://api.codecov.io/api/v2/github/{ORG}/repos/{repo}/'
-  r=requests.get(u,headers=h,timeout=45)
-  if r.status_code in (401,403) and CODECOV_TOKEN:r=requests.get(u,headers={'Accept':'application/json'},timeout=45)
+  u=f'https://api.codecov.io/api/v2/github/{ORG}/repos/{repo}/totals/'
+  r=requests.get(u,headers=h,params={'branch':branch},timeout=45)
+  if r.status_code in (401,403) and CODECOV_TOKEN:r=requests.get(u,headers={'Accept':'application/json'},params={'branch':branch},timeout=45)
   if r.status_code!=200:return None
-  j=r.json();c=(j.get('totals') or {}).get('coverage')
-  return (float(c),j.get('updatestamp')) if c is not None else None
- except Exception as e:print(f'WARN codecov {repo}: {e}',file=sys.stderr);return None
+  j=r.json();t=j.get('totals') or {}
+  if t.get('coverage') is None:return None
+  m=re.search(r'/commit/([0-9a-f]{7,40})',j.get('commit_file_url') or '')
+  return {'coverage':round(float(t['coverage']),2),'files':t.get('files'),'lines':t.get('lines'),'hits':t.get('hits'),'misses':t.get('misses'),'partials':t.get('partials'),'commit':m.group(1) if m else None,'report_url':f'https://app.codecov.io/github/{ORG}/{repo}/tree/{branch}'}
+ except Exception as e:print(f'WARN codecov {repo}@{branch}: {e}',file=sys.stderr);return None
+def commit_date(repo,sha):
+ c=api(f'/repos/{ORG}/{repo}/commits/{sha}') if sha else None
+ return ((c or {}).get('commit') or {}).get('committer',{}).get('date')
 def details(repo):
  """Extra repo details: latest merged PR, dev branch, default-branch activity."""
  out={'default_branch':None,'dev_branches':[],'last_merged_pr':None,'main_last_commit':None,'main_commits_recent':None,'activity_days':CFG.get('activity_days',30)}
  try:
-  meta=api(f'/repos/{ORG}/{repo}') or {};branch=meta.get('default_branch') or 'main';out['default_branch']=branch
+  branch=default_branch(repo);out['default_branch']=branch
   out['dev_branches']=[b for b in CFG.get('dev_branch_names',['dev','develop','development']) if api(f'/repos/{ORG}/{repo}/branches/{b}')]
   pulls=[p for p in (api(f'/repos/{ORG}/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=50') or []) if p.get('merged_at')]
   if pulls:
@@ -76,22 +82,32 @@ def details(repo):
   out['main_commits_recent']=len(commits)
   last=commits[0] if commits else ((api(f'/repos/{ORG}/{repo}/commits?sha={branch}&per_page=1') or [None])[0])
   if last:out['main_last_commit']=((last.get('commit') or {}).get('committer') or {}).get('date')
+  for b in out['dev_branches']:
+   cc=codecov(repo,b)
+   if cc:out['dev_coverage']={'branch':b,'coverage':cc['coverage'],'commit':cc['commit'],'report_url':cc['report_url']};break
  except Exception as e:print(f'WARN details {repo}: {e}',file=sys.stderr)
  return out
+def default_branch(repo):
+ return (api(f'/repos/{ORG}/{repo}') or {}).get('default_branch') or 'main'
 def inspect(repo):
  out=inspect_coverage(repo);out.update(details(repo));out['dpg']=repo in CFG.get('dpg_repositories',[]);return out
 def inspect_coverage(repo):
- url=f'https://github.com/{ORG}/{repo}';out={'owner':ORG,'repository':repo,'html_url':url,'coverage':None,'coverage_source':None,'workflow_conclusion':None,'workflow_url':url+'/actions','updated_at':None}
- cc=codecov(repo)
- if cc:out.update(coverage=round(cc[0],2),coverage_source='Codecov',updated_at=cc[1])
+ """Coverage of the default branch: Codecov first, else artifacts of the latest default-branch CI run."""
+ url=f'https://github.com/{ORG}/{repo}';branch=default_branch(repo)
+ out={'owner':ORG,'repository':repo,'html_url':url,'coverage':None,'coverage_source':None,'coverage_branch':branch,'coverage_commit':None,'coverage_detail':None,'workflow_conclusion':None,'workflow_url':url+'/actions','updated_at':None}
+ cc=codecov(repo,branch)
+ if cc:out.update(coverage=cc['coverage'],coverage_source='Codecov',coverage_commit=cc['commit'],coverage_detail={k:cc[k] for k in ('files','lines','hits','misses','partials','report_url')},updated_at=commit_date(repo,cc['commit']))
  try:
-  d=api(f'/repos/{ORG}/{repo}/actions/runs?per_page=100') or {};names=[n.lower() for n in CFG.get('workflow_names',[])]
+  d=api(f'/repos/{ORG}/{repo}/actions/runs?branch={branch}&per_page=100') or {};names=[n.lower() for n in CFG.get('workflow_names',[])]
   runs=sorted([r for r in d.get('workflow_runs',[]) if r.get('status')=='completed' and (not names or r.get('name','').lower() in names)],key=lambda r:r.get('updated_at',''),reverse=True)
   run=next((r for r in runs if r.get('conclusion')=='success'),runs[0] if runs else None)
   if not run:
-   out['workflow_conclusion']='no completed run';return out
+   out['workflow_conclusion']='no completed run'
+   if not cc:out['coverage_source']=f'No Codecov upload or CI run on {branch}'
+   return out
   out.update(workflow_conclusion=run.get('conclusion'),workflow_url=run.get('html_url'))
   if cc:return out
+  out['coverage_commit']=run.get('head_sha')
   out['updated_at']=run.get('updated_at')
   arts=(api(f"/repos/{ORG}/{repo}/actions/runs/{run['id']}/artifacts?per_page=100") or {}).get('artifacts',[])
   hints=CFG.get('artifact_name_hints',[])
@@ -103,9 +119,9 @@ def inspect_coverage(repo):
      for member in z.namelist():
       if member.endswith('/'):continue
       val=parse(member,z.read(member))
-      if val:out.update(coverage=round(val[0],2),coverage_source=f'{val[1]} · {a["name"]}');return out
+      if val:out.update(coverage=round(val[0],2),coverage_source=f'{val[1]} · {a["name"]}',coverage_detail={'report_url':run.get('html_url'),'file':member});return out
    except Exception as e:print(f'WARN {repo}/{a.get("name")}: {e}',file=sys.stderr)
-  out['coverage_source']='No supported report in latest run artifacts'
+  out['coverage_source']=f'No coverage report in latest {branch} run'
  except Exception as e:out.update(workflow_conclusion='error',coverage_source=str(e)[:180]);print(f'ERROR {repo}: {e}',file=sys.stderr)
  return out
 def main():
