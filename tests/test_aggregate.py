@@ -42,3 +42,13 @@ def test_security_workflow_missing(monkeypatch):
     monkeypatch.setattr(a, 'api', lambda path: None)
     s = a.security_status('experience-api', 'main', 'security.yml')
     assert s['state'] == 'no workflow' and s['badge_url'] is None
+
+def test_inspect_record_shape(monkeypatch):
+    monkeypatch.setattr(a, 'resolve_branch', lambda r, b: ('development', True))
+    monkeypatch.setattr(a, 'branch_coverage', lambda r, b: {'coverage': 74.35, 'source': 'Codecov', 'commit': 'abc',
+        'detail': {'lines': 10, 'hits': 7, 'files': 1, 'report_url': 'x'}, 'measured_at': 't'})
+    monkeypatch.setattr(a, 'security_status', lambda r, b, w: {'state': 'failing'})
+    rec = a.inspect({'name': 'network-adapter', 'branch': 'development', 'security_workflow': 'security.yml'})
+    assert rec['branch'] == 'development' and rec['coverage'] == 74.35 and rec['security']['state'] == 'failing'
+    assert rec['coverage_badge_url'] == 'https://codecov.io/gh/OpenAgriNet/network-adapter/branch/development/graph/badge.svg'
+    assert 'last_merged_pr' not in rec and 'main_commits_recent' not in rec and 'dev_coverage' not in rec

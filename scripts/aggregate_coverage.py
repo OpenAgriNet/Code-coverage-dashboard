@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Aggregate supported coverage reports from existing GitHub Actions artifacts."""
 import io, json, os, re, sys, zipfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import requests
 import xml.etree.ElementTree as ET
 API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN')
@@ -68,37 +68,23 @@ def codecov(repo,branch):
 def commit_date(repo,sha):
  c=api(f'/repos/{ORG}/{repo}/commits/{sha}') if sha else None
  return ((c or {}).get('commit') or {}).get('committer',{}).get('date')
-def details(repo,branch):
- """Extra repo details: latest merged PR and default-branch activity."""
- out={'last_merged_pr':None,'main_last_commit':None,'main_commits_recent':None,'activity_days':CFG.get('activity_days',30)}
- try:
-  pulls=[p for p in (api(f'/repos/{ORG}/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=50') or []) if p.get('merged_at')]
-  if pulls:
-   p=max(pulls,key=lambda p:p['merged_at']);out['last_merged_pr']={'number':p['number'],'title':p['title'],'url':p['html_url'],'merged_at':p['merged_at'],'author':(p.get('user') or {}).get('login'),'base':(p.get('base') or {}).get('ref')}
-  since=(datetime.now(timezone.utc)-timedelta(days=out['activity_days'])).strftime('%Y-%m-%dT%H:%M:%SZ')
-  commits=api(f'/repos/{ORG}/{repo}/commits?sha={branch}&since={since}&per_page=100') or []
-  out['main_commits_recent']=len(commits)
-  last=commits[0] if commits else ((api(f'/repos/{ORG}/{repo}/commits?sha={branch}&per_page=1') or [None])[0])
-  if last:out['main_last_commit']=((last.get('commit') or {}).get('committer') or {}).get('date')
- except Exception as e:print(f'WARN details {repo}: {e}',file=sys.stderr)
- return out
 def default_branch(repo):
  return (api(f'/repos/{ORG}/{repo}') or {}).get('default_branch') or 'main'
 def resolve_branch(repo,branch):
  """(branch, exists). None means the repo's default branch."""
  if not branch:return default_branch(repo),True
  return branch,bool(api(f'/repos/{ORG}/{repo}/branches/{branch}'))
-def inspect(repo):
- url=f'https://github.com/{ORG}/{repo}';branch=default_branch(repo)
- devs=[b for b in CFG.get('dev_branch_names',['dev','develop','development']) if b!=branch and api(f'/repos/{ORG}/{repo}/branches/{b}')]
+def inspect(t):
+ repo=t['name'];url=f'https://github.com/{ORG}/{repo}';branch,exists=resolve_branch(repo,t.get('branch'))
+ out={'repository':repo,'html_url':url,'dpg':repo in CFG.get('dpg_repositories',[]),'branch':branch,'branch_exists':exists,
+  'coverage':None,'coverage_source':'Branch not found','coverage_commit':None,'coverage_detail':None,
+  'coverage_badge_url':f'https://codecov.io/gh/{ORG}/{repo}/branch/{branch}/graph/badge.svg','measured_at':None,
+  'security':{'state':'branch not found','run_url':None,'badge_url':None,'finished_at':None}}
+ if not exists:return out
  m=branch_coverage(repo,branch)
- out={'owner':ORG,'repository':repo,'html_url':url,'dpg':repo in CFG.get('dpg_repositories',[]),'default_branch':branch,'dev_branches':devs,
-  'coverage':m['coverage'],'coverage_source':m['source'],'coverage_branch':branch,'coverage_commit':m['commit'],'coverage_detail':m['detail'],'updated_at':m['measured_at'],
-  'workflow_conclusion':m['workflow_conclusion'],'workflow_url':m['workflow_url'] or url+'/actions',
-  'dev_coverage':None}
- dc=branch_coverage(repo,devs[0]) if devs else None
- if dc and dc['coverage'] is not None:out['dev_coverage']=dc
- out.update(details(repo,branch));return out
+ out.update(coverage=m['coverage'],coverage_source=m['source'],coverage_commit=m['commit'],coverage_detail=m['detail'],measured_at=m['measured_at'],
+  security=security_status(repo,branch,t.get('security_workflow','security.yml')))
+ return out
 def branch_coverage(repo,branch):
  """Coverage of one branch: Codecov first, else artifacts of the latest CI run on that branch."""
  out={'branch':branch,'coverage':None,'source':None,'commit':None,'detail':None,'measured_at':None,'workflow_conclusion':None,'workflow_url':None}
@@ -174,7 +160,7 @@ def main():
  if dpg is None:dpg=CFG.get('dpg_repositories',[])
  else:print(f"DPG project lists {len(dpg)} repos: {', '.join(dpg)}")
  CFG['dpg_repositories']=dpg
- results=[inspect(t['name']) for t in repo_targets(CFG,dpg)]
+ results=[inspect(t) for t in repo_targets(CFG,dpg)]
  os.makedirs('data',exist_ok=True)
  with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'repositories':results},f,indent=2);f.write('\n')
  print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")
