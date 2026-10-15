@@ -32,36 +32,24 @@ h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.1
 .summary{font-size:18px;max-width:62ch;margin:14px 0 32px;color:var(--muted)}
 .summary strong{color:var(--ink);font-weight:600}
 
-/* Details table */
-.details-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:12px}
-.details-head h2{font-size:20px;margin:0;font-weight:800;letter-spacing:-.01em}
-.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.controls input[type=search],.controls select{font:inherit;font-size:14px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-.controls input[type=search]{width:200px}
-.check{display:inline-flex;align-items:center;gap:7px;font-size:14px;color:var(--muted);cursor:pointer}
-.check input{width:16px;height:16px;accent-color:var(--good)}
+/* Tables */
+section{margin-top:36px}
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.sec-head h2{font-size:20px;margin:0;font-weight:800;letter-spacing:-.01em}
+.sec-head p{margin:2px 0 0}
+.controls input[type=search]{font:inherit;font-size:14px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:220px}
 .table-wrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow-x:auto}
-table{border-collapse:collapse;width:100%;min-width:720px}
-table.show-extra{min-width:1120px}
-th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+table{border-collapse:collapse;width:100%;min-width:560px;table-layout:fixed}
+th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
 th{font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap}
+th:first-child{width:40%}th:nth-child(2){width:32%}
 tbody tr:last-child td{border-bottom:0}
-.extra{display:none}table.show-extra .extra{display:table-cell}
 .repo{font-weight:600;font-size:15px}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--good);color:var(--good);vertical-align:2px}
-.sub{font-size:13px;color:var(--muted);margin-top:2px}
-.cov{display:grid;grid-template-columns:96px 1fr;gap:2px 12px;align-items:baseline}
-.cov+.cov{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
-.cov .br{font-size:13px;color:var(--muted)}
-.cov .pct{font-weight:800;font-size:16px}
-.cov .sub{grid-column:2}
-.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--track);color:var(--muted)}
-.pill.good{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
-.pill.bad{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
-.pr{display:block;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.empty{text-align:center;padding:40px;color:var(--muted)}
-
-.how{margin-top:20px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 20px}
+.sub{font-size:13px;color:var(--muted);margin-top:3px}
+.badge{display:inline-block;line-height:0}.badge img{height:20px}
+.empty{text-align:center;padding:32px;color:var(--muted)}
+.how{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 20px}
 .how summary{cursor:pointer;font-weight:600;padding:12px 0}
 .how ul{margin:0 0 16px;padding-left:20px;color:var(--muted);max-width:80ch}
 .how li{margin:6px 0}.how b{color:var(--ink);font-weight:600}
@@ -70,7 +58,7 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
 @media (max-width:700px){
   main{padding:28px 16px 48px}
   h1{font-size:25px}.summary{font-size:16px}
-  .controls input[type=search]{width:100%}.controls{width:100%}
+  .controls,.controls input[type=search]{width:100%}
 }
 </style>
 </head>
@@ -81,119 +69,84 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
     <span class="updated" id="updated">Loading data…</span>
   </header>
   <p class="summary" id="summary">Reading the latest coverage reports.</p>
+  <div class="controls"><input type="search" id="search" placeholder="Find a repository" aria-label="Find a repository"></div>
 
-  <section aria-labelledby="details-title">
-    <div class="details-head">
-      <h2 id="details-title">Repository details</h2>
-      <div class="controls">
-        <input type="search" id="search" placeholder="Find a repository" aria-label="Find a repository">
-        <select id="state" aria-label="Filter">
-          <option value="all">All repositories</option>
-          <option value="dpg">DPG only</option>
-          <option value="nondpg">Not DPG</option>
-          <option value="has">With coverage</option>
-          <option value="missing">Without coverage</option>
-          <option value="failed">Latest CI failed</option>
-          <option value="dev">Has development branch</option>
-          <option value="nodev">No development branch</option>
-        </select>
-        <select id="sort" aria-label="Sort">
-          <option value="coverage-desc">Highest coverage first</option>
-          <option value="coverage-asc">Lowest coverage first</option>
-          <option value="name-asc">Name A to Z</option>
-          <option value="updated-desc">Most recently measured</option>
-          <option value="activity-desc">Most main-branch activity</option>
-          <option value="pr-desc">Most recent merged PR</option>
-        </select>
-        <label class="check"><input type="checkbox" id="extra"> Branch activity and PRs</label>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table id="tbl">
-        <thead><tr>
-          <th>Repository</th><th>Coverage</th><th>Latest CI</th><th>Measured</th>
-          <th class="extra">Development branch</th><th class="extra">Main branch, last 30 days</th><th class="extra">Latest merged PR</th>
-        </tr></thead>
-        <tbody id="rows"><tr><td colspan="7" class="empty">Loading coverage data…</td></tr></tbody>
-      </table>
-    </div>
-    <details class="how">
-      <summary>How coverage is measured</summary>
-      <ul>
-        <li><b>Branches.</b> The default branch (usually <code>main</code>) and, if the repository has one, its <code>dev</code>, <code>develop</code> or <code>development</code> branch, shown only when that branch has a coverage report. The summary and sorting use the default branch.</li>
-        <li><b>Codecov first.</b> Line coverage Codecov reports for the latest uploaded commit on that branch. Partially covered lines count as not covered.</li>
-        <li><b>CI report second.</b> If Codecov has nothing, the coverage file (Cobertura or JaCoCo XML, LCOV, Istanbul JSON, Go cover profile) saved by the latest completed <code>CI</code> run on that branch.</li>
-        <li><b>Measured.</b> Commit time of the measured commit, or finish time of the CI run.</li>
-        <li><b>No report</b> means nothing was uploaded or saved. It does not mean 0%. This dashboard never reruns tests.</li>
-      </ul>
-    </details>
+  <section aria-labelledby="dev-title">
+    <div class="sec-head"><div>
+      <h2 id="dev-title">Development</h2>
+      <p class="sub">Each repository's working branch, set in <code>config/repos.json</code>.</p>
+    </div></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Repository</th><th>Code coverage</th><th>Security</th></tr></thead>
+      <tbody id="dev-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+    </table></div>
   </section>
+
+  <section aria-labelledby="rel-title">
+    <div class="sec-head"><div>
+      <h2 id="rel-title">Latest release</h2>
+      <p class="sub">Each repository's highest <code>release-*</code> branch.</p>
+    </div></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Repository</th><th>Code coverage</th><th>Security</th></tr></thead>
+      <tbody id="rel-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <details class="how">
+    <summary>How this is measured</summary>
+    <ul>
+      <li><b>Branch.</b> Set per repository in <code>config/repos.json</code> (for example <code>development</code> for network-adapter, <code>main</code> for the AI repos). The latest-release table uses each repo's highest <code>release-*</code> branch.</li>
+      <li><b>Code coverage.</b> The badge is Codecov's live badge for that branch. The line count underneath comes from the last refresh: Codecov first, otherwise the coverage file saved by the latest <code>CI</code> run on that branch. Partially covered lines count as not covered.</li>
+      <li><b>Security.</b> The latest completed run of the repo's <code>security.yml</code> on that branch. <i>No runs on this branch</i> means the workflow does not run there; it is not a failure.</li>
+      <li><b>No report</b> or an <i>unknown</i> badge means nothing was uploaded for that branch. It does not mean 0%. This dashboard never reruns tests.</li>
+    </ul>
+  </details>
 </main>
 <script>
-let all=[];
+let data={repositories:[],releases:[]};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isNum=v=>v!=null&&v!==''&&Number.isFinite(Number(v));
-const tone=c=>c>=80?'good':c>=60?'warn':'bad';
 const num=v=>Number(v).toLocaleString();
-const date=v=>{if(!v)return '—';const d=new Date(v);return isNaN(d)?'—':d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})};
-const ago=v=>{if(!v)return '';const d=Math.floor((Date.now()-new Date(v))/864e5);return d<=0?'today':d===1?'yesterday':d+' days ago'};
-const repoUrl=r=>r.html_url||`https://github.com/${r.owner||'OpenAgriNet'}/${r.repository}`;
-const failed=r=>['failure','cancelled','error'].includes(r.workflow_conclusion);
+const repoUrl=r=>r.html_url||`https://github.com/OpenAgriNet/${r.repository}`;
 const dpgTag=r=>r.dpg?'<span class="tag" title="Part of the OpenAgriNet DPG project">DPG</span>':'';
+const SEC={passing:'Passing',failing:'Failing','no runs':'No runs on this branch','no workflow':'No security workflow','branch not found':'Branch not found'};
 
-function covBlock(r,br,c,cd,sha,src){
-  cd=cd||{};const url=repoUrl(r);
-  const commit=sha?`<a href="${esc(url)}/commit/${esc(sha)}">${esc(String(sha).slice(0,7))}</a>`:'';
-  const source=cd.report_url?`<a href="${esc(cd.report_url)}" target="_blank" rel="noopener">${esc(src||'Report')}</a>`:esc(src||'');
-  const pct=isNum(c)?`<span class="pct ${tone(+c)}">${(+c).toFixed(2)}%</span>`:'<span class="muted">No report</span>';
-  const lines=cd.lines?`<div class="sub">${num(cd.hits)} of ${num(cd.lines)} lines, ${num(cd.files)} files</div>`:'';
-  return `<div class="cov"><span class="br">${esc(br)}</span>${pct}${lines}<div class="sub">${source}${source&&commit?', commit ':''}${commit}</div></div>`;
+function row(r){
+  const url=repoUrl(r),cd=r.coverage_detail||{},s=r.security||{};
+  const cov=r.branch_exists===false?'<span class="muted">Branch not found</span>'
+    :`<a class="badge" href="${esc(cd.report_url||url)}" target="_blank" rel="noopener"><img src="${esc(r.coverage_badge_url)}" alt="Coverage ${isNum(r.coverage)?(+r.coverage).toFixed(2)+'%':'unknown'}"></a>`
+     +(cd.lines?`<div class="sub">${num(cd.hits)} of ${num(cd.lines)} lines covered</div>`:isNum(r.coverage)?'':'<div class="sub">No report on this branch</div>');
+  const label=SEC[s.state]||'Unknown';
+  const sec=s.badge_url&&s.state!=='no runs'
+    ?`<a class="badge" href="${esc(s.run_url||url+'/actions')}" target="_blank" rel="noopener"><img src="${esc(s.badge_url)}" alt="Security ${esc(label)}"></a>`
+    :`<span class="muted">${esc(label)}</span>`;
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${dpgTag(r)}<div class="sub">${esc(r.branch)}</div></td><td>${cov}</td><td>${sec}</td></tr>`;
+}
+function fill(id,list,empty){
+  const q=$('search').value.toLowerCase(),a=list.filter(r=>r.repository.toLowerCase().includes(q));
+  $(id).innerHTML=a.length?a.map(row).join(''):`<tr><td colspan="3" class="empty">${q?'No repositories match.':empty}</td></tr>`;
 }
 function render(){
-  const q=$('search').value.toLowerCase(),st=$('state').value,sort=$('sort').value;
-  let a=all.filter(r=>r.repository.toLowerCase().includes(q));
-  const f={dpg:r=>r.dpg,nondpg:r=>!r.dpg,has:r=>isNum(r.coverage),missing:r=>!isNum(r.coverage),failed,dev:r=>(r.dev_branches||[]).length,nodev:r=>!(r.dev_branches||[]).length}[st];
-  if(f)a=a.filter(f);
-  const cv=r=>isNum(r.coverage)?+r.coverage:-1,t=v=>new Date(v||0).getTime();
-  a.sort((x,y)=>sort==='name-asc'?x.repository.localeCompare(y.repository):sort==='coverage-asc'?cv(x)-cv(y):sort==='updated-desc'?t(y.updated_at)-t(x.updated_at):sort==='activity-desc'?(y.main_commits_recent??-1)-(x.main_commits_recent??-1):sort==='pr-desc'?t(y.last_merged_pr?.merged_at)-t(x.last_merged_pr?.merged_at):cv(y)-cv(x));
-  $('rows').innerHTML=a.length?a.map(r=>{
-    const url=repoUrl(r),d=r.dev_coverage;
-    const cov=covBlock(r,r.coverage_branch||r.default_branch||'main',r.coverage,r.coverage_detail,r.coverage_commit,r.coverage_source)+(d&&isNum(d.coverage)?covBlock(r,d.branch,d.coverage,d.detail,d.commit,d.source):'');
-    const ci=r.workflow_conclusion==='success'?'<span class="pill good">Passing</span>':failed(r)?`<span class="pill bad">${esc(r.workflow_conclusion==='failure'?'Failing':r.workflow_conclusion)}</span>`:'<span class="pill">No CI run</span>';
-    const devs=r.dev_branches||[];
-    const dev=devs.length?devs.map(b=>`<a href="${esc(url)}/tree/${esc(b)}">${esc(b)}</a>`).join(', '):'<span class="muted">None</span>';
-    const n=r.main_commits_recent;
-    const act=n==null?'<span class="muted">—</span>':`<div class="${n>=10?'good':n>0?'warn':'bad'}" style="font-weight:600">${n>=100?'100+':n} commit${n===1?'':'s'}</div><div class="sub">Last commit ${esc(ago(r.main_last_commit)||'unknown')}</div>`;
-    const p=r.last_merged_pr;
-    const pr=p?`<a class="pr" href="${esc(p.url)}" target="_blank" rel="noopener" title="${esc(p.title)}">#${esc(p.number)} ${esc(p.title)}</a><div class="sub">${esc(p.author||'')} into ${esc(p.base||'')}, ${esc(ago(p.merged_at))}</div>`:'<span class="muted">None</span>';
-    return `<tr id="repo-${esc(r.repository)}">
-      <td><a class="repo" href="${esc(url)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${dpgTag(r)}<div class="sub">${esc(r.owner||'OpenAgriNet')}</div></td>
-      <td>${cov}</td>
-      <td>${ci}<div class="sub"><a href="${esc(r.workflow_url||url+'/actions')}" target="_blank" rel="noopener">View run</a></div></td>
-      <td>${esc(date(r.updated_at))}<div class="sub">${esc(ago(r.updated_at))}</div></td>
-      <td class="extra">${dev}</td><td class="extra">${act}</td><td class="extra">${pr}</td></tr>`;
-  }).join(''):'<tr><td colspan="7" class="empty">No repositories match. Clear the search or pick another filter.</td></tr>';
+  fill('dev-rows',data.repositories||[],'No repositories configured. Add them to config/repos.json.');
+  fill('rel-rows',data.releases||[],'No repository has a release branch yet.');
 }
 async function init(){
   try{
     const res=await fetch('./data/coverage.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
-    const d=await res.json();all=d.repositories||[];
-    const h=all.filter(r=>isNum(r.coverage)),avg=h.length?h.reduce((s,r)=>s+ +r.coverage,0)/h.length:null;
-    const met=h.filter(r=>+r.coverage>=80).length;
-    $('updated').textContent=d.generated_at?'Updated '+new Date(d.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Not refreshed yet';
-    $('summary').innerHTML=all.length?`<strong>${h.length} of ${all.length}</strong> repositories report coverage on main${avg!=null?`, averaging <strong>${avg.toFixed(1)}%</strong>`:''}. <strong>${met}</strong> meet the 80% target.`:'No repositories are configured yet. Add them to <code>config/repos.json</code>.';
+    data=await res.json();const all=data.repositories||[];
+    const has=all.filter(r=>isNum(r.coverage)).length,pass=all.filter(r=>(r.security||{}).state==='passing').length;
+    $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Not refreshed yet';
+    $('summary').innerHTML=all.length?`On their development branches, <strong>${has} of ${all.length}</strong> repositories report coverage and <strong>${pass}</strong> pass security.`:'No repositories are configured yet.';
     render();
   }catch(e){
     $('updated').textContent='Data unavailable';
     $('summary').textContent='Coverage data could not be loaded. Run the refresh workflow and check its logs.';
-    $('rows').innerHTML='<tr><td colspan="7" class="empty">data/coverage.json is missing or unreadable.</td></tr>';
+    ['dev-rows','rel-rows'].forEach(id=>$(id).innerHTML='<tr><td colspan="3" class="empty">data/coverage.json is missing or unreadable.</td></tr>');
   }
 }
-['search','state','sort'].forEach(id=>$(id).addEventListener('input',render));
-const setExtra=on=>{$('tbl').classList.toggle('show-extra',on);try{localStorage.setItem('showExtra',on?'1':'0')}catch(e){}};
-try{$('extra').checked=localStorage.getItem('showExtra')==='1'}catch(e){}
-setExtra($('extra').checked);$('extra').addEventListener('change',e=>setExtra(e.target.checked));
+$('search').addEventListener('input',render);
 init();
 </script>
 </body>
