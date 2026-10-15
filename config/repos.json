@@ -1,25 +1,43 @@
 {
   "organization": "OpenAgriNet",
   "repositories": [
-    "knowledge-provider",
-    "decision-support-system",
-    "discovery-service",
-    "experience-api",
-    "experience-ui",
-    "helmcharts",
-    "infra-automation",
-    "network-adapter"
+    {
+      "name": "network-adapter",
+      "branch": "development"
+    },
+    {
+      "name": "discovery-service",
+      "branch": "development"
+    },
+    {
+      "name": "helmcharts",
+      "branch": "development"
+    },
+    {
+      "name": "decision-support-system",
+      "branch": "main"
+    },
+    {
+      "name": "knowledge-provider",
+      "branch": "main"
+    },
+    {
+      "name": "experience-api",
+      "branch": "main"
+    },
+    {
+      "name": "experience-ui",
+      "branch": "main"
+    },
+    {
+      "name": "infra-automation",
+      "branch": "main"
+    }
   ],
   "artifact_name_hints": [],
   "workflow_names": [
     "CI"
   ],
-  "dev_branch_names": [
-    "dev",
-    "develop",
-    "development"
-  ],
-  "activity_days": 30,
   "dpg_repositories": [
     "decision-support-system",
     "discovery-service",
@@ -35,5 +53,6 @@
   },
   "exclude_repositories": [
     "engineering-tracker"
-  ]
+  ],
+  "release_branch_prefix": "release-"
 }

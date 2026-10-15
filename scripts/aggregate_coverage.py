@@ -84,6 +84,10 @@ def details(repo,branch):
  return out
 def default_branch(repo):
  return (api(f'/repos/{ORG}/{repo}') or {}).get('default_branch') or 'main'
+def resolve_branch(repo,branch):
+ """(branch, exists). None means the repo's default branch."""
+ if not branch:return default_branch(repo),True
+ return branch,bool(api(f'/repos/{ORG}/{repo}/branches/{branch}'))
 def inspect(repo):
  url=f'https://github.com/{ORG}/{repo}';branch=default_branch(repo)
  devs=[b for b in CFG.get('dev_branch_names',['dev','develop','development']) if b!=branch and api(f'/repos/{ORG}/{repo}/branches/{b}')]
@@ -148,13 +152,20 @@ def dpg_project_repos():
    if not items['pageInfo']['hasNextPage']:return sorted(names)
    after=items['pageInfo']['endCursor']
  except Exception as e:print(f'WARN DPG project #{proj.get("number")}: {e}; using dpg_repositories from config',file=sys.stderr);return None
+def repo_targets(cfg,dpg):
+ """Configured repos (objects or plain names) plus project-discovered ones, minus exclusions; first entry wins."""
+ skip=set(cfg.get('exclude_repositories',[]));out={}
+ for e in cfg.get('repositories',[])+list(dpg):
+  e={'name':e} if isinstance(e,str) else dict(e)
+  if e['name'] in skip or e['name'] in out:continue
+  out[e['name']]={'name':e['name'],'branch':e.get('branch'),'security_workflow':e.get('security_workflow','security.yml')}
+ return list(out.values())
 def main():
  dpg=dpg_project_repos()
  if dpg is None:dpg=CFG.get('dpg_repositories',[])
  else:print(f"DPG project lists {len(dpg)} repos: {', '.join(dpg)}")
- CFG['dpg_repositories']=dpg;skip=set(CFG.get('exclude_repositories',[]))
- repos=[r for r in dict.fromkeys(CFG.get('repositories',[])+dpg) if r not in skip]
- results=[inspect(r) for r in repos]
+ CFG['dpg_repositories']=dpg
+ results=[inspect(t['name']) for t in repo_targets(CFG,dpg)]
  os.makedirs('data',exist_ok=True)
  with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'repositories':results},f,indent=2);f.write('\n')
  print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")
