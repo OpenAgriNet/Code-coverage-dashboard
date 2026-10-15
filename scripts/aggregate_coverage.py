@@ -147,6 +147,11 @@ def security_status(repo,branch,workflow):
  if not runs:out['state']='no runs';return out
  r=runs[0];out.update(state='passing' if r.get('conclusion')=='success' else 'failing',run_url=r.get('html_url'),finished_at=r.get('updated_at'))
  return out
+def latest_release_branch(repo,prefix):
+ """Highest-versioned branch starting with `prefix` (release-0.0.10 beats release-0.0.9), or None."""
+ names=[b['name'] for b in (api(f'/repos/{ORG}/{repo}/branches?per_page=100') or []) if b['name'].startswith(prefix)]
+ key=lambda n:[(0,int(x),'') if x.isdigit() else (1,0,x) for x in re.split(r'[.\-]',n[len(prefix):])]
+ return max(names,key=key) if names else None
 def repo_targets(cfg,dpg):
  """Configured repos (objects or plain names) plus project-discovered ones, minus exclusions; first entry wins."""
  skip=set(cfg.get('exclude_repositories',[]));out={}
@@ -161,7 +166,11 @@ def main():
  else:print(f"DPG project lists {len(dpg)} repos: {', '.join(dpg)}")
  CFG['dpg_repositories']=dpg
  results=[inspect(t) for t in repo_targets(CFG,dpg)]
+ prefix=CFG.get('release_branch_prefix','release-');releases=[]
+ for t in repo_targets(CFG,dpg):
+  rb=latest_release_branch(t['name'],prefix)
+  if rb:releases.append(inspect({**t,'branch':rb}))
  os.makedirs('data',exist_ok=True)
- with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'repositories':results},f,indent=2);f.write('\n')
+ with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'repositories':results,'releases':releases},f,indent=2);f.write('\n')
  print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")
 if __name__=='__main__':main()

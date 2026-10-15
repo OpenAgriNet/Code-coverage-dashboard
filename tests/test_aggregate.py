@@ -52,3 +52,11 @@ def test_inspect_record_shape(monkeypatch):
     assert rec['branch'] == 'development' and rec['coverage'] == 74.35 and rec['security']['state'] == 'failing'
     assert rec['coverage_badge_url'] == 'https://codecov.io/gh/OpenAgriNet/network-adapter/branch/development/graph/badge.svg'
     assert 'last_merged_pr' not in rec and 'main_commits_recent' not in rec and 'dev_coverage' not in rec
+
+def test_latest_release_picks_highest_version(monkeypatch):
+    monkeypatch.setattr(a, 'api', lambda p: [{'name': 'release-0.0.9'}, {'name': 'release-0.0.10'}, {'name': 'main'}])
+    assert a.latest_release_branch('na', 'release-') == 'release-0.0.10'
+
+def test_latest_release_none_when_no_release_branch(monkeypatch):
+    monkeypatch.setattr(a, 'api', lambda p: [{'name': 'main'}])
+    assert a.latest_release_branch('kp', 'release-') is None
