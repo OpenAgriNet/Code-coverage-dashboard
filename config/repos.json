@@ -14,7 +14,6 @@
   "workflow_names": [
     "CI"
   ],
-  "notes": "Starter list based on names visible in the screenshot. Add all repositories to track.",
   "dev_branch_names": [
     "dev",
     "develop",
@@ -29,5 +28,12 @@
     "infra-automation",
     "network-adapter"
   ],
-  "dpg_source": "OpenAgriNet org project #9 (repos with issues/PRs on the DPG board)"
+  "dpg_source": "Fallback only. Each refresh reads OpenAgriNet project #9 (needs DPG_PROJECT_TOKEN secret); any repo with an issue or PR there is tracked and tagged DPG automatically.",
+  "dpg_project": {
+    "org": "OpenAgriNet",
+    "number": 9
+  },
+  "exclude_repositories": [
+    "engineering-tracker"
+  ]
 }

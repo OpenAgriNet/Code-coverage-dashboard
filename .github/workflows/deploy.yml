@@ -29,6 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          DPG_PROJECT_TOKEN: ${{ secrets.DPG_PROJECT_TOKEN }}
           GITHUB_ORG: OpenAgriNet
         run: python scripts/aggregate_coverage.py
       - uses: actions/configure-pages@v5

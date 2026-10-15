@@ -4,7 +4,7 @@ import io, json, os, re, sys, zipfile
 from datetime import datetime, timedelta, timezone
 import requests
 import xml.etree.ElementTree as ET
-API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN')
+API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN')
 CFG=json.load(open('config/repos.json',encoding='utf-8')); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
 if TOKEN: S.headers['Authorization']='Bearer '+TOKEN
 
@@ -126,8 +126,34 @@ def branch_coverage(repo,branch):
   out['source']=f'No coverage report in latest {branch} run'
  except Exception as e:out.update(workflow_conclusion='error',source=str(e)[:180]);print(f'ERROR {repo}@{branch}: {e}',file=sys.stderr)
  return out
+PROJECT_QUERY="""query($org:String!,$num:Int!,$after:String){organization(login:$org){projectV2(number:$num){
+ items(first:100,after:$after){pageInfo{hasNextPage endCursor}
+  nodes{content{... on Issue{repository{nameWithOwner}} ... on PullRequest{repository{nameWithOwner}}}}}}}}"""
+def dpg_project_repos():
+ """Repos with an issue or PR on the DPG org project, or None if the project can't be read."""
+ proj=CFG.get('dpg_project') or {}
+ if not proj.get('number') or not PROJECT_TOKEN:return None
+ org=proj.get('org',ORG);names=set();after=None
+ try:
+  while True:
+   r=requests.post(API+'/graphql',json={'query':PROJECT_QUERY,'variables':{'org':org,'num':int(proj['number']),'after':after}},headers={'Authorization':'Bearer '+PROJECT_TOKEN},timeout=45)
+   r.raise_for_status();j=r.json()
+   if j.get('errors'):raise RuntimeError(j['errors'][0].get('message'))
+   items=j['data']['organization']['projectV2']['items']
+   for n in items['nodes']:
+    full=(((n or {}).get('content') or {}).get('repository') or {}).get('nameWithOwner') or ''
+    owner,_,name=full.partition('/')
+    if name and owner.lower()==ORG.lower():names.add(name)
+   if not items['pageInfo']['hasNextPage']:return sorted(names)
+   after=items['pageInfo']['endCursor']
+ except Exception as e:print(f'WARN DPG project #{proj.get("number")}: {e}; using dpg_repositories from config',file=sys.stderr);return None
 def main():
- repos=CFG.get('repositories',[]);results=[inspect(r) for r in repos]
+ dpg=dpg_project_repos()
+ if dpg is None:dpg=CFG.get('dpg_repositories',[])
+ else:print(f"DPG project lists {len(dpg)} repos: {', '.join(dpg)}")
+ CFG['dpg_repositories']=dpg;skip=set(CFG.get('exclude_repositories',[]))
+ repos=[r for r in dict.fromkeys(CFG.get('repositories',[])+dpg) if r not in skip]
+ results=[inspect(r) for r in repos]
  os.makedirs('data',exist_ok=True)
  with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'repositories':results},f,indent=2);f.write('\n')
  print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")
