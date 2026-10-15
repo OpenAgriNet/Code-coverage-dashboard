@@ -21,5 +21,14 @@
     "develop",
     "development"
   ],
-  "activity_days": 30
+  "activity_days": 30,
+  "dpg_repositories": [
+    "decision-support-system",
+    "discovery-service",
+    "engineering-tracker",
+    "helmcharts",
+    "infra-automation",
+    "network-adapter"
+  ],
+  "dpg_source": "OpenAgriNet org project #9 (repos with issues/PRs on the DPG board)"
 }

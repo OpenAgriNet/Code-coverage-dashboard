@@ -79,7 +79,7 @@ def details(repo):
  except Exception as e:print(f'WARN details {repo}: {e}',file=sys.stderr)
  return out
 def inspect(repo):
- out=inspect_coverage(repo);out.update(details(repo));return out
+ out=inspect_coverage(repo);out.update(details(repo));out['dpg']=repo in CFG.get('dpg_repositories',[]);return out
 def inspect_coverage(repo):
  url=f'https://github.com/{ORG}/{repo}';out={'owner':ORG,'repository':repo,'html_url':url,'coverage':None,'coverage_source':None,'workflow_conclusion':None,'workflow_url':url+'/actions','updated_at':None}
  cc=codecov(repo)
