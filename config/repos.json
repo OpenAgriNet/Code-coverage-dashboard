@@ -1,6 +1,7 @@
 {
   "organization": "OpenAgriNet",
-  "repositories": ["knowledge-provider", "decision-support-system", "helmcharts", "network-adapter", "voice-oan-api", "mahavistaar-ai-app", "bharat-oan-api", "network-specs", "amul-oan-api"],
+  "repositories": ["knowledge-provider", "decision-support-system", "helmcharts", "network-adapter"],
   "artifact_name_hints": [],
+  "workflow_names": ["CI"],
   "notes": "Starter list based on names visible in the screenshot. Add all repositories to track."
 }

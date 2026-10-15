@@ -4,7 +4,7 @@ import io, json, os, re, sys, zipfile
 from datetime import datetime, timezone
 import requests
 import xml.etree.ElementTree as ET
-API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN')
+API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN')
 CFG=json.load(open('config/repos.json',encoding='utf-8')); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
 if TOKEN: S.headers['Authorization']='Bearer '+TOKEN
 
@@ -51,13 +51,30 @@ def parse(name,raw):
     total=sum(int(x[1]) for x in lines);hit=sum(int(x[1]) for x in lines if int(x[2])>0);return (100*hit/total if total else 100.0),'Go coverprofile'
    except Exception:pass
  return None
+def codecov(repo):
+ h={'Accept':'application/json'}
+ if CODECOV_TOKEN:h['Authorization']='Bearer '+CODECOV_TOKEN
+ try:
+  u=f'https://api.codecov.io/api/v2/github/{ORG}/repos/{repo}/'
+  r=requests.get(u,headers=h,timeout=45)
+  if r.status_code in (401,403) and CODECOV_TOKEN:r=requests.get(u,headers={'Accept':'application/json'},timeout=45)
+  if r.status_code!=200:return None
+  j=r.json();c=(j.get('totals') or {}).get('coverage')
+  return (float(c),j.get('updatestamp')) if c is not None else None
+ except Exception as e:print(f'WARN codecov {repo}: {e}',file=sys.stderr);return None
 def inspect(repo):
  url=f'https://github.com/{ORG}/{repo}';out={'owner':ORG,'repository':repo,'html_url':url,'coverage':None,'coverage_source':None,'workflow_conclusion':None,'workflow_url':url+'/actions','updated_at':None}
+ cc=codecov(repo)
+ if cc:out.update(coverage=round(cc[0],2),coverage_source='Codecov',updated_at=cc[1])
  try:
-  d=api(f'/repos/{ORG}/{repo}/actions/runs?per_page=100') or {};runs=sorted([r for r in d.get('workflow_runs',[]) if r.get('status')=='completed'],key=lambda r:r.get('updated_at',''),reverse=True)
+  d=api(f'/repos/{ORG}/{repo}/actions/runs?per_page=100') or {};names=[n.lower() for n in CFG.get('workflow_names',[])]
+  runs=sorted([r for r in d.get('workflow_runs',[]) if r.get('status')=='completed' and (not names or r.get('name','').lower() in names)],key=lambda r:r.get('updated_at',''),reverse=True)
   run=next((r for r in runs if r.get('conclusion')=='success'),runs[0] if runs else None)
-  if not run:out['workflow_conclusion']='no completed run';return out
-  out.update(workflow_conclusion=run.get('conclusion'),workflow_url=run.get('html_url'),updated_at=run.get('updated_at'))
+  if not run:
+   out['workflow_conclusion']='no completed run';return out
+  out.update(workflow_conclusion=run.get('conclusion'),workflow_url=run.get('html_url'))
+  if cc:return out
+  out['updated_at']=run.get('updated_at')
   arts=(api(f"/repos/{ORG}/{repo}/actions/runs/{run['id']}/artifacts?per_page=100") or {}).get('artifacts',[])
   hints=CFG.get('artifact_name_hints',[])
   for a in arts:
