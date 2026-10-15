@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""Aggregate supported coverage reports from existing GitHub Actions artifacts."""
+import io, json, os, re, sys, zipfile
+from datetime import datetime, timezone
+import requests
+import xml.etree.ElementTree as ET
+API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN')
+CFG=json.load(open('config/repos.json',encoding='utf-8')); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+if TOKEN: S.headers['Authorization']='Bearer '+TOKEN
+
+def api(path):
+ r=S.get(API+path,timeout=45)
+ if r.status_code==404:return None
+ r.raise_for_status();return r.json()
+def xml_pct(raw):
+ try: root=ET.fromstring(raw)
+ except Exception:return None
+ for k in ('line-rate','lineRate'):
+  if root.attrib.get(k) is not None:
+   try:
+    x=float(root.attrib[k]);return x*100 if x<=1 else x
+   except ValueError:pass
+ for c in root.findall('.//counter'):
+  if c.attrib.get('type')=='LINE' and 'covered' in c.attrib and 'missed' in c.attrib:
+   n=int(c.attrib['covered'])+int(c.attrib['missed']);return 100*int(c.attrib['covered'])/n if n else 100.0
+ for n in root.iter():
+  if n.tag.lower().endswith('metrics') and 'coveredstatements' in n.attrib and 'statements' in n.attrib:
+   total=int(n.attrib['statements']);return 100*int(n.attrib['coveredstatements'])/total if total else 100.0
+ return None
+def parse(name,raw):
+ low=name.lower()
+ if low.endswith('.xml') and any(k in low for k in ('coverage','cobertura','clover','jacoco')):
+  p=xml_pct(raw)
+  if p is not None:return p,'XML'
+ if low.endswith(('lcov.info','.lcov')):
+  t=raw.decode('utf-8','replace');lf=re.findall(r'^LF:(\d+)$',t,re.M);lh=re.findall(r'^LH:(\d+)$',t,re.M)
+  if lf and lh:
+   n=sum(map(int,lf));return (100*sum(map(int,lh))/n if n else 100.0),'LCOV'
+ if low.endswith('.json') and ('coverage' in low or 'summary' in low):
+  try:o=json.loads(raw)
+  except Exception:return None
+  t=o.get('total',o);lines=t.get('lines',{}) if isinstance(t,dict) else {}
+  if isinstance(lines,dict) and 'pct' in lines:return float(lines['pct']),'JSON lines'
+  for k in ('line_coverage','lineCoverage','coverage'):
+   if isinstance(t,dict) and isinstance(t.get(k),(int,float)):
+    x=float(t[k]);return (x*100 if 0<=x<=1 else x),'JSON'
+ if low.endswith(('.txt','.out')) and ('coverage' in low or 'coverprofile' in low):
+  lines=[x.split() for x in raw.decode('utf-8','replace').splitlines() if x and not x.startswith('mode:')]
+  if lines and all(len(x)>=3 for x in lines):
+   try:
+    total=sum(int(x[1]) for x in lines);hit=sum(int(x[1]) for x in lines if int(x[2])>0);return (100*hit/total if total else 100.0),'Go coverprofile'
+   except Exception:pass
+ return None
+def inspect(repo):
+ url=f'https://github.com/{ORG}/{repo}';out={'owner':ORG,'repository':repo,'html_url':url,'coverage':None,'coverage_source':None,'workflow_conclusion':None,'workflow_url':url+'/actions','updated_at':None}
+ try:
+  d=api(f'/repos/{ORG}/{repo}/actions/runs?per_page=100') or {};runs=sorted([r for r in d.get('workflow_runs',[]) if r.get('status')=='completed'],key=lambda r:r.get('updated_at',''),reverse=True)
+  run=next((r for r in runs if r.get('conclusion')=='success'),runs[0] if runs else None)
+  if not run:out['workflow_conclusion']='no completed run';return out
+  out.update(workflow_conclusion=run.get('conclusion'),workflow_url=run.get('html_url'),updated_at=run.get('updated_at'))
+  arts=(api(f"/repos/{ORG}/{repo}/actions/runs/{run['id']}/artifacts?per_page=100") or {}).get('artifacts',[])
+  hints=CFG.get('artifact_name_hints',[])
+  for a in arts:
+   if a.get('expired') or (hints and not any(h.lower() in a.get('name','').lower() for h in hints)):continue
+   try:
+    zresp=S.get(f"{API}/repos/{ORG}/{repo}/actions/artifacts/{a['id']}/zip",timeout=90);zresp.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(zresp.content)) as z:
+     for member in z.namelist():
+      if member.endswith('/'):continue
+      val=parse(member,z.read(member))
+      if val:out.update(coverage=round(val[0],2),coverage_source=f'{val[1]} · {a["name"]}');return out
+   except Exception as e:print(f'WARN {repo}/{a.get("name")}: {e}',file=sys.stderr)
+  out['coverage_source']='No supported report in latest run artifacts'
+ except Exception as e:out.update(workflow_conclusion='error',coverage_source=str(e)[:180]);print(f'ERROR {repo}: {e}',file=sys.stderr)
+ return out
+def main():
+ repos=CFG.get('repositories',[]);results=[inspect(r) for r in repos]
+ os.makedirs('data',exist_ok=True)
+ with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'repositories':results},f,indent=2);f.write('\n')
+ print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")
+if __name__=='__main__':main()
