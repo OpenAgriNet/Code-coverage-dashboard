@@ -54,11 +54,11 @@ def test_inspect_record_shape(monkeypatch):
     assert 'last_merged_pr' not in rec and 'main_commits_recent' not in rec and 'dev_coverage' not in rec
 
 def test_latest_release_picks_highest_version(monkeypatch):
-    monkeypatch.setattr(a, 'api', lambda p: [{'name': 'release-0.0.9'}, {'name': 'release-0.0.10'}, {'name': 'main'}])
+    monkeypatch.setattr(a, 'api', lambda p: [{'ref': 'refs/heads/release-0.0.9'}, {'ref': 'refs/heads/release-0.0.10'}])
     assert a.latest_release_branch('na', 'release-') == 'release-0.0.10'
 
 def test_latest_release_none_when_no_release_branch(monkeypatch):
-    monkeypatch.setattr(a, 'api', lambda p: [{'name': 'main'}])
+    monkeypatch.setattr(a, 'api', lambda p: [])
     assert a.latest_release_branch('kp', 'release-') is None
 
 def test_collect_adds_main_view_and_reuses_record_when_branch_is_default(monkeypatch):
@@ -76,3 +76,26 @@ def test_collect_adds_main_view_and_reuses_record_when_branch_is_default(monkeyp
     assert [r['branch'] for r in got['main']] == ['main', 'main']
     assert [r['branch'] for r in got['releases']] == ['release-0.0.2']
     assert calls.count(('dss', 'main')) == 1  # main record reused, not measured twice
+
+def test_collect_survives_api_error_for_one_repo(monkeypatch):
+    def fake_inspect(t):
+        if t['name'] == 'broken':
+            raise RuntimeError('502 Bad Gateway')
+        return {'repository': t['name'], 'branch': 'main'}
+    monkeypatch.setattr(a, 'inspect', fake_inspect)
+    monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
+    monkeypatch.setattr(a, 'latest_release_branch', lambda repo, prefix: None)
+    got = a.collect([{'name': 'broken', 'branch': None, 'security_workflow': 'security.yml'},
+                     {'name': 'ok', 'branch': None, 'security_workflow': 'security.yml'}], 'release-')
+    assert [r['repository'] for r in got['repositories']] == ['broken', 'ok']
+    assert got['repositories'][0]['security']['state'] == 'unknown'
+    assert got['repositories'][0]['coverage'] is None
+
+def test_latest_release_ignores_non_version_branches_and_ranks_rc_below_final(monkeypatch):
+    seen = []
+    def fake(path):
+        seen.append(path)
+        return [{'ref': 'refs/heads/' + n} for n in ['release-notes', 'release-0.1.0-rc1', 'release-0.1.0', 'release-0.0.9']]
+    monkeypatch.setattr(a, 'api', fake)
+    assert a.latest_release_branch('na', 'release-') == 'release-0.1.0'
+    assert seen == ['/repos/OpenAgriNet/na/git/matching-refs/heads/release-']

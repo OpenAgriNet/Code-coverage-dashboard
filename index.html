@@ -134,6 +134,7 @@ const SEC={passing:'Passing',failing:'Failing','no runs':'No runs on this branch
 function row(r){
   const url=repoUrl(r),cd=r.coverage_detail||{},s=r.security||{};
   const cov=r.branch_exists===false?'<span class="muted">Branch not found</span>'
+    :!r.coverage_badge_url?`<span class="muted">${esc(r.coverage_source||'Unknown')}</span>`
     :`<a class="badge" href="${esc(cd.report_url||url)}" target="_blank" rel="noopener"><img src="${esc(r.coverage_badge_url)}" alt="Coverage ${isNum(r.coverage)?(+r.coverage).toFixed(2)+'%':'unknown'}"></a>`
      +(cd.lines?`<div class="sub">${num(cd.hits)} of ${num(cd.lines)} lines covered</div>`:isNum(r.coverage)?'':'<div class="sub">No report on this branch</div>')
      +(day(r.measured_at)?`<div class="sub">Measured ${esc(day(r.measured_at))}</div>`:'');

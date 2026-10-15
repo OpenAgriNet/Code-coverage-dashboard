@@ -148,10 +148,14 @@ def security_status(repo,branch,workflow):
  r=runs[0];out.update(state='passing' if r.get('conclusion')=='success' else 'failing',run_url=r.get('html_url'),finished_at=r.get('updated_at'))
  return out
 def latest_release_branch(repo,prefix):
- """Highest-versioned branch starting with `prefix` (release-0.0.10 beats release-0.0.9), or None."""
- names=[b['name'] for b in (api(f'/repos/{ORG}/{repo}/branches?per_page=100') or []) if b['name'].startswith(prefix)]
- key=lambda n:[(0,int(x),'') if x.isdigit() else (1,0,x) for x in re.split(r'[.\-]',n[len(prefix):])]
- return max(names,key=key) if names else None
+ """Highest version branch named prefix+N.N.N (an -rcN suffix ranks below the final release); other names are ignored."""
+ pat=re.compile('^'+re.escape(prefix)+r'(\d+(?:\.\d+)*)(?:-rc(\d+))?$');best=None
+ for ref in api(f'/repos/{ORG}/{repo}/git/matching-refs/heads/{prefix}') or []:
+  name=ref.get('ref','')[len('refs/heads/'):];m=pat.match(name)
+  if not m:continue
+  key=(tuple(int(x) for x in m.group(1).split('.')),0 if m.group(2) else 1,int(m.group(2) or 0))
+  if best is None or key>best[0]:best=(key,name)
+ return best[1] if best else None
 def repo_targets(cfg,dpg):
  """Configured repos (objects or plain names) plus project-discovered ones, minus exclusions; first entry wins."""
  skip=set(cfg.get('exclude_repositories',[]));out={}
@@ -160,14 +164,25 @@ def repo_targets(cfg,dpg):
   if e['name'] in skip or e['name'] in out:continue
   out[e['name']]={'name':e['name'],'branch':e.get('branch'),'security_workflow':e.get('security_workflow','security.yml')}
  return list(out.values())
+def safe_inspect(t):
+ """inspect(), but one repo's API failure becomes an 'unknown' row instead of stopping the whole refresh."""
+ try:return inspect(t)
+ except Exception as e:
+  print(f'ERROR {t["name"]}@{t.get("branch")}: {e}',file=sys.stderr)
+  return {'repository':t['name'],'html_url':f'https://github.com/{ORG}/{t["name"]}','dpg':t['name'] in CFG.get('dpg_repositories',[]),'branch':t.get('branch') or 'default','branch_exists':None,
+   'coverage':None,'coverage_source':f'Error: {str(e)[:120]}','coverage_commit':None,'coverage_detail':None,'coverage_badge_url':None,'measured_at':None,
+   'security':{'state':'unknown','run_url':None,'badge_url':None,'finished_at':None}}
 def collect(targets,prefix):
  """Configured-branch view, default-branch (main) view, and latest-release view for every target."""
  dev,main,rel=[],[],[]
  for t in targets:
-  r=inspect(t);dev.append(r);d=default_branch(t['name'])
-  main.append(r if r['branch']==d else inspect({**t,'branch':d}))
-  rb=latest_release_branch(t['name'],prefix)
-  if rb:rel.append(inspect({**t,'branch':rb}))
+  r=safe_inspect(t);dev.append(r)
+  try:d=default_branch(t['name'])
+  except Exception as e:print(f'ERROR {t["name"]} default branch: {e}',file=sys.stderr);d=None
+  main.append(r if d is None or r['branch']==d else safe_inspect({**t,'branch':d}))
+  try:rb=latest_release_branch(t['name'],prefix)
+  except Exception as e:print(f'ERROR {t["name"]} release branches: {e}',file=sys.stderr);rb=None
+  if rb:rel.append(safe_inspect({**t,'branch':rb}))
  return {'repositories':dev,'main':main,'releases':rel}
 def main():
  dpg=dpg_project_repos()
