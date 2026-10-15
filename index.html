@@ -3,22 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OpenAgriNet Coverage</title>
+<title>OpenAgriNet DPG coverage</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#F1F4EC;--surface:#FFFFFF;--ink:#1D2A1F;--muted:#5D6B5F;--line:#D5DCCD;--track:#E2E8DA;
-  --hatch:#C9D1BF;--good:#2E7A3A;--warn:#A87708;--bad:#B3261E;--dev:#6B9C74;--link:#1F5F8B;--focus:#1F5F8B;
+  --good:#2E7A3A;--warn:#A87708;--bad:#B3261E;--link:#1F5F8B;--focus:#1F5F8B;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#121914;--surface:#19221B;--ink:#E3EBDD;--muted:#9AA99C;--line:#2C392F;--track:#243027;
-  --hatch:#334236;--good:#5DBB6B;--warn:#D9A53A;--bad:#EF6A5F;--dev:#8FC79A;--link:#7DB7E0;--focus:#7DB7E0;color-scheme:dark}}
+  --good:#5DBB6B;--warn:#D9A53A;--bad:#EF6A5F;--link:#7DB7E0;--focus:#7DB7E0;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#121914;--surface:#19221B;--ink:#E3EBDD;--muted:#9AA99C;--line:#2C392F;--track:#243027;
-  --hatch:#334236;--good:#5DBB6B;--warn:#D9A53A;--bad:#EF6A5F;--dev:#8FC79A;--link:#7DB7E0;--focus:#7DB7E0;color-scheme:dark}
+  --good:#5DBB6B;--warn:#D9A53A;--bad:#EF6A5F;--link:#7DB7E0;--focus:#7DB7E0;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Public Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
 main{max-width:1160px;margin:0 auto;padding:40px 24px 64px}
@@ -29,35 +29,8 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 header{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
 h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.15}
 .updated{color:var(--muted);font-size:13px}
-.summary{font-size:18px;max-width:62ch;margin:14px 0 0;color:var(--muted)}
+.summary{font-size:18px;max-width:62ch;margin:14px 0 32px;color:var(--muted)}
 .summary strong{color:var(--ink);font-weight:600}
-
-/* Field chart: the one bold element */
-.field{margin:32px 0 40px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 24px 18px}
-.field-head{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
-.field-head h2{font-size:16px;margin:0;font-weight:600}
-.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-.legend span{display:inline-flex;align-items:center;gap:7px}
-.sw{display:inline-block;width:18px;height:8px;border-radius:2px;background:var(--good)}
-.sw.dev{height:4px;background:var(--dev)}
-.sw.none{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 7px);border:1px solid var(--hatch)}
-.sw.goal{width:0;height:12px;border-left:2px dashed var(--muted);border-radius:0}
-.frow{display:grid;grid-template-columns:250px 1fr 150px;align-items:center;gap:16px;padding:9px 0;border-top:1px solid var(--line)}
-.frow:first-child{border-top:0}
-.fname{font-weight:600;white-space:nowrap}
-.fname .tag{margin-left:6px}
-.bars{position:relative;display:grid;gap:4px}
-.track{position:relative;height:14px;background:var(--track);border-radius:3px;overflow:hidden}
-.track.dev{height:6px}
-.track.none{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 7px)}
-.fill{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--good);transform-origin:left;animation:grow .9s cubic-bezier(.2,.7,.2,1) both}
-.fill.warn{background:var(--warn)}.fill.bad{background:var(--bad)}
-.track.dev .fill{background:var(--dev)}
-.target{position:absolute;top:-4px;bottom:-4px;left:80%;border-left:2px dashed var(--muted);opacity:.55;pointer-events:none}
-.fval{text-align:right;font-weight:800;font-size:18px;line-height:1.1}
-.fval small{display:block;white-space:nowrap;font-weight:500;font-size:12px;color:var(--muted);margin-top:3px}
-@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-@media (prefers-reduced-motion:reduce){.fill{animation:none}}
 
 /* Details table */
 .details-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:12px}
@@ -97,9 +70,6 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
 @media (max-width:700px){
   main{padding:28px 16px 48px}
   h1{font-size:25px}.summary{font-size:16px}
-  .field{padding:18px 16px 12px}
-  .frow{grid-template-columns:1fr auto;gap:6px 12px}
-  .fname{grid-column:1}.fval{grid-column:2;grid-row:1}.bars{grid-column:1/-1}
   .controls input[type=search]{width:100%}.controls{width:100%}
 }
 </style>
@@ -107,23 +77,10 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
 <body>
 <main>
   <header>
-    <h1>OpenAgriNet code coverage</h1>
+    <h1>OpenAgriNet DPG repositories code coverage</h1>
     <span class="updated" id="updated">Loading data…</span>
   </header>
   <p class="summary" id="summary">Reading the latest coverage reports.</p>
-
-  <section class="field" aria-labelledby="field-title">
-    <div class="field-head">
-      <h2 id="field-title">Line coverage by repository</h2>
-      <div class="legend" aria-hidden="true">
-        <span><i class="sw"></i>main</span>
-        <span><i class="sw dev"></i>development</span>
-        <span><i class="sw none"></i>no report</span>
-        <span><i class="sw goal"></i>80% target</span>
-      </div>
-    </div>
-    <div id="field"></div>
-  </section>
 
   <section aria-labelledby="details-title">
     <div class="details-head">
@@ -163,7 +120,7 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
     <details class="how">
       <summary>How coverage is measured</summary>
       <ul>
-        <li><b>Branches.</b> The default branch (usually <code>main</code>) and, if the repository has one, its <code>dev</code>, <code>develop</code> or <code>development</code> branch. The summary and sorting use the default branch.</li>
+        <li><b>Branches.</b> The default branch (usually <code>main</code>) and, if the repository has one, its <code>dev</code>, <code>develop</code> or <code>development</code> branch, shown only when that branch has a coverage report. The summary and sorting use the default branch.</li>
         <li><b>Codecov first.</b> Line coverage Codecov reports for the latest uploaded commit on that branch. Partially covered lines count as not covered.</li>
         <li><b>CI report second.</b> If Codecov has nothing, the coverage file (Cobertura or JaCoCo XML, LCOV, Istanbul JSON, Go cover profile) saved by the latest completed <code>CI</code> run on that branch.</li>
         <li><b>Measured.</b> Commit time of the measured commit, or finish time of the CI run.</li>
@@ -185,21 +142,6 @@ const repoUrl=r=>r.html_url||`https://github.com/${r.owner||'OpenAgriNet'}/${r.r
 const failed=r=>['failure','cancelled','error'].includes(r.workflow_conclusion);
 const dpgTag=r=>r.dpg?'<span class="tag" title="Part of the OpenAgriNet DPG project">DPG</span>':'';
 
-function bar(c,dev){
-  if(!isNum(c))return `<div class="track${dev?' dev':''} none"></div>`;
-  c=Number(c);return `<div class="track${dev?' dev':''}"><div class="fill ${tone(c)}" style="width:${Math.max(0,Math.min(100,c))}%"></div></div>`;
-}
-function renderField(){
-  const a=[...all].sort((x,y)=>(isNum(y.coverage)?+y.coverage:-1)-(isNum(x.coverage)?+x.coverage:-1)||x.repository.localeCompare(y.repository));
-  $('field').innerHTML=a.map(r=>{
-    const d=r.dev_coverage,c=r.coverage;
-    const val=isNum(c)?`<span class="${tone(+c)}">${(+c).toFixed(1)}%</span>`:'<span class="muted" style="font-weight:500;font-size:14px">No report</span>';
-    const dv=d?`<small>${esc(d.branch)} ${isNum(d.coverage)?(+d.coverage).toFixed(1)+'%':'none'}</small>`:'';
-    return `<div class="frow"><a class="fname" href="#repo-${esc(r.repository)}">${esc(r.repository)}${dpgTag(r)}</a>
-      <div class="bars">${bar(c,false)}${d?bar(d.coverage,true):''}<div class="target"></div></div>
-      <div class="fval">${val}${dv}</div></div>`;
-  }).join('')||'<p class="muted">No repositories configured.</p>';
-}
 function covBlock(r,br,c,cd,sha,src){
   cd=cd||{};const url=repoUrl(r);
   const commit=sha?`<a href="${esc(url)}/commit/${esc(sha)}">${esc(String(sha).slice(0,7))}</a>`:'';
@@ -217,7 +159,7 @@ function render(){
   a.sort((x,y)=>sort==='name-asc'?x.repository.localeCompare(y.repository):sort==='coverage-asc'?cv(x)-cv(y):sort==='updated-desc'?t(y.updated_at)-t(x.updated_at):sort==='activity-desc'?(y.main_commits_recent??-1)-(x.main_commits_recent??-1):sort==='pr-desc'?t(y.last_merged_pr?.merged_at)-t(x.last_merged_pr?.merged_at):cv(y)-cv(x));
   $('rows').innerHTML=a.length?a.map(r=>{
     const url=repoUrl(r),d=r.dev_coverage;
-    const cov=covBlock(r,r.coverage_branch||r.default_branch||'main',r.coverage,r.coverage_detail,r.coverage_commit,r.coverage_source)+(d?covBlock(r,d.branch,d.coverage,d.detail,d.commit,d.source):'');
+    const cov=covBlock(r,r.coverage_branch||r.default_branch||'main',r.coverage,r.coverage_detail,r.coverage_commit,r.coverage_source)+(d&&isNum(d.coverage)?covBlock(r,d.branch,d.coverage,d.detail,d.commit,d.source):'');
     const ci=r.workflow_conclusion==='success'?'<span class="pill good">Passing</span>':failed(r)?`<span class="pill bad">${esc(r.workflow_conclusion==='failure'?'Failing':r.workflow_conclusion)}</span>`:'<span class="pill">No CI run</span>';
     const devs=r.dev_branches||[];
     const dev=devs.length?devs.map(b=>`<a href="${esc(url)}/tree/${esc(b)}">${esc(b)}</a>`).join(', '):'<span class="muted">None</span>';
@@ -241,7 +183,7 @@ async function init(){
     const met=h.filter(r=>+r.coverage>=80).length;
     $('updated').textContent=d.generated_at?'Updated '+new Date(d.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Not refreshed yet';
     $('summary').innerHTML=all.length?`<strong>${h.length} of ${all.length}</strong> repositories report coverage on main${avg!=null?`, averaging <strong>${avg.toFixed(1)}%</strong>`:''}. <strong>${met}</strong> meet the 80% target.`:'No repositories are configured yet. Add them to <code>config/repos.json</code>.';
-    renderField();render();
+    render();
   }catch(e){
     $('updated').textContent='Data unavailable';
     $('summary').textContent='Coverage data could not be loaded. Run the refresh workflow and check its logs.';

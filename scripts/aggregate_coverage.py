@@ -91,7 +91,9 @@ def inspect(repo):
  out={'owner':ORG,'repository':repo,'html_url':url,'dpg':repo in CFG.get('dpg_repositories',[]),'default_branch':branch,'dev_branches':devs,
   'coverage':m['coverage'],'coverage_source':m['source'],'coverage_branch':branch,'coverage_commit':m['commit'],'coverage_detail':m['detail'],'updated_at':m['measured_at'],
   'workflow_conclusion':m['workflow_conclusion'],'workflow_url':m['workflow_url'] or url+'/actions',
-  'dev_coverage':branch_coverage(repo,devs[0]) if devs else None}
+  'dev_coverage':None}
+ dc=branch_coverage(repo,devs[0]) if devs else None
+ if dc and dc['coverage'] is not None:out['dev_coverage']=dc
  out.update(details(repo,branch));return out
 def branch_coverage(repo,branch):
  """Coverage of one branch: Codecov first, else artifacts of the latest CI run on that branch."""
