@@ -128,9 +128,10 @@ def branch_coverage(repo,branch):
  return out
 PROJECT_QUERY="""query($org:String!,$num:Int!,$after:String){organization(login:$org){projectV2(number:$num){
  items(first:100,after:$after){pageInfo{hasNextPage endCursor}
-  nodes{content{... on Issue{repository{nameWithOwner}} ... on PullRequest{repository{nameWithOwner}}}}}}}}"""
+  nodes{content{... on Issue{repository{nameWithOwner isPrivate}} ... on PullRequest{repository{nameWithOwner isPrivate}}}}}}}}"""
 def dpg_project_repos():
- """Repos with an issue or PR on the DPG org project, or None if the project can't be read."""
+ """Public repos with an issue or PR on the DPG org project, or None if the project can't be read.
+ The dashboard is published openly, so private repos found on the project are never added."""
  proj=CFG.get('dpg_project') or {}
  if not proj.get('number') or not PROJECT_TOKEN:return None
  org=proj.get('org',ORG);names=set();after=None
@@ -141,9 +142,9 @@ def dpg_project_repos():
    if j.get('errors'):raise RuntimeError(j['errors'][0].get('message'))
    items=j['data']['organization']['projectV2']['items']
    for n in items['nodes']:
-    full=(((n or {}).get('content') or {}).get('repository') or {}).get('nameWithOwner') or ''
-    owner,_,name=full.partition('/')
-    if name and owner.lower()==ORG.lower():names.add(name)
+    repo=((n or {}).get('content') or {}).get('repository') or {}
+    owner,_,name=(repo.get('nameWithOwner') or '').partition('/')
+    if name and owner.lower()==ORG.lower() and repo.get('isPrivate') is False:names.add(name)
    if not items['pageInfo']['hasNextPage']:return sorted(names)
    after=items['pageInfo']['endCursor']
  except Exception as e:print(f'WARN DPG project #{proj.get("number")}: {e}; using dpg_repositories from config',file=sys.stderr);return None
