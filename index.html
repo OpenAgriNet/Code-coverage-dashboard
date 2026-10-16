@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenAgriNet DPG coverage</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%232E7A3A%22/%3E%3Cpath d=%22M4 8.5l2.5 2.5L12 5.5%22 stroke=%22white%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -65,7 +66,15 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
   main{padding:28px 16px 48px}
   h1{font-size:25px}.summary{font-size:16px}
   .controls,.controls input[type=search]{width:100%}
+  table{min-width:0;table-layout:auto}
+  thead{display:none}
+  tbody tr{display:block;padding:12px 16px;border-bottom:1px solid var(--line)}
+  tbody tr:last-child{border-bottom:0}
+  td{display:block;border:0;padding:5px 0}
+  td[data-label]::before{content:attr(data-label);display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:3px}
 }
+.stale{color:var(--warn)}
+.fallback{font-weight:600}
 </style>
 </head>
 <body>
@@ -91,7 +100,7 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
       </div>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Repository</th><th>Code coverage</th><th>Security</th></tr></thead>
+      <thead><tr><th scope="col">Repository</th><th scope="col">Code coverage</th><th scope="col">Security</th></tr></thead>
       <tbody id="dev-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
     </table></div>
   </section>
@@ -102,7 +111,7 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
       <p class="sub">Each repository's highest <code>release-*</code> branch.</p>
     </div></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Repository</th><th>Code coverage</th><th>Security</th></tr></thead>
+      <thead><tr><th scope="col">Repository</th><th scope="col">Code coverage</th><th scope="col">Security</th></tr></thead>
       <tbody id="rel-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
     </table></div>
   </section>
@@ -114,6 +123,7 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
       <li><b>Code coverage.</b> The badge is Codecov's live badge for that branch. The line count underneath comes from the last refresh: Codecov first, otherwise the coverage file saved by the latest <code>CI</code> run on that branch. Partially covered lines count as not covered.</li>
       <li><b>Security.</b> The latest completed run of the repo's <code>security.yml</code> on that branch. <i>No runs on this branch</i> means the workflow does not run there; it is not a failure.</li>
       <li><b>Refresh data</b> opens the refresh workflow on GitHub; click <i>Run workflow</i> there (needs write access to this repo). The badges are always live; line counts and run links update when the run finishes.</li>
+      <li><b>Stale coverage.</b> A <i>Measured</i> date more than 14 days old is shown in amber: that branch has had no coverage upload for two weeks.</li>
       <li><b>Dates.</b> <i>Measured</i> is the commit time of the commit whose coverage is shown (or the CI run time). <i>Last run</i> is when the latest security run on that branch finished.</li>
       <li><b>No report</b> or an <i>unknown</i> badge means nothing was uploaded for that branch. It does not mean 0%. This dashboard never reruns tests.</li>
     </ul>
@@ -129,30 +139,34 @@ const num=v=>Number(v).toLocaleString();
 const day=v=>{if(!v)return '';const d=new Date(v);return isNaN(d)?'':d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})};
 const repoUrl=r=>r.html_url||`https://github.com/OpenAgriNet/${r.repository}`;
 const dpgTag=r=>r.dpg?'<span class="tag" title="Part of the OpenAgriNet DPG project">DPG</span>':'';
+const STALE_DAYS=14;
+document.addEventListener('error',e=>{const i=e.target;if(i.tagName==='IMG'&&i.dataset.fallback){const t=document.createElement('span');t.className='fallback';t.textContent=i.dataset.fallback;i.replaceWith(t)}},true);
 const SEC={passing:'Passing',failing:'Failing','no runs':'No runs on this branch','no workflow':'No security workflow','branch not found':'Branch not found'};
 
 function row(r){
   const url=repoUrl(r),cd=r.coverage_detail||{},s=r.security||{};
+  const age=r.measured_at?Math.floor((Date.now()-new Date(r.measured_at))/864e5):null;
+  const measured=day(r.measured_at)?`<div class="sub${age>STALE_DAYS?' stale':''}">Measured ${esc(day(r.measured_at))}${age>STALE_DAYS?` (${age} days ago)`:''}</div>`:'';
   const cov=r.branch_exists===false?'<span class="muted">Branch not found</span>'
-    :!r.coverage_badge_url?`<span class="muted">${esc(r.coverage_source||'Unknown')}</span>`
-    :`<a class="badge" href="${esc(cd.report_url||url)}" target="_blank" rel="noopener"><img src="${esc(r.coverage_badge_url)}" alt="Coverage ${isNum(r.coverage)?(+r.coverage).toFixed(2)+'%':'unknown'}"></a>`
-     +(cd.lines?`<div class="sub">${num(cd.hits)} of ${num(cd.lines)} lines covered</div>`:isNum(r.coverage)?'':'<div class="sub">No report on this branch</div>')
-     +(day(r.measured_at)?`<div class="sub">Measured ${esc(day(r.measured_at))}</div>`:'');
+    :!isNum(r.coverage)?`<span class="muted">${esc(r.coverage_badge_url?'No report on this branch':(r.coverage_source||'Unknown'))}</span>`
+    :`<a class="badge" href="${esc(cd.report_url||url)}" target="_blank" rel="noopener"><img src="${esc(r.coverage_badge_url)}" data-fallback="${(+r.coverage).toFixed(2)}%" alt="Coverage ${isNum(r.coverage)?(+r.coverage).toFixed(2)+'%':'unknown'}"></a>`
+     +(cd.lines?`<div class="sub">${num(cd.hits)} of ${num(cd.lines)} lines covered</div>`:'')+measured;
   const label=SEC[s.state]||'Unknown';
   const sec=(s.badge_url&&s.state!=='no runs'
-    ?`<a class="badge" href="${esc(s.run_url||url+'/actions')}" target="_blank" rel="noopener"><img src="${esc(s.badge_url)}" alt="Security ${esc(label)}"></a>`
+    ?`<a class="badge" href="${esc(s.run_url||url+'/actions')}" target="_blank" rel="noopener"><img src="${esc(s.badge_url)}" data-fallback="${esc(label)}" alt="Security ${esc(label)}"></a>`
     :`<span class="muted">${esc(label)}</span>`)
     +(day(s.finished_at)?`<div class="sub">Last run ${esc(day(s.finished_at))}</div>`:'');
-  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${dpgTag(r)}<div class="sub">${esc(r.branch)}</div></td><td>${cov}</td><td>${sec}</td></tr>`;
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${dpgTag(r)}<div class="sub">${esc(r.branch)}</div></td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
 }
 function fill(id,list,empty){
-  const q=$('search').value.toLowerCase(),a=list.filter(r=>r.repository.toLowerCase().includes(q));
+  const q=$('search').value.toLowerCase(),cv=r=>isNum(r.coverage)?+r.coverage:-1;
+  const a=list.filter(r=>r.repository.toLowerCase().includes(q)).sort((x,y)=>cv(y)-cv(x)||x.repository.localeCompare(y.repository));
   $(id).innerHTML=a.length?a.map(row).join(''):`<tr><td colspan="3" class="empty">${q?'No repositories match.':empty}</td></tr>`;
 }
 const viewList=()=>(view==='main'?data.main:data.repositories)||[];
 function summary(){
-  const all=viewList(),has=all.filter(r=>isNum(r.coverage)).length,pass=all.filter(r=>(r.security||{}).state==='passing').length;
-  $('summary').innerHTML=all.length?`On their ${view==='main'?'main':'development'} branches, <strong>${has} of ${all.length}</strong> repositories report coverage and <strong>${pass}</strong> pass security.`:'No repositories are configured yet.';
+  const all=viewList(),has=all.filter(r=>isNum(r.coverage)).length,st=k=>all.filter(r=>(r.security||{}).state===k).length,pass=st('passing'),fail=st('failing');
+  $('summary').innerHTML=all.length?`On their ${view==='main'?'main':'development'} branches, <strong>${has} of ${all.length}</strong> repositories report coverage. Security: <strong>${pass}</strong> passing, <strong class="${fail?'bad':''}">${fail}</strong> failing.`:'No repositories are configured yet.';
 }
 function setView(v){
   view=v;try{localStorage.setItem('branchView',v)}catch(e){}
