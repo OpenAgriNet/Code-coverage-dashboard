@@ -2,7 +2,7 @@ name: Refresh and deploy coverage dashboard
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '17 */24 * * *'
   push:
     branches: [main]
     paths: ['index.html', 'config/**', 'scripts/**', '.github/workflows/deploy.yml']
