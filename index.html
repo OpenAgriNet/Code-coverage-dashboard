@@ -157,9 +157,9 @@ const LOOKED_UP=['npm','python','golang'];
 function stackRow(r){
   const url=repoUrl(r),deps=r.dependencies||[],langs=(r.languages||[]).slice(0,3).map(l=>l[0]).join(' · '),techs=r.techs||[];
   const lic=r.license?`<span class="lic">${esc(r.license)}</span>`:'<span class="lic none">No LICENSE file</span>';
-  const known=deps.filter(d=>d.license).length,pkgs=deps.filter(d=>LOOKED_UP.includes(d.ecosystem)).length;
+  const vuln=deps.filter(d=>d.vulns&&d.vulns.count).length,known=deps.filter(d=>d.license).length,pkgs=deps.filter(d=>LOOKED_UP.includes(d.ecosystem)).length;
   const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
-    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>`
+    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=1">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
     :'<span class="muted">None found</span>';
   return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}</div></td>`
     +`<td data-label="License">${lic}</td>`
