@@ -4,6 +4,7 @@ import io, json, os, re, sys, zipfile
 from datetime import datetime, timezone
 import requests
 from repoconfig import load as load_config, resolve
+from releasefind import find_versions
 import xml.etree.ElementTree as ET
 API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN')
 CFG=load_config('config/repos.json'); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
@@ -52,14 +53,15 @@ def parse(name,raw):
     total=sum(int(x[1]) for x in lines);hit=sum(int(x[1]) for x in lines if int(x[2])>0);return (100*hit/total if total else 100.0),'Go coverprofile'
    except Exception:pass
  return None
-def codecov(repo,branch):
- """Codecov totals for the latest uploaded commit on `branch`."""
+def codecov(repo,branch,sha=None):
+ """Codecov totals for the latest uploaded commit on `branch`, or for commit `sha` when given."""
  h={'Accept':'application/json'}
  if CODECOV_TOKEN:h['Authorization']='Bearer '+CODECOV_TOKEN
  try:
   u=f'https://api.codecov.io/api/v2/github/{ORG}/repos/{repo}/totals/'
-  r=requests.get(u,headers=h,params={'branch':branch},timeout=45)
-  if r.status_code in (401,403) and CODECOV_TOKEN:r=requests.get(u,headers={'Accept':'application/json'},params={'branch':branch},timeout=45)
+  q={'sha':sha} if sha else {'branch':branch}
+  r=requests.get(u,headers=h,params=q,timeout=45)
+  if r.status_code in (401,403) and CODECOV_TOKEN:r=requests.get(u,headers={'Accept':'application/json'},params=q,timeout=45)
   if r.status_code!=200:return None
   j=r.json();t=j.get('totals') or {}
   if t.get('coverage') is None:return None
@@ -76,23 +78,25 @@ def resolve_branch(repo,branch):
  if not branch:return default_branch(repo),True
  return branch,bool(api(f'/repos/{ORG}/{repo}/branches/{branch}'))
 def inspect(t):
- repo=t['name'];url=f'https://github.com/{ORG}/{repo}';branch,exists=resolve_branch(repo,t.get('branch'))
- out={'repository':repo,'html_url':url,'dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':branch,'branch_exists':exists,
+ """Coverage and security of one ref: a branch, or (when t['sha'] is set) a tagged commit, which has no live badges."""
+ repo=t['name'];url=f'https://github.com/{ORG}/{repo}';sha=t.get('sha')
+ branch,exists=(t['branch'],True) if sha else resolve_branch(repo,t.get('branch'))
+ out={'repository':repo,'html_url':url,'dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':branch,'ref_kind':'tag' if sha else 'branch','branch_exists':exists,
   'coverage':None,'coverage_source':'Branch not found','coverage_commit':None,'coverage_detail':None,
-  'coverage_badge_url':f'https://codecov.io/gh/{ORG}/{repo}/branch/{branch}/graph/badge.svg','measured_at':None,
+  'coverage_badge_url':None if sha else f'https://codecov.io/gh/{ORG}/{repo}/branch/{branch}/graph/badge.svg','measured_at':None,
   'security':{'state':'branch not found','run_url':None,'badge_url':None,'finished_at':None}}
  if not exists:return out
- m=branch_coverage(repo,branch)
+ m=branch_coverage(repo,branch,sha)
  out.update(coverage=m['coverage'],coverage_source=m['source'],coverage_commit=m['commit'],coverage_detail=m['detail'],measured_at=m['measured_at'],
-  security=security_status(repo,branch,t.get('security_workflow','security.yml')))
+  security=security_status(repo,branch,t.get('security_workflow','security.yml'),sha))
  return out
-def branch_coverage(repo,branch):
- """Coverage of one branch: Codecov first, else artifacts of the latest CI run on that branch."""
+def branch_coverage(repo,branch,sha=None):
+ """Coverage of one branch (or of commit `sha`): Codecov first, else artifacts of the latest CI run there."""
  out={'branch':branch,'coverage':None,'source':None,'commit':None,'detail':None,'measured_at':None,'workflow_conclusion':None,'workflow_url':None}
- cc=codecov(repo,branch)
+ cc=codecov(repo,branch,sha)
  if cc:out.update(coverage=cc['coverage'],source='Codecov',commit=cc['commit'],detail={k:cc[k] for k in ('files','lines','hits','misses','partials','report_url')},measured_at=commit_date(repo,cc['commit']))
  try:
-  d=api(f'/repos/{ORG}/{repo}/actions/runs?branch={branch}&per_page=100') or {};names=[n.lower() for n in CFG.get('workflow_names',[])]
+  d=api(f'/repos/{ORG}/{repo}/actions/runs?{"head_sha="+sha if sha else "branch="+branch}&per_page=100') or {};names=[n.lower() for n in CFG.get('workflow_names',[])]
   runs=sorted([r for r in d.get('workflow_runs',[]) if r.get('status')=='completed' and (not names or r.get('name','').lower() in names)],key=lambda r:r.get('updated_at',''),reverse=True)
   run=next((r for r in runs if r.get('conclusion')=='success'),runs[0] if runs else None)
   if not run:
@@ -117,24 +121,15 @@ def branch_coverage(repo,branch):
   out['source']=f'No coverage report in latest {branch} run'
  except Exception as e:out.update(workflow_conclusion='error',source=str(e)[:180]);print(f'ERROR {repo}@{branch}: {e}',file=sys.stderr)
  return out
-def security_status(repo,branch,workflow):
- """Latest completed run of the security workflow on `branch`."""
+def security_status(repo,branch,workflow,sha=None):
+ """Latest completed run of the security workflow on `branch`, or on commit `sha` (no live badge for a commit)."""
  out={'state':'no workflow','run_url':None,'badge_url':None,'finished_at':None}
  if not api(f'/repos/{ORG}/{repo}/actions/workflows/{workflow}'):return out
- out['badge_url']=f'https://github.com/{ORG}/{repo}/actions/workflows/{workflow}/badge.svg?branch={branch}'
- runs=(api(f'/repos/{ORG}/{repo}/actions/workflows/{workflow}/runs?branch={branch}&status=completed&per_page=1') or {}).get('workflow_runs',[])
+ if not sha:out['badge_url']=f'https://github.com/{ORG}/{repo}/actions/workflows/{workflow}/badge.svg?branch={branch}'
+ runs=(api(f'/repos/{ORG}/{repo}/actions/workflows/{workflow}/runs?{"head_sha="+sha if sha else "branch="+branch}&status=completed&per_page=1') or {}).get('workflow_runs',[])
  if not runs:out['state']='no runs';return out
  r=runs[0];out.update(state='passing' if r.get('conclusion')=='success' else 'failing',run_url=r.get('html_url'),finished_at=r.get('updated_at'))
  return out
-def latest_release_branch(repo,prefix):
- """Highest version branch named prefix+N.N.N (an -rcN suffix ranks below the final release); other names are ignored."""
- pat=re.compile('^'+re.escape(prefix)+r'(\d+(?:\.\d+)*)(?:-rc(\d+))?$');best=None
- for ref in api(f'/repos/{ORG}/{repo}/git/matching-refs/heads/{prefix}') or []:
-  name=ref.get('ref','')[len('refs/heads/'):];m=pat.match(name)
-  if not m:continue
-  key=(tuple(int(x) for x in m.group(1).split('.')),0 if m.group(2) else 1,int(m.group(2) or 0))
-  if best is None or key>best[0]:best=(key,name)
- return best[1] if best else None
 def safe_inspect(t):
  """inspect(), but one repo's API failure becomes an 'unknown' row instead of stopping the whole refresh."""
  try:return inspect(t)
@@ -143,21 +138,35 @@ def safe_inspect(t):
   return {'repository':t['name'],'html_url':f'https://github.com/{ORG}/{t["name"]}','dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':t.get('branch') or 'default','branch_exists':None,
    'coverage':None,'coverage_source':f'Error: {str(e)[:120]}','coverage_commit':None,'coverage_detail':None,'coverage_badge_url':None,'measured_at':None,
    'security':{'state':'unknown','run_url':None,'badge_url':None,'finished_at':None}}
-def collect(targets,prefix):
- """Configured-branch view, default-branch (main) view, and latest-release view for every target."""
+def release_group(t):
+ """Every release version of one repo, each measured, or None when releases are off or none were found.
+ The default pick is the newest stable version (the newest one if all are pre-releases)."""
+ rc=t.get('releases')
+ if not rc:return None
+ try:found=find_versions(ORG,t['name'],rc,api)
+ except Exception as e:print(f'ERROR {t["name"]} releases: {e}',file=sys.stderr);return None
+ recs=[]
+ for v in found['versions']:
+  rec=safe_inspect({**t,'branch':v['ref'],'sha':v['sha'] if v['ref_kind']=='tag' else None})
+  rec.update(version=v['version'],ref_kind=v['ref_kind'],kinds=v['kinds'],prerelease=v['prerelease'],published_at=v['published_at'],sha=v['sha'])
+  recs.append(rec)
+ if not recs:return None
+ return {'repository':t['name'],'html_url':f'https://github.com/{ORG}/{t["name"]}','dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),
+  'default':next((r['version'] for r in recs if not r['prerelease']),recs[0]['version']),'not_measured':found['total']-len(recs),'versions':recs}
+def collect(targets):
+ """Configured-branch view, default-branch (main) view, and per-repo release versions for every target."""
  dev,main,rel=[],[],[]
  for t in targets:
   r=safe_inspect(t);dev.append(r)
   try:d=default_branch(t['name'])
   except Exception as e:print(f'ERROR {t["name"]} default branch: {e}',file=sys.stderr);d=None
   main.append(r if d is None or r['branch']==d else safe_inspect({**t,'branch':d}))
-  try:rb=latest_release_branch(t['name'],prefix)
-  except Exception as e:print(f'ERROR {t["name"]} release branches: {e}',file=sys.stderr);rb=None
-  if rb:rel.append(safe_inspect({**t,'branch':rb}))
+  g=release_group(t)
+  if g:rel.append(g)
  return {'repositories':dev,'main':main,'releases':rel}
 def main():
  targets=resolve(CFG,ORG,api,PROJECT_TOKEN)
- d=collect(targets,CFG.get('release_branch_prefix','release-'));results=d['repositories']
+ d=collect(targets);results=d['repositories']
  os.makedirs('data',exist_ok=True)
  with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),**d},f,indent=2);f.write('\n')
  print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")

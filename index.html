@@ -41,7 +41,7 @@
   <section aria-labelledby="rel-title">
     <div class="sec-head"><div>
       <h2 id="rel-title">Latest release</h2>
-      <p class="sub">Each repository's highest <code>release-*</code> branch.</p>
+      <p class="sub">Each repository's newest stable version. Pick another from the list to see it. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
     </div></div>
     <div class="table-wrap"><table>
       <thead><tr><th scope="col">Repository</th><th scope="col">Code coverage</th><th scope="col">Security</th></tr></thead>
@@ -63,7 +63,8 @@
   <details class="how">
     <summary>How this is measured</summary>
     <ul>
-      <li><b>Branch.</b> Set per repository in <code>config/repos.json</code> (for example <code>development</code> for network-adapter, <code>main</code> for the AI repos). The latest-release table uses each repo's highest <code>release-*</code> branch.</li>
+      <li><b>Branch.</b> Set per repository in <code>config/repos.json</code> (for example <code>development</code> for network-adapter, <code>main</code> for the AI repos).</li>
+      <li><b>Releases.</b> Versions come from release branches (<code>release-1.2.0</code>), git tags (<code>v1.2.0</code>) and GitHub Releases, as set under <code>releases</code> in the config. <code>v1.2.0</code> and <code>1.2.0</code> are one version; names that are not versions (such as <code>fork-point</code>) are ignored. A branch is measured as it is now and has live badges. A tag or release is measured at its tagged commit, so it shows plain numbers and the date of the last run.</li>
       <li><b>Code coverage.</b> The badge is Codecov's live badge for that branch. The line count underneath comes from the last refresh: Codecov first, otherwise the coverage file saved by the latest <code>CI</code> run on that branch. Partially covered lines count as not covered.</li>
       <li><b>Security.</b> The latest completed run of the repo's <code>security.yml</code> on that branch. <i>No runs on this branch</i> means the workflow does not run there; it is not a failure.</li>
       <li><b>Refresh data</b> opens the refresh workflow on GitHub; click <i>Run workflow</i> there (needs write access to this repo). The badges are always live; line counts and run links update when the run finishes.</li>
@@ -88,25 +89,38 @@ const STALE_DAYS=14;
 document.addEventListener('error',e=>{const i=e.target;if(i.tagName==='IMG'&&i.dataset.fallback){const t=document.createElement('span');t.className='fallback';t.textContent=i.dataset.fallback;i.replaceWith(t)}},true);
 const SEC={passing:'Passing',failing:'Failing','no runs':'No runs on this branch','no workflow':'No security workflow','branch not found':'Branch not found'};
 
-function row(r){
-  const url=repoUrl(r),cd=r.coverage_detail||{},s=r.security||{};
+function row(r,picker){
+  const url=repoUrl(r),cd=r.coverage_detail||{},s=r.security||{},what=r.ref_kind==='tag'?'tag':'branch';
   const age=r.measured_at?Math.floor((Date.now()-new Date(r.measured_at))/864e5):null;
   const measured=day(r.measured_at)?`<div class="sub${age>STALE_DAYS?' stale':''}">Measured ${esc(day(r.measured_at))}${age>STALE_DAYS?` (${age} days ago)`:''}</div>`:'';
   const cov=r.branch_exists===false?'<span class="muted">Branch not found</span>'
-    :!isNum(r.coverage)?`<span class="muted">${esc(r.coverage_badge_url?'No report on this branch':(r.coverage_source||'Unknown'))}</span>`
-    :`<a class="badge" href="${esc(cd.report_url||url)}" target="_blank" rel="noopener"><img src="${esc(r.coverage_badge_url)}" data-fallback="${(+r.coverage).toFixed(2)}%" alt="Coverage ${isNum(r.coverage)?(+r.coverage).toFixed(2)+'%':'unknown'}"></a>`
+    :!isNum(r.coverage)?`<span class="muted">${esc(r.coverage_badge_url?`No report on this ${what}`:(r.coverage_source||'Unknown'))}</span>`
+    :`<a class="badge" href="${esc(cd.report_url||url)}" target="_blank" rel="noopener">${r.coverage_badge_url?`<img src="${esc(r.coverage_badge_url)}" data-fallback="${(+r.coverage).toFixed(2)}%" alt="Coverage ${(+r.coverage).toFixed(2)}%">`:`<span class="pct">${(+r.coverage).toFixed(2)}%</span>`}</a>`
      +(cd.lines?`<div class="sub">${num(cd.hits)} of ${num(cd.lines)} lines covered</div>`:'')+measured;
-  const label=SEC[s.state]||'Unknown';
+  const label=s.state==='no runs'?`No runs on this ${what}`:SEC[s.state]||'Unknown';
   const sec=(s.badge_url&&s.state!=='no runs'
     ?`<a class="badge" href="${esc(s.run_url||url+'/actions')}" target="_blank" rel="noopener"><img src="${esc(s.badge_url)}" data-fallback="${esc(label)}" alt="Security ${esc(label)}"></a>`
-    :`<span class="muted">${esc(label)}</span>`)
+    :(s.run_url&&(s.state==='passing'||s.state==='failing')
+      ?`<a class="pct ${s.state==='passing'?'good':'bad'}" href="${esc(s.run_url)}" target="_blank" rel="noopener">${esc(label)}</a>`
+      :`<span class="muted">${esc(label)}</span>`))
     +(day(s.finished_at)?`<div class="sub">Last run ${esc(day(s.finished_at))}</div>`:'');
-  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}</div></td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}${picker||`<div class="sub">${esc(r.branch)}</div>`}</td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
 }
-function fill(id,list,empty){
-  const q=$('search').value.toLowerCase(),cv=r=>isNum(r.coverage)?+r.coverage:-1;
+const picked={};
+const KIND={branch:'release branch',tag:'tag',release:'GitHub Release'};
+function relPick(g){return g.versions.find(v=>v.version===picked[g.repository])||g.versions.find(v=>v.version===g.default)||g.versions[0]}
+function relRow(g){
+  const v=relPick(g),id='ver-'+g.repository.replace(/[^\w-]/g,'_');
+  const opts=g.versions.map(x=>`<option value="${esc(x.version)}"${x===v?' selected':''}>${esc(x.version)}${x.prerelease?' (pre-release)':''}${x.version===g.default?' · latest':''}</option>`).join('');
+  const more=g.not_measured>0?`<div class="sub">${g.not_measured} older ${g.not_measured===1?'version is':'versions are'} not shown (<code>releases.max_versions</code>).</div>`:'';
+  const how=`${v.kinds.map(k=>KIND[k]).join(' + ')} · <code>${esc(v.branch)}</code>${day(v.published_at)?` · ${esc(day(v.published_at))}`:''}`;
+  return row({...v,repository:g.repository,html_url:g.html_url,tags:g.tags,dpg:g.dpg},
+    `<div><label class="sr" for="${id}">Version of ${esc(g.repository)}</label><select class="ver" id="${id}" data-repo="${esc(g.repository)}">${opts}</select></div><div class="sub">${how}</div>${more}`);
+}
+function fill(id,list,empty,render1=row){
+  const q=$('search').value.toLowerCase(),cv=r=>r.versions?0:isNum(r.coverage)?+r.coverage:-1;  // release rows keep name order so a row does not jump while its version is changed
   const a=list.filter(r=>r.repository.toLowerCase().includes(q)).sort((x,y)=>cv(y)-cv(x)||x.repository.localeCompare(y.repository));
-  $(id).innerHTML=a.length?a.map(row).join(''):`<tr><td colspan="3" class="empty">${q?'No repositories match.':empty}</td></tr>`;
+  $(id).innerHTML=a.length?a.map(x=>render1(x)).join(''):`<tr><td colspan="3" class="empty">${q?'No repositories match.':empty}</td></tr>`;
 }
 const viewList=()=>(view==='main'?data.main:data.repositories)||[];
 function summary(){
@@ -141,7 +155,7 @@ function fillStack(){
 }
 function render(){
   fill('dev-rows',viewList(),'No repositories configured. Add them to config/repos.json.');
-  fill('rel-rows',data.releases||[],'No repository has a release branch yet.');
+  fill('rel-rows',data.releases||[],'No repository has a release version yet.',relRow);
   fillStack();
 }
 async function initStack(){
@@ -162,6 +176,7 @@ async function init(){
   }
 }
 $('search').addEventListener('input',render);
+$('rel-rows').addEventListener('change',e=>{const s=e.target.closest('select.ver');if(s){picked[s.dataset.repo]=s.value;render();const again=document.querySelector(`select.ver[data-repo="${CSS.escape(s.dataset.repo)}"]`);if(again)again.focus()}});
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
 init();initStack();
 </script>

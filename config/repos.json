@@ -33,5 +33,12 @@
   "defaults": { "security_workflow": "security.yml" },
   "workflow_names": ["CI"],
   "artifact_name_hints": [],
-  "release_branch_prefix": "release-"
+
+  "releases": {
+    "sources": ["branch", "tag", "release"],
+    "branch_prefix": "release-",
+    "tag_pattern": "^v?(?P<version>\\d+(?:\\.\\d+)*(?:-[0-9A-Za-z.]+)?)$",
+    "include_prereleases": true,
+    "max_versions": 10
+  }
 }
