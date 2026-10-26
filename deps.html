@@ -22,12 +22,7 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
     <span class="updated" id="updated">Loading data…</span>
   </header>
   <p class="summary" id="summary">Reading the dependency list.</p>
-  <div class="controls">
-    <select id="repo" aria-label="Repository"><option value="">All repositories</option></select>
-    <select id="eco" aria-label="Ecosystem"><option value="">All ecosystems</option></select>
-    <select id="vuln" aria-label="Vulnerabilities"><option value="">All dependencies</option><option value="1">With known vulnerabilities</option></select>
-    <input type="search" id="search" placeholder="Find a package or license" aria-label="Find a package or license">
-  </div>
+  <div id="filters"></div>
 
   <section aria-labelledby="dep-title">
     <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div></div>
@@ -37,24 +32,51 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
     </table></div>
   </section>
 
+  <details class="how" id="policy-box">
+    <summary>License policy (green, yellow, red)</summary>
+    <div id="policy"></div>
+  </details>
+
   <details class="how">
     <summary>Where this comes from</summary>
     <ul>
       <li><b>Packages.</b> <a href="https://github.com/specfy/stack-analyser" target="_blank" rel="noopener">specfy/stack-analyser</a> reads the manifests (<code>package.json</code>, <code>go.mod</code>, <code>requirements.txt</code>, <code>pyproject.toml</code>, compose files, workflows) on each repository's working branch. These are direct dependencies, not the full lockfile tree.</li>
       <li><b>License and latest.</b> From <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a> for npm, PyPI and Go. When the listed version is a range or unknown there, the license of the latest release is shown and marked <i>latest</i>.</li>
       <li><b>Vulnerabilities.</b> From <a href="https://osv.dev" target="_blank" rel="noopener">OSV.dev</a>, Google's open vulnerability database (GitHub advisories, PyPI, Go and others). It is a public API that needs no key or login, and only package names and versions are sent. A package is checked at the version listed here; for a range such as <code>^5.0.0</code> that is the lowest version the range allows, so the real installed version may be newer and already fixed. <i>Fixed in</i> is the one version that fixes every fixable advisory; advisories with no released fix are counted separately.</li>
+      <li><b>License risk.</b> Each license is matched against the green, yellow and red lists under <code>licenses</code> in <code>config/repos.json</code>. For an expression <i>A OR B</i> the better class counts, for <i>A AND B</i> the worse (AND binds tighter, parentheses are respected). Several licenses listed together (<i>MIT, Apache-2.0</i>) are treated as all applying, so the worst counts. A license on no list, or one that cannot be read, is <i>unclassified</i>.</li>
+      <li><b>Filters.</b> Within one filter the ticked values are OR-ed; different filters are AND-ed. Each option shows how many dependencies it would give. The address bar holds the filters, so a link shares the view.</li>
       <li><b>Docker images and GitHub Actions</b> are listed for completeness; their licenses are not looked up.</li>
     </ul>
   </details>
 </main>
+<script src="filters.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ECO={npm:'npm',python:'PyPI',golang:'Go',docker:'Docker',githubAction:'GitHub Action'};
 const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
   docker:n=>n.includes('/')&&n.split('/')[0].includes('.')?null:`https://hub.docker.com/r/${n.includes('/')?n:'_/'+n}`,githubAction:n=>`https://github.com/${n}`};
-let all=[];
-const SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
+const LOOKED=['npm','python','golang'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
+const RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
+const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
+const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
+let repos=[],all=[],policy={green:[],yellow:[],red:[]},bar=null;
+
+const vnum=v=>{const m=String(v||'').replace(/^[\^~=<>v\s]+/,'').match(/^\d+(?:\.\d+)*/);return m?m[0].split('.').map(Number):null};
+function newer(a,b){const x=vnum(a),y=vnum(b);if(!x||!y)return null;for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0}return false}
+const updateOf=d=>{const n=newer(d.latest,d.version);return n===null?'unknown':n?'behind':'current'};
+const riskOf=d=>d.license?d.license_class||'unclassified':LOOKED.includes(d.ecosystem)?'none':'na';
+function vulnOf(d){const q=d.vulns;if(!q)return['unchecked'];if(!q.count)return['none'];return q.severity==='CRITICAL'||q.severity==='HIGH'?['any','critical-high']:['any']}
+
+const FACETS=[
+  {key:'repository',param:'repo',label:'Repository',get:d=>d.repository},
+  {key:'ecosystem',param:'eco',label:'Ecosystem',get:d=>d.ecosystem,valueLabel:v=>ECO[v]||v},
+  {key:'license',param:'license',label:'License',get:d=>d.license||'(none)'},
+  {key:'risk',label:'License risk',get:riskOf,valueLabel:v=>RISK[v]||v,order:['red','yellow','green','unclassified','none','na']},
+  {key:'vuln',label:'Vulnerabilities',get:vulnOf,valueLabel:v=>VULN[v]||v,order:['critical-high','any','none','unchecked']},
+  {key:'update',label:'Update status',get:updateOf,valueLabel:v=>UPDATE[v]||v,order:['behind','current','unknown']},
+];
+
 function vulnCells(d){
   const q=d.vulns;
   if(!q)return['<span class="muted">Not checked</span>','<span class="muted">—</span>'];
@@ -65,54 +87,56 @@ function vulnCells(d){
   const fixed=q.fixed_in?`<code>${esc(q.fixed_in)}</code>${q.unfixed?`<div class="sub">${q.unfixed} more with no fix released</div>`:''}`:'<span class="bad">No fix released</span>';
   return[`<details class="vuln"><summary class="${cls}">${q.count} known · ${esc(worst)}</summary><ul>${list}</ul></details>${note}`,fixed];
 }
-function cell(d){
+function licCell(d){
+  if(d.license_of==='error')return '<span class="warn" title="deps.dev did not answer; this is not a missing license">Lookup failed</span>';
+  if(!d.license)return `<span class="muted">${LOOKED.includes(d.ecosystem)?'Unknown':'Not looked up'}</span>`;
+  const r=riskOf(d);
+  return `<span class="lic risk risk-${r}" title="${esc(RISK[r])}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
+}
+function row(d,single){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
   const name=href?`<a class="pkg" href="${esc(href)}" target="_blank" rel="noopener">${esc(d.name)}</a>`:`<span class="pkg">${esc(d.name)}</span>`;
-  const repo=$('repo').value?'':`<div class="sub">${esc(d.repository)}</div>`;
-  const looked=['npm','python','golang'].includes(d.ecosystem);
-  const lic=d.license?`<span class="lic">${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}`
-    :`<span class="muted">${looked?'Unknown':'Not looked up'}</span>`;
-  const latest=d.latest&&d.latest!==d.version&&d.latest!==String(d.version).replace(/^[\^~=v]+/,'')?`<span class="warn">${esc(d.latest)}</span>`:esc(d.latest||'—');
+  const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:esc(d.latest||'—');
   const [vc,fx]=vulnCells(d);
-  return `<tr><td>${name}${repo}</td><td data-label="Ecosystem">${esc(ECO[d.ecosystem]||d.ecosystem)}</td><td data-label="Version"><code>${esc(d.version)}</code></td><td data-label="Latest">${latest}</td><td data-label="License">${lic}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
+  return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[d.ecosystem]||d.ecosystem)}</td><td data-label="Version"><code>${esc(d.version)}</code></td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
 }
-function render(){
-  const r=$('repo').value,e=$('eco').value,onlyVuln=$('vuln').value==='1',q=$('search').value.toLowerCase();
-  const list=all.filter(d=>(!r||d.repository===r)&&(!e||d.ecosystem===e)&&(!onlyVuln||(d.vulns&&d.vulns.count))&&(!q||d.name.toLowerCase().includes(q)||String(d.license||'').toLowerCase().includes(q)));
-  $('title').textContent=r?`${r} dependencies`:'Dependencies';
-  const lic={};list.forEach(d=>{const k=d.license||(['npm','python','golang'].includes(d.ecosystem)?'Unknown':null);if(k)lic[k]=(lic[k]||0)+1});
-  const nv=list.filter(d=>d.vulns&&d.vulns.count).length,unchecked=list.filter(d=>!d.vulns).length;
-  const top=Object.entries(lic).sort((a,b)=>b[1]-a[1]);
-  $('summary').innerHTML=`<strong>${list.length}</strong> ${list.length===1?'dependency':'dependencies'}${r?'':` across <strong>${new Set(list.map(d=>d.repository)).size}</strong> repositories`}.`
-    +(nv?` <strong class="bad">${nv}</strong> with known vulnerabilities.`:' No known vulnerabilities.')+(unchecked?` ${unchecked} not checked (Docker images, Actions, unpinned versions).`:'')
-    +(top.length?` Licenses: ${top.slice(0,5).map(([k,n])=>`<strong>${esc(k)}</strong> ${n}`).join(', ')}${top.length>5?`, ${top.length-5} more`:''}.`:'');
-  const meta=r&&repos.find(x=>x.repository===r);
-  $('dep-note').innerHTML=meta?`Branch <code>${esc(meta.branch)}</code> · Repository license: ${meta.license?`<span class="lic">${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`:'';
-  $('rows').innerHTML=list.length?list.map(cell).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match.':'No dependencies found.'}</td></tr>`;
+function render(list,state){
+  const sel=(state.selected.repository||[]),single=sel.length===1?sel[0]:null;
+  $('title').textContent=single?`${single} dependencies`:'Dependencies';
+  const count=f=>list.filter(f).length,looked=list.filter(d=>LOOKED.includes(d.ecosystem));
+  const nv=count(d=>d.vulns&&d.vulns.count),unchecked=count(d=>!d.vulns),down=looked.length>0&&looked.every(d=>!d.vulns);
+  const cls={};list.forEach(d=>{const r=riskOf(d);if(r!=='na')cls[r]=(cls[r]||0)+1});
+  const risk=['red','yellow','green','unclassified','none'].filter(k=>cls[k]).map(k=>`<span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span>${RISK[k]} <strong>${cls[k]}</strong></span>`).join(' · ');
+  $('summary').innerHTML=`<strong>${list.length}</strong> ${list.length===1?'dependency':'dependencies'}${single?'':` in <strong>${new Set(list.map(d=>d.repository)).size}</strong> ${new Set(list.map(d=>d.repository)).size===1?'repository':'repositories'}`}. `
+    +(down?'<strong class="warn">Vulnerability data is unavailable right now</strong> (the lookup failed; this is not a clean result). '
+      :nv?`<strong class="bad">${nv}</strong> with known vulnerabilities. `:unchecked===list.length&&list.length?'':'No known vulnerabilities. ')
+    +(unchecked&&!down?`${unchecked} not checked (Docker images, Actions, unpinned versions). `:'')
+    +(risk?`<br>License risk: ${risk}`:'');
+  const meta=single&&repos.find(x=>x.repository===single);
+  $('dep-note').innerHTML=meta?`Branch <code>${esc(meta.branch)}</code> · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`:'';
+  $('rows').innerHTML=list.length?list.map(d=>row(d,single)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
 }
-let repos=[];
-function sync(){
-  const p=new URLSearchParams();if($('repo').value)p.set('repo',$('repo').value);
-  history.replaceState(null,'',p.toString()?'?'+p:location.pathname);render();
+function renderPolicy(){
+  const any=['green','yellow','red'].some(k=>(policy[k]||[]).length);
+  $('policy').innerHTML=any?`<ul class="policy">${['green','yellow','red'].map(k=>`<li><span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span><b>${RISK[k]}</b></span> ${(policy[k]||[]).length?(policy[k]).map(x=>`<code>${esc(x)}</code>`).join(' '):'<span class="muted">none listed</span>'}</li>`).join('')}</ul>`
+    :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code>, <code>yellow</code> and <code>red</code> in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
 }
 async function init(){
   try{
     const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
     const data=await res.json();repos=(data.repositories||[]).slice().sort((a,b)=>a.repository.localeCompare(b.repository));
+    policy=data.license_policy||policy;
     all=repos.flatMap(r=>(r.dependencies||[]).map(d=>({...d,repository:r.repository}))).sort((a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name));
     $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    repos.forEach(r=>$('repo').add(new Option(`${r.repository} (${(r.dependencies||[]).length})`,r.repository)));
-    [...new Set(all.map(d=>d.ecosystem))].sort().forEach(e=>$('eco').add(new Option(ECO[e]||e,e)));
-    const qs=new URLSearchParams(location.search),want=qs.get('repo');if(want&&repos.some(r=>r.repository===want))$('repo').value=want;
-    if(qs.get('vuln')==='1')$('vuln').value='1';
-    render();
+    renderPolicy();
+    bar=Filters.createFilterBar($('filters'),{facets:FACETS,items:all,noun:'dependencies',text:{param:'q',placeholder:'Find a package or license',of:d=>d.name+' '+(d.license||'')},onChange:render});
+    render(bar.visible(),bar.state());
   }catch(e){
     $('updated').textContent='Data unavailable';
     $('summary').textContent='Dependency data could not be loaded. Run the refresh workflow and check its logs.';
     $('rows').innerHTML='<tr><td colspan="7" class="empty">data/stack.json is missing or unreadable.</td></tr>';
   }
 }
-$('repo').addEventListener('change',sync);$('eco').addEventListener('change',render);$('vuln').addEventListener('change',render);$('search').addEventListener('input',render);
 init();
 </script>
 </body>

@@ -79,3 +79,46 @@ table.wide th:first-child{width:24%}table.wide th:nth-child(2){width:16%}table.w
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .pct{font-weight:600}
 a.pct.good,a.pct.bad{text-decoration:none}
+
+/* Filter bar (filters.js) */
+.fb{margin:0 0 18px}
+.fb-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fb-text{font:inherit;font-size:14px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:230px}
+.fb-facet{position:relative}
+.fb-btn{font:inherit;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer}
+.fb-btn:hover{border-color:var(--muted)}
+.fb-btn.on{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link)}
+.fb-n{background:var(--link);color:var(--surface);border-radius:999px;font-size:12px;min-width:20px;padding:0 6px;text-align:center;line-height:20px}
+.fb-caret{font-size:11px;color:var(--muted)}
+.fb-pop{position:absolute;z-index:20;top:calc(100% + 6px);left:0;min-width:260px;max-width:min(360px,92vw);max-height:340px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:8px}
+.fb-pop[hidden]{display:none}
+.fb-pop-head{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.fb-find{flex:1;font:inherit;font-size:14px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0}
+.fb-pop ul{list-style:none;margin:0;padding:0}
+.fb-pop li[hidden]{display:none}
+.fb-pop label{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:6px;cursor:pointer;font-size:14px}
+.fb-pop label:hover{background:var(--track)}
+.fb-pop input[type=checkbox]{width:16px;height:16px;accent-color:var(--link);margin:0;flex:none}
+.fb-pop input:disabled+.fb-lab{color:var(--muted);opacity:.55}
+.fb-pop label:has(input:disabled){cursor:default}
+.fb-lab{flex:1;overflow-wrap:anywhere}
+.fb-count{color:var(--muted);font-size:13px}
+.fb-link{font:inherit;font-size:13px;font-weight:600;background:none;border:0;color:var(--link);cursor:pointer;padding:4px}
+.fb-link:hover{text-decoration:underline}
+.fb-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.fb-chips[hidden]{display:none}
+.fb-chip{font:inherit;font-size:13px;display:inline-flex;gap:5px;align-items:center;background:var(--track);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer}
+.fb-chip:hover{border-color:var(--bad)}
+.fb-chip-k{color:var(--muted);font-weight:600}
+.fb-stale{border-style:dashed}
+.fb-status{margin:8px 0 0;font-size:13px;color:var(--muted)}
+.fb select,.fb input{max-width:100%}
+
+/* License risk */
+.risk{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.risk .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.risk-green .dot{background:var(--good)}.risk-yellow .dot{background:var(--warn)}.risk-red .dot{background:var(--bad)}
+.risk-red{color:var(--bad)}
+.risk-unclassified .dot,.risk-none .dot{background:none;border:2px solid var(--muted)}
+ul.policy{list-style:none;margin:0 0 14px;padding:0}ul.policy li{margin:8px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+ul.policy .risk{min-width:84px}

@@ -20,7 +20,7 @@
     </div>
   </header>
   <p class="summary" id="summary">Reading the latest coverage reports.</p>
-  <div class="controls"><input type="search" id="search" placeholder="Find a repository" aria-label="Find a repository"></div>
+  <div id="filters"></div>
 
   <section aria-labelledby="dev-title">
     <div class="sec-head"><div>
@@ -43,9 +43,9 @@
       <h2 id="rel-title">Latest release</h2>
       <p class="sub">Each repository's newest stable version. Choose one version for every repository here, or change a single repository in its row. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
     </div>
-      <div class="controls"><label class="sub" for="rel-kind">Found as</label><select class="ver" id="rel-kind"><option value="">Any</option><option value="release">GitHub Release</option><option value="tag">Tag</option><option value="branch">Release branch</option></select>
-        <label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select></div>
+      <div class="controls"><label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select></div>
     </div>
+    <div id="rel-filters"></div>
     <div class="table-wrap"><table>
       <thead><tr><th scope="col">Repository</th><th scope="col">Code coverage</th><th scope="col">Security</th></tr></thead>
       <tbody id="rel-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
@@ -78,6 +78,7 @@
     </ul>
   </details>
 </main>
+<script src="filters.js"></script>
 <script>
 let data={repositories:[],main:[],releases:[]},view='dev';
 try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
@@ -109,8 +110,10 @@ function row(r,picker){
     +(day(s.finished_at)?`<div class="sub">Last run ${esc(day(s.finished_at))}</div>`:'');
   return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}${picker||`<div class="sub">${esc(r.branch)}</div>`}</td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
 }
-const picked={};let relAll='',relKind='';
-const gv=g=>relKind?g.versions.filter(v=>v.kinds.includes(relKind)):g.versions;
+const picked={};let relAll='',relAllowed=null,relBar=null,bar=null,visibleSet=null;
+const shown=r=>!visibleSet||visibleSet.has(r.repository);
+const vkey=(g,v)=>g.repository+'@'+v.version;
+const gv=g=>relAllowed?g.versions.filter(v=>relAllowed.has(vkey(g,v))):g.versions;
 const latestOf=g=>gv(g).find(v=>!v.prerelease)||gv(g)[0];
 const verCmp=(a,b)=>{const p=v=>{const[n,...r]=v.split('-');return[n.split('.').map(Number),r.join('-')]},[an,ap]=p(a),[bn,bp]=p(b);
   for(let i=0;i<Math.max(an.length,bn.length);i++){const d=(an[i]||0)-(bn[i]||0);if(d)return d}
@@ -136,30 +139,30 @@ function relRow(g){
     `<div><label class="sr" for="${id}">Version of ${esc(g.repository)}</label><select class="ver" id="${id}" data-repo="${esc(g.repository)}">${opts}</select></div><div class="sub">${how}</div>${more}`);
 }
 function fill(id,list,empty,render1=row){
-  const q=$('search').value.toLowerCase(),cv=r=>r.versions?0:isNum(r.coverage)?+r.coverage:-1;  // release rows keep name order so a row does not jump while its version is changed
-  const a=list.filter(r=>r.repository.toLowerCase().includes(q)).sort((x,y)=>cv(y)-cv(x)||x.repository.localeCompare(y.repository));
-  $(id).innerHTML=a.length?a.map(x=>render1(x)).join(''):`<tr><td colspan="3" class="empty">${q?'No repositories match.':empty}</td></tr>`;
+  const cv=r=>r.versions?0:isNum(r.coverage)?+r.coverage:-1;  // release rows keep name order so a row does not jump while its version is changed
+  const a=list.filter(shown).sort((x,y)=>cv(y)-cv(x)||x.repository.localeCompare(y.repository));
+  $(id).innerHTML=a.length?a.map(x=>render1(x)).join(''):`<tr><td colspan="3" class="empty">${visibleSet&&list.length?'No repositories match these filters.':empty}</td></tr>`;
 }
 const viewList=()=>(view==='main'?data.main:data.repositories)||[];
 function summary(){
-  const all=viewList(),has=all.filter(r=>isNum(r.coverage)).length,st=k=>all.filter(r=>(r.security||{}).state===k).length,pass=st('passing'),fail=st('failing');
-  $('summary').innerHTML=all.length?`On their ${view==='main'?'main':'development'} branches, <strong>${has} of ${all.length}</strong> repositories report coverage. Security: <strong>${pass}</strong> passing, <strong class="${fail?'bad':''}">${fail}</strong> failing.`:'No repositories are configured yet.';
+  const all=viewList().filter(shown),has=all.filter(r=>isNum(r.coverage)).length,st=k=>all.filter(r=>(r.security||{}).state===k).length,pass=st('passing'),fail=st('failing');
+  $('summary').innerHTML=all.length?`On their ${view==='main'?'main':'development'} branches, <strong>${has} of ${all.length}</strong> ${visibleSet?'matching ':''}repositories report coverage. Security: <strong>${pass}</strong> passing, <strong class="${fail?'bad':''}">${fail}</strong> failing.`:'No repositories are configured yet.';
 }
 function setView(v){
   view=v;try{localStorage.setItem('branchView',v)}catch(e){}
   $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
   $('dev-title').textContent=v==='main'?'Main':'Development';
   $('dev-note').innerHTML=v==='main'?'Each repository\'s default branch.':'Each repository\'s working branch, set in <code>config/repos.json</code>.';
-  summary();render();
+  if(bar)bar.setItems(repoItems());else{summary();render()}
 }
 let stack=null;
 const LOOKED_UP=['npm','python','golang'];
 function stackRow(r){
   const url=repoUrl(r),deps=r.dependencies||[],langs=(r.languages||[]).slice(0,3).map(l=>l[0]).join(' · '),techs=r.techs||[];
-  const lic=r.license?`<span class="lic">${esc(r.license)}</span>`:'<span class="lic none">No LICENSE file</span>';
+  const lic=r.license?`<span class="lic risk risk-${esc(r.license_class||'unclassified')}" title="${esc(RISK[r.license_class||'unclassified'])}"><span class="dot" aria-hidden="true"></span>${esc(r.license)}</span><span class="sr"> (${esc(RISK[r.license_class||'unclassified'])})</span>`:'<span class="lic none">No LICENSE file</span>';
   const vuln=deps.filter(d=>d.vulns&&d.vulns.count).length,known=deps.filter(d=>d.license).length,pkgs=deps.filter(d=>LOOKED_UP.includes(d.ecosystem)).length;
   const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
-    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=1">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
+    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
     :'<span class="muted">None found</span>';
   return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}</div></td>`
     +`<td data-label="License">${lic}</td>`
@@ -168,17 +171,53 @@ function stackRow(r){
 }
 function fillStack(){
   if(!stack)return;
-  const q=$('search').value.toLowerCase(),a=(stack.repositories||[]).filter(r=>r.repository.toLowerCase().includes(q)).sort((x,y)=>x.repository.localeCompare(y.repository));
-  $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${q?'No repositories match.':'No repositories analysed yet.'}</td></tr>`;
+  const a=(stack.repositories||[]).filter(shown).sort((x,y)=>x.repository.localeCompare(y.repository));
+  $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${visibleSet&&(stack.repositories||[]).length?'No repositories match these filters.':'No repositories analysed yet.'}</td></tr>`;
 }
 function render(){
   if($('rel-all').options.length<2)fillRelAll();
   fill('dev-rows',viewList(),'No repositories configured. Add them to config/repos.json.');
-  fill('rel-rows',(data.releases||[]).filter(g=>gv(g).length),relKind?'No repository has a version found that way.':'No repository has a release version yet.',relRow);
+  fill('rel-rows',(data.releases||[]).filter(g=>gv(g).length),relAllowed?'No repository has a version that matches.':'No repository has a release version yet.',relRow);
   fillStack();
 }
+/* ---- filters: one bar for every table (a repository is shown when it passes all of them) ---- */
+const SECL={passing:'Passing',failing:'Failing','no runs':'No runs','no workflow':'No security workflow','branch not found':'Branch not found',unknown:'Unknown'};
+const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No LICENSE file'};
+const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'},PLAIN=['Markdown','JSON','YAML','Text','SVG','Jinja','Smarty','CSS','HTML'];
+function repoItems(){
+  const st=Object.fromEntries(((stack&&stack.repositories)||[]).map(r=>[r.repository,r]));
+  return viewList().map(r=>{
+    const s=st[r.repository]||{},deps=s.dependencies||[],c=isNum(r.coverage)?+r.coverage:null;
+    const vul=!deps.some(d=>d.vulns)?['unchecked']:!deps.some(d=>d.vulns&&d.vulns.count)?['none']:deps.some(d=>d.vulns&&(d.vulns.severity==='CRITICAL'||d.vulns.severity==='HIGH'))?['any','critical-high']:['any'];
+    return {repository:r.repository,tags:r.tags||(r.dpg?['DPG']:[]),sec:(r.security||{}).state||'unknown',cov:c===null?'none':c>=80?'high':c>=50?'mid':'low',
+      license:stack?(s.license||'(no LICENSE file)'):null,risk:stack?(s.license?s.license_class||'unclassified':'none'):null,vuln:stack?vul:null,
+      langs:(s.languages||[]).map(l=>l[0]).filter(l=>!PLAIN.includes(l)).slice(0,2)};
+  });
+}
+const REPO_FACETS=[
+  {key:'repository',param:'repo',label:'Repository',get:i=>i.repository},
+  {key:'tag',label:'Tag',get:i=>i.tags.length?i.tags:'(none)'},
+  {key:'sec',label:'Security',get:i=>i.sec,valueLabel:v=>SECL[v]||v,order:['failing','passing','no runs','no workflow']},
+  {key:'cov',label:'Coverage',get:i=>i.cov,valueLabel:v=>COVL[v],order:['low','mid','high','none']},
+  {key:'risk',label:'License risk',get:i=>i.risk,valueLabel:v=>RISK[v]||v,order:['red','yellow','green','unclassified','none']},
+  {key:'license',label:'License',get:i=>i.license},
+  {key:'vuln',label:'Vulnerabilities',get:i=>i.vuln,valueLabel:v=>VULNL[v]||v,order:['critical-high','any','none','unchecked']},
+  {key:'lang',label:'Language',get:i=>i.langs},
+];
+function onRepoFilter(list){visibleSet=new Set(list.map(i=>i.repository));summary();render()}
+function initFilters(){
+  bar=Filters.createFilterBar($('filters'),{facets:REPO_FACETS,items:repoItems(),noun:'repositories',text:{param:'q',placeholder:'Find a repository',of:i=>i.repository},onChange:onRepoFilter});
+  visibleSet=new Set(bar.visible().map(i=>i.repository));
+  const items=(data.releases||[]).flatMap(g=>g.versions.map(v=>({key:vkey(g,v),kinds:v.kinds,stable:v.prerelease?'pre':'stable'})));
+  relBar=Filters.createFilterBar($('rel-filters'),{facets:[
+    {key:'found',param:'found',label:'Found as',get:i=>i.kinds,valueLabel:v=>({branch:'Release branch',tag:'Tag',release:'GitHub Release'}[v]||v),order:['release','tag','branch']},
+    {key:'stable',param:'stab',label:'Stability',get:i=>i.stable,valueLabel:v=>v==='pre'?'Pre-release':'Stable',order:['stable','pre']},
+  ],items,noun:'versions',onChange:list=>{relAllowed=list.length===items.length?null:new Set(list.map(i=>i.key));fillRelAll();render()}});
+  relAllowed=relBar.visible().length===items.length?null:new Set(relBar.visible().map(i=>i.key));
+  const want=new URLSearchParams(location.search).get('ver');if(want)relAll=want;
+}
 async function initStack(){
-  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();fillStack()}
+  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();if(bar)bar.setItems(repoItems());fillStack()}
   catch(e){$('stack-rows').innerHTML='<tr><td colspan="4" class="empty">data/stack.json is missing or unreadable.</td></tr>'}
 }
 async function init(){
@@ -187,16 +226,15 @@ async function init(){
     data=await res.json();
     $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Not refreshed yet';
     if(!data.main)data.main=data.repositories||[];
-    setView(view);
+    setView(view);initFilters();fillRelAll();summary();render();
   }catch(e){
     $('updated').textContent='Data unavailable';
     $('summary').textContent='Coverage data could not be loaded. Run the refresh workflow and check its logs.';
     ['dev-rows','rel-rows'].forEach(id=>$(id).innerHTML='<tr><td colspan="3" class="empty">data/coverage.json is missing or unreadable.</td></tr>');
   }
 }
-$('search').addEventListener('input',render);
-$('rel-kind').addEventListener('change',e=>{relKind=e.target.value;for(const k in picked)delete picked[k];fillRelAll();render()});
-$('rel-all').addEventListener('change',e=>{relAll=e.target.value;for(const k in picked)delete picked[k];render()});
+$('rel-all').addEventListener('change',e=>{relAll=e.target.value;for(const k in picked)delete picked[k];
+  const q=new URLSearchParams(location.search);relAll?q.set('ver',relAll):q.delete('ver');try{history.replaceState(null,'',q.toString()?'?'+q:location.pathname)}catch(_){}render()});
 $('rel-rows').addEventListener('change',e=>{const s=e.target.closest('select.ver');if(s){picked[s.dataset.repo]=s.value;render();const again=document.querySelector(`select.ver[data-repo="${CSS.escape(s.dataset.repo)}"]`);if(again)again.focus()}});
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
 init();initStack();
