@@ -66,3 +66,19 @@ def test_global_releases_false_turns_off_everywhere_unless_a_repo_sets_its_own()
     c = n(releases=False, repositories=['a', {'name': 'b', 'releases': {'sources': ['tag']}}])
     assert c['releases'] is None and c['repositories'][0]['releases'] is None
     assert c['repositories'][1]['releases']['sources'] == ['tag'] and c['repositories'][1]['releases']['max_versions'] == 10
+
+def test_license_policy_defaults_to_empty_lists():
+    assert n()['licenses'] == {'green': [], 'yellow': [], 'red': []}
+
+def test_license_policy_is_kept_and_trimmed():
+    assert n(licenses={'green': [' MIT ', 'Apache-2.0'], 'red': ['GPL-*']})['licenses'] == {'green': ['MIT', 'Apache-2.0'], 'yellow': [], 'red': ['GPL-*']}
+
+@pytest.mark.parametrize('bad,msg', [
+    ({'green': ['MIT'], 'red': ['mit']}, 'in both green and red'),
+    ({'blue': ['MIT']}, 'use only the keys'),
+    ({'green': 'MIT'}, 'must be a list'),
+    ({'green': ['']}, 'must be a list'),
+])
+def test_invalid_license_policy(bad, msg):
+    with pytest.raises(ConfigError, match=msg):
+        n(licenses=bad)

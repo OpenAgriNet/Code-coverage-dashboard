@@ -32,3 +32,9 @@ def test_dep_info_quotes_scoped_npm_names_and_prefixes_go_versions():
 def test_dep_info_skips_docker_and_actions():
     got = d.dep_info('docker', 'redis', 'alpine', lambda p: (_ for _ in ()).throw(AssertionError('no lookup')))
     assert got['license'] is None and got['license_of'] is None
+
+def test_lookup_failure_is_marked_error_not_unknown():
+    def boom(path):
+        raise RuntimeError('429')
+    got = d.dep_info('python', 'fastapi', '0.1', boom)
+    assert got['license'] is None and got['license_of'] == 'error'

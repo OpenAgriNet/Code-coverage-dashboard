@@ -15,7 +15,7 @@ def test_stack_record_adds_dependency_info(monkeypatch):
     raw = {'languages': {'Go': 3}, 'techs': ['golang'], 'dependencies': [['golang', 'github.com/a/b', 'v1.0.0']]}
     rec = r.stack_record({'name': 'na', 'branch': 'development'}, analyse=lambda repo, branch: raw,
                          info=lambda e, n, v: {'name': n, 'license': 'MIT'}, vulns=lambda deps: None)
-    assert rec['languages'] == [('Go', 3)] and rec['dependencies'] == [{'name': 'github.com/a/b', 'license': 'MIT'}] and rec['error'] is None
+    assert rec['languages'] == [('Go', 3)] and rec['dependencies'] == [{'name': 'github.com/a/b', 'license': 'MIT', 'license_class': 'unclassified'}] and rec['error'] is None
 
 def test_stack_record_runs_vulnerability_check_on_the_dependencies(monkeypatch):
     monkeypatch.setattr(r, 'repo_license', lambda repo: None)
@@ -25,7 +25,7 @@ def test_stack_record_runs_vulnerability_check_on_the_dependencies(monkeypatch):
             d['vulns'] = {'count': 2}
     rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
                          info=lambda e, n, v: {'name': n}, vulns=vulns)
-    assert rec['dependencies'] == [{'name': 'jinja2', 'vulns': {'count': 2}}]
+    assert rec['dependencies'] == [{'name': 'jinja2', 'vulns': {'count': 2}, 'license_class': None}]
 
 def test_repo_license(monkeypatch):
     monkeypatch.setattr(r.ac, 'api', lambda p: {'license': {'spdx_id': 'MIT'}})
@@ -34,3 +34,19 @@ def test_repo_license(monkeypatch):
     assert r.repo_license('na') == 'Other'
     monkeypatch.setattr(r.ac, 'api', lambda p: None)
     assert r.repo_license('na') is None
+
+def test_stack_record_classifies_repo_and_dependency_licenses(monkeypatch):
+    monkeypatch.setattr(r, 'repo_license', lambda repo: 'MIT')
+    policy = {'green': ['MIT'], 'yellow': [], 'red': ['GPL-*']}
+    rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: {'dependencies': [['npm', 'a', '1'], ['npm', 'b', '1'], ['docker', 'c', '1']]},
+                         info=lambda e, n, v: {'name': n, 'license': {'a': 'MIT', 'b': 'GPL-3.0-only', 'c': None}[n]}, vulns=lambda deps: None, policy=policy)
+    assert rec['license_class'] == 'green'
+    assert [(d['name'], d['license_class']) for d in rec['dependencies']] == [('c', None), ('a', 'green'), ('b', 'red')]  # sorted by ecosystem
+
+def test_stack_record_survives_default_branch_failure(monkeypatch):
+    monkeypatch.setattr(r, 'repo_license', lambda repo: 'MIT')
+    def boom(repo):
+        raise RuntimeError('502')
+    monkeypatch.setattr(r.ac, 'default_branch', boom)
+    rec = r.stack_record({'name': 'na', 'branch': None}, analyse=lambda *a: {})
+    assert rec['license'] == 'MIT' and rec['error'] == '502' and rec['dependencies'] == []

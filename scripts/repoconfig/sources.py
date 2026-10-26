@@ -20,8 +20,8 @@ def query_repos(src,org,get):
   d=get(f'/search/repositories?q={q}&per_page={PAGE}&page={page}') or {}
   if d.get('incomplete_results'):raise RuntimeError('GitHub search returned incomplete results')
   items=d.get('items',[]);out+=[{'name':i['name'],'private':bool(i.get('private'))} for i in items]
-  if len(items)<PAGE:break
- return out
+  if len(items)<PAGE:return out
+ raise RuntimeError(f'more than {PAGE*MAX_PAGES} results (GitHub search stops there); narrow the query')
 def project_repos(src,org,token,post=requests.post):
  """Repos of `org` that have an issue or PR on the project board. Needs a token that can read projects."""
  if not token:raise RuntimeError('needs the DPG_PROJECT_TOKEN secret')

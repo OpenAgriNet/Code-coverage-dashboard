@@ -17,12 +17,14 @@ def analyse(repo,branch):
   subprocess.run(['git','clone','-q','--depth','1','-b',branch,f'https://github.com/{ac.ORG}/{repo}.git',src],check=True,timeout=300,env=env)
   # the CLI joins -o onto the working directory, so pass a bare file name
   subprocess.run(['npx','--yes',ANALYSER,src,'--flat','-o','out.json'],cwd=tmp,check=True,timeout=600,stdout=subprocess.DEVNULL,env=env)
-  return json.load(open(os.path.join(tmp,'out.json'),encoding='utf-8'))
+  with open(os.path.join(tmp,'out.json'),encoding='utf-8') as f:return json.load(f)
 def summarize(raw):
  """Languages by file count, tech keys, and deduplicated [ecosystem, name, version] dependencies."""
  langs=sorted((raw.get('languages') or {}).items(),key=lambda x:(-x[1],x[0]))
  seen=set();deps=[]
- for e,n,v in raw.get('dependencies') or []:
-  if (e,n,v) in seen:continue
-  seen.add((e,n,v));deps.append([e,n,v])
+ for dep in raw.get('dependencies') or []:
+  if not isinstance(dep,(list,tuple)) or len(dep)!=3:continue  # one odd manifest entry must not lose the whole repo
+  key=tuple(dep)
+  if key in seen:continue
+  seen.add(key);deps.append(list(key))
  return {'languages':langs,'techs':sorted(set(raw.get('techs') or [])),'dependencies':sorted(deps,key=lambda d:(d[0],d[1].lower()))}

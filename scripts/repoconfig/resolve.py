@@ -25,7 +25,10 @@ def resolve(cfg,org,get,project_token=None,log=lambda m:print(m,file=sys.stderr)
   found[r['name'].lower()]=target(r['name'],r['branch'],r['tags'],r['security_workflow'],True,r['releases'])
  for src in cfg['sources']:
   if not src['enabled']:continue
-  try:matches=lookup(src,org,get,project_token);log(f'{src["label"]}: {len(matches)} repos')
+  try:
+   matches=lookup(src,org,get,project_token)
+   if not matches and src['fallback']:raise RuntimeError('found no repositories (a renamed property or a typo?)')
+   log(f'{src["label"]}: {len(matches)} repos')
   except Exception as e:
    matches=[{'name':n,'private':False} for n in src['fallback']]
    log(f'WARN {src["label"]}: {e}; '+(f'using its {len(matches)} fallback repos' if matches else 'no fallback configured'))

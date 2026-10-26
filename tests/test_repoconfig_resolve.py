@@ -81,3 +81,11 @@ def test_releases_setting_flows_to_targets_listed_off_and_discovered():
     assert by['a']['sources'] == ['tag'] and by['a']['max_versions'] == 3
     assert by['b'] is None
     assert by['c']['max_versions'] == 3 and by['d']['max_versions'] == 3
+
+def test_query_matching_nothing_uses_the_fallback_and_warns():
+    got, logs = run(cfg(sources=[{**Q, 'fallback': ['x']}]), search())
+    assert names(got) == ['x'] and any('WARN' in l and 'no repositories' in l for l in logs)
+
+def test_query_matching_nothing_without_fallback_is_not_an_error():
+    got, logs = run(cfg(sources=[Q]), search())
+    assert got == [] and not any('WARN' in l for l in logs)

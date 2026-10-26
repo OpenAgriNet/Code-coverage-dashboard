@@ -83,3 +83,26 @@ def test_details_are_fetched_once_per_advisory_across_packages():
 
 def test_unknown_severity_and_medium_alias():
     assert v.severity({}) == 'UNKNOWN' and v.severity({'database_specific': {'severity': 'MEDIUM'}}) == 'MODERATE'
+
+def test_prerelease_is_older_than_its_final_release():
+    assert v.vkey('2.0.0-rc.1') < v.vkey('2.0.0') and v.vkey('5.0.0rc1') < v.vkey('5.0.0') and v.vkey('1.2') == v.vkey('1.2.0')
+    assert v.vkey('0.0.10') > v.vkey('0.0.9')
+    x = vuln('A', fixed=['2.0.0'])
+    assert v.fixed_version(x, 'PyPI', 'jinja2', '2.0.0rc1') == '2.0.0'  # was shown as "no fix released"
+
+@pytest.mark.parametrize('declared,exact', [('1.2.3', True), ('v1.2.3', True), ('==1.2.3', True), ('=1.2.3', True), ('^1.2.3', False), ('>=1.2', False), ('1.x', False), ('~1.2.3', False), ('latest', False)])
+def test_is_exact(declared, exact):
+    assert v.is_exact(declared) is exact
+
+def test_one_failing_advisory_lookup_leaves_only_that_dependency_unchecked():
+    v.DETAILS.clear()
+    def post(path, body):
+        return {'results': [{'vulns': [{'id': 'BAD' if q['package']['name'] == 'a' else 'OK'}]} for q in body['queries']]}
+    def fetch(path):
+        if path.endswith('BAD'):
+            raise RuntimeError('429')
+        return vuln('OK', fixed=['9.0'])
+    deps = [dep('a'), dep('b')]
+    logs = []
+    v.annotate(deps, post=post, fetch=fetch, log=logs.append)
+    assert deps[0]['vulns'] is None and deps[1]['vulns']['count'] == 1 and any('a:' in l for l in logs)
