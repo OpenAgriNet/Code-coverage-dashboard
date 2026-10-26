@@ -16,54 +16,64 @@ Two tables, each with three columns:
 | Code coverage | Codecov's live badge for that branch, with "N of M lines covered" from the last refresh |
 | Security | Latest completed run of the repo's `security.yml` on that branch, shown as the GitHub Actions badge |
 
-- **Development**: the branch configured per repository (see below).
+- **Development**: each repository's development branch (see *Choosing repositories*).
 - **Latest release**: each repository's newest stable version, with a dropdown of all its versions (see "Finding releases"). Repos with no version are left out.
 
 ## Choosing repositories
 
-`config/repos.json` has three parts. Everything else in the file is a global setting (`workflow_names`, `artifact_name_hints`, `defaults.security_workflow`, `releases`).
-
-**`repositories`**: repos you name yourself, with their branch.
+The config says only what the scripts cannot know. Repos are **found**, not listed:
 
 ```json
-"repositories": [
-  {"name": "network-adapter", "branch": "development"},
-  {"name": "experience-api", "branch": "main", "tags": ["core"], "security_workflow": "security.yml"},
-  "knowledge-provider"
+"sources": [{"type": "query", "query": "props.project-name:\"OAN DPG\"", "tags": ["DPG"]}],
+"exclude": ["engineering-tracker", "Code-coverage-dashboard"],
+"repositories": [{"name": "infra-automation"}],
+"branches": {"development": "^(dev|develop|development)$"}
+```
+
+**`sources`**: where repos come from. Every repo a source finds gets that source's `tags`.
+- `query` is a [GitHub repository search](https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories). `org:<organization>` and `fork:true` are added for you, because search hides forks by default (`"include_forks": false` opts out). Custom properties are searched with `props.<name>:"<value>"`.
+- `project` finds repos with an issue or PR on an org project board (`"number"`, optional `"org"`). It needs the `DPG_PROJECT_TOKEN` secret. Not used by default.
+- Both accept `tags` and `enabled`.
+- Private repos found by a source are skipped, because the dashboard is public.
+- If a source fails (rate limit, bad token) the refresh **stops with an error naming it**, nothing is published, and the dashboard keeps its last data. A query that finds nothing only logs a warning. There is no fixed fallback list.
+
+**`exclude`**: repo names to drop, whatever finds them. This is where repos such as the engineering tracker or this dashboard go.
+
+**`repositories`**: custom additions and overrides only. A repo the sources already find needs no entry. Use an entry to add a repo the query does not find (a private one, or one outside the query), or to set something for one repo:
+
+```json
+{"name": "some-repo", "dev_branch": "integration", "tags": ["core"], "security_workflow": "scan.yml", "releases": {"sources": ["tag"]}}
+```
+
+All keys except `name` are optional. An entry is merged with whatever the sources found, and its `tags` are added to theirs.
+
+**Branches.** There is no `branch` on a repo: the Development / Main switch on the dashboard decides.
+- **Main** is the repo's default branch.
+- **Development** is the repo's `dev_branch` if given, else the first branch (alphabetically) matching `branches.development`, else the default branch. In that last case the dashboard says *default branch* next to the name, so a repo without a development branch is not shown as if it had one.
+- A branch that does not exist (a wrong `dev_branch`) shows **Branch not found**.
+
+**Release sets.** `release_sets` names a release across repos that version themselves differently:
+
+```json
+"release_sets": [
+  {"alias": "v1", "label": "Release 1", "tags": {"network-adapter": "0.1.0", "discovery-service": "0.1.0", "knowledge-provider": "v0.1.0"}},
+  {"alias": "v2", "label": "Release 2", "current": true, "tags": {"network-adapter": "0.2.0", "discovery-service": "0.2.0"}}
 ]
 ```
 
-- `branch` is optional; no `branch` uses the repository's default branch. A branch that does not exist shows **Branch not found**.
-- `tags` are optional chips shown next to the name.
-- `security_workflow` is optional and defaults to `defaults.security_workflow` (`security.yml`).
+- `tags` maps each repo to its own tag (`0.1.0`, `v0.1.0` and `release-0.1.0` are the same version). It is matched to the versions found under `releases` below, so the tag must be a version name and within `max_versions`; otherwise the row says the tag was not found.
+- One set may be marked `"current": true`; with none marked, the last one listed is current. The dashboard opens on the current set and the **Release** selector switches between sets or back to each repo's latest. Repos you did not map show *Not part of Release 2*.
+- The selection is in the address bar (`?set=v1`).
 
-**`sources`**: ways to find repos automatically. Every repo a source finds gets that source's `tags`.
-
-```json
-"sources": [
-  {"type": "query", "query": "props.project-name:\"OAN DPG\"", "tags": ["DPG"], "fallback": ["network-adapter"]},
-  {"type": "project", "number": 9, "tags": ["DPG"], "enabled": false}
-]
-```
-
-- `query` is a [GitHub repository search](https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories) query. `org:<organization>` and `fork:true` are added for you, because search hides forks by default; set `"include_forks": false` to opt out. Custom properties are searched with `props.<name>:"<value>"`.
-- `project` finds repos with an issue or PR on an org project board. It needs the `DPG_PROJECT_TOKEN` secret.
-- Both accept `branch` (used for repos they find that you did not list), `enabled` (default `true`) and `fallback`, a list of repo names used if the lookup fails (rate limit, missing token), so tags do not silently disappear.
-- Private repos found by a source are skipped, because the dashboard is public. List a private repo under `repositories` to track it anyway.
-
-**`exclude`**: repo names to drop from everything.
+**Other settings**: `coverage` (`workflow_names`, `artifact_name_hints`), `security` (`workflow`), `releases`, `stack` and `licenses` are described in their own sections. Removed keys are rejected with a message saying what replaces them: `branch` on a repo or source, `fallback`, `defaults`, `workflow_names`, `artifact_name_hints` at the top level, `dpg_repositories`, `dpg_project`, `dpg_source`, `exclude_repositories`, `release_branch_prefix`. Unknown keys and the same repo listed twice are errors that name the entry.
 
 ### When the same repo turns up twice
 
 Names are compared ignoring case.
-
-1. A repo under `repositories` decides its own `branch` and `security_workflow`.
+1. A repo under `repositories` decides its own `dev_branch` and `security_workflow`.
 2. `tags` are merged: its own first, then each source's, in file order.
-3. Between sources, the first one that sets a `branch` wins. A different branch from a later source is logged as `clash`.
-4. `exclude` beats everything, including a listed repo.
-5. A source that fails never stops the others, and the refresh log says which one and why.
-
-The same repo listed twice under `repositories`, an unknown source `type`, or a mistyped value stops the run with a message naming the entry. The old keys `dpg_repositories`, `dpg_project`, `dpg_source`, `exclude_repositories` and `release_branch_prefix` are no longer read, and the error tells you what replaces them.
+3. `exclude` beats everything, including a listed repo.
+4. Private repos found by a source are skipped; listed repos are always kept.
 
 ## Finding releases
 
@@ -129,13 +139,13 @@ Both pages share one filter component (`filters.js`).
 
 | Data | Source | Authorization |
 |---|---|---|
-| Languages, technologies, dependencies | [specfy/stack-analyser](https://github.com/specfy/stack-analyser) on a shallow clone of the working branch | The clone uses no token and runs with an allowlisted environment, so no secret reaches the third-party code |
+| Languages, technologies, dependencies | [specfy/stack-analyser](https://github.com/specfy/stack-analyser) on a shallow clone of the development branch | The clone uses no token and runs with an allowlisted environment, so no secret reaches the third-party code |
 | Repo license | GitHub's license API | The workflow token |
 | Dependency license and latest version (npm, PyPI, Go) | [deps.dev](https://deps.dev) | None, public API |
 | Known vulnerabilities and the fixed version | [OSV.dev](https://osv.dev) (Google's open vulnerability database, which includes the GitHub advisories) | None: public API, no key or login. Only package names and versions are sent |
 
 - **Main stack only.** The Stack column lists the repo's real languages and frameworks, not every file type. `stack` in `config/repos.json` controls it: `ignore_languages` and `ignore_techs` (markup, data, CI and tooling by default), `max_languages`, `max_techs`, and `min_share` (a language must be at least that share of the remaining code files; stack-analyser labels a stray `go.mod` as AMPL). Names are compared ignoring case. Languages and tools that are already implied (for example `python` as a tool next to the language Python) are in the ignore list.
-- **Development / Main.** Both the stack table and `deps.html` have the same switch as the coverage tables: each repo's working branch, or its default branch. A repo whose working branch is its default branch is analysed once. The choice is remembered across the two pages and kept in the address bar (`?branch=main`).
+- **Development / Main.** Both the stack table and `deps.html` have the same switch as the coverage tables: each repo's development branch, or its default branch. A repo whose development branch is its default branch is analysed once. The choice is remembered across the two pages and kept in the address bar (`?branch=main`).
 - **"OR", commas and AND in licenses.** A license can be an SPDX expression. `Apache-2.0 OR BSD-3-Clause` (for example `cryptography`) is a real choice. Several licenses reported together (`Apache-2.0, BSD-3-Clause`, for example Go modules that contain files under both) all apply, so the policy takes the strictest; each comma-separated item is classified on its own before that. Names such as `GPL-3.0-or-later` contain "or" as part of the id and are not expressions.
 - A package is checked at the version in its manifest. For a range such as `^5.0.0` that is the lowest version the range allows, so the version actually installed may be newer and already fixed; the page says so on those rows. Exact pins (`==`, Go modules) are checked exactly.
 - **Fixed in** is the single lowest version that fixes every advisory that has a fix. Advisories with no released fix are counted separately and shown as *no fix released*.
@@ -160,7 +170,7 @@ The workflow's built-in `GITHUB_TOKEN` is enough for public repositories' branch
 
 ## Coverage fallback
 
-If Codecov has nothing for the branch, the script looks for a coverage file in the artifacts of the latest successful run (of workflows named in `workflow_names`, default `CI`) on that branch. Supported: Cobertura/JaCoCo XML, LCOV, Istanbul `coverage-summary.json`, Go cover profiles.
+If Codecov has nothing for the branch, the script looks for a coverage file in the artifacts of the latest successful run (of workflows named in `coverage.workflow_names`, default `CI`; `coverage.artifact_name_hints` limits which artifacts are read) on that branch. Supported: Cobertura/JaCoCo XML, LCOV, Istanbul `coverage-summary.json`, Go cover profiles.
 
 ## Local run
 

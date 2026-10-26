@@ -25,7 +25,7 @@
   <section aria-labelledby="dev-title">
     <div class="sec-head"><div>
       <h2 id="dev-title">Development</h2>
-      <p class="sub" id="dev-note">Each repository's working branch, set in <code>config/repos.json</code>.</p>
+      <p class="sub" id="dev-note">Each repository's development branch: its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>, else the default branch.</p>
     </div>
       <div class="switch" role="group" aria-label="Branch to show">
         <button type="button" id="view-dev" aria-pressed="true">Development</button>
@@ -41,9 +41,10 @@
   <section aria-labelledby="rel-title">
     <div class="sec-head"><div>
       <h2 id="rel-title">Latest release</h2>
-      <p class="sub">Each repository's newest stable version. Choose one version for every repository here, or change a single repository in its row. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
+      <p class="sub">Each repository's newest stable version, or the tags of a named release (when the config defines release sets). Choose a release or one version for every repository here, or change a single repository in its row. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
     </div>
-      <div class="controls"><label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select></div>
+      <div class="controls"><label class="sub" for="rel-set" id="rel-set-label" hidden>Release</label><select class="ver" id="rel-set" hidden><option value="">Each repo's latest</option></select>
+        <label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select></div>
     </div>
     <div id="rel-filters"></div>
     <div class="table-wrap"><table>
@@ -55,7 +56,7 @@
   <section aria-labelledby="stack-title">
     <div class="sec-head"><div>
       <h2 id="stack-title">Stack and licenses</h2>
-      <p class="sub" id="stack-note">Each repository's working branch. <a href="deps.html">All dependencies →</a></p>
+      <p class="sub" id="stack-note">Each repository's development branch. <a href="deps.html">All dependencies →</a></p>
     </div></div>
     <div class="table-wrap"><table class="wide">
       <thead><tr><th scope="col">Repository</th><th scope="col">License</th><th scope="col">Stack</th><th scope="col">Dependencies</th></tr></thead>
@@ -66,14 +67,14 @@
   <details class="how">
     <summary>How this is measured</summary>
     <ul>
-      <li><b>Branch.</b> Set per repository in <code>config/repos.json</code> (for example <code>development</code> for network-adapter, <code>main</code> for the AI repos).</li>
+      <li><b>Branch.</b> Set per repository in <code>config/repos.json</code> (the <code>dev_branch</code> in the config, else the first branch matching <code>branches.development</code>, else the default branch).</li>
       <li><b>Releases.</b> Versions come from release branches (<code>release-1.2.0</code>), git tags (<code>v1.2.0</code>) and GitHub Releases, as set under <code>releases</code> in the config. <code>v1.2.0</code> and <code>1.2.0</code> are one version; names that are not versions (such as <code>fork-point</code>) are ignored. A branch is measured as it is now and has live badges. A tag or release is measured at its tagged commit, so it shows plain numbers and the date of the last run.</li>
       <li><b>Code coverage.</b> The badge is Codecov's live badge for that branch. The line count underneath comes from the last refresh: Codecov first, otherwise the coverage file saved by the latest <code>CI</code> run on that branch. Partially covered lines count as not covered.</li>
       <li><b>Security.</b> The latest completed run of the repo's <code>security.yml</code> on that branch. <i>No runs on this branch</i> means the workflow does not run there; it is not a failure.</li>
       <li><b>Refresh data</b> opens the refresh workflow on GitHub; click <i>Run workflow</i> there (needs write access to this repo). The badges are always live; line counts and run links update when the run finishes.</li>
       <li><b>Stale coverage.</b> A <i>Measured</i> date more than 14 days old is shown in amber: that branch has had no coverage upload for two weeks.</li>
       <li><b>Dates.</b> <i>Measured</i> is the commit time of the commit whose coverage is shown (or the CI run time). <i>Last run</i> is when the latest security run on that branch finished.</li>
-      <li><b>Stack and licenses.</b> <a href="https://github.com/specfy/stack-analyser" target="_blank" rel="noopener">specfy/stack-analyser</a> reads a fresh clone of the working branch for languages, technologies and dependencies. The repo license is GitHub's reading of its <code>LICENSE</code> file. Each npm, PyPI and Go dependency's license and latest version come from <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a>; Docker images and GitHub Actions are listed but not looked up.</li>
+      <li><b>Stack and licenses.</b> <a href="https://github.com/specfy/stack-analyser" target="_blank" rel="noopener">specfy/stack-analyser</a> reads a fresh clone of the development branch for languages, technologies and dependencies. The repo license is GitHub's reading of its <code>LICENSE</code> file. Each npm, PyPI and Go dependency's license and latest version come from <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a>; Docker images and GitHub Actions are listed but not looked up.</li>
       <li><b>No report</b> or an <i>unknown</i> badge means nothing was uploaded for that branch. It does not mean 0%. This dashboard never reruns tests.</li>
     </ul>
   </details>
@@ -108,9 +109,25 @@ function row(r,picker){
       ?`<a class="pct ${s.state==='passing'?'good':'bad'}" href="${esc(s.run_url)}" target="_blank" rel="noopener">${esc(label)}</a>`
       :`<span class="muted">${esc(label)}</span>`))
     +(day(s.finished_at)?`<div class="sub">Last run ${esc(day(s.finished_at))}</div>`:'');
-  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}${picker||`<div class="sub">${esc(r.branch)}</div>`}</td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}${picker||`<div class="sub">${esc(r.branch)}${devDefault(r)}</div>`}</td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
 }
-const picked={};let relAll='',relAllowed=null,relBar=null,bar=null,visibleSet=null;
+const picked={};let relAll='',relSet='',relAllowed=null,relBar=null,bar=null,visibleSet=null;
+const devDefault=r=>view==='dev'&&r.branch_source==='default'&&r.ref_kind!=='tag'?' <span title="No branch matched the development pattern in config/repos.json, so the default branch is shown">· default branch</span>':'';
+const pool=g=>relSet?g.versions:gv(g);   // a named release ignores the Found as / Stability filters: it names its versions itself
+const curSet=()=>(data.release_sets||[]).find(s=>s.alias===relSet);
+const setEntry=g=>{const s=curSet();const e=s&&Object.entries(s.repos).find(([k])=>k.toLowerCase()===g.repository.toLowerCase());return e&&e[1]};
+function setUrl(k,v){const q=new URLSearchParams(location.search);v?q.set(k,v):q.delete(k);try{history.replaceState(null,'',q.toString()?'?'+q:location.pathname)}catch(_){}}
+function fillRelSet(){
+  const sets=data.release_sets||[],sel=$('rel-set');
+  $('rel-set').hidden=$('rel-set-label').hidden=!sets.length;
+  sel.innerHTML='<option value="">Each repo\'s latest</option>'+sets.map(s=>`<option value="${esc(s.alias)}">${esc(s.label)}${s.current?' (current)':''}</option>`).join('');
+  sel.value=sets.some(s=>s.alias===relSet)?relSet:'';relSet=sel.value;
+}
+function initRelSet(){
+  const sets=data.release_sets||[],q=new URLSearchParams(location.search),p=q.get('set'),cur=sets.find(s=>s.current);
+  relSet=p===null?(q.get('ver')?'':cur?cur.alias:''):p==='latest'?'':p;
+  fillRelSet();$('rel-all').disabled=!!relSet;
+}
 const shown=r=>!visibleSet||visibleSet.has(r.repository);
 const vkey=(g,v)=>g.repository+'@'+v.version;
 const gv=g=>relAllowed?g.versions.filter(v=>relAllowed.has(vkey(g,v))):g.versions;
@@ -124,15 +141,21 @@ function fillRelAll(){
 }
 const KIND={branch:'release branch',tag:'tag',release:'GitHub Release'};
 function relPick(g){
-  const by=x=>gv(g).find(v=>v.version===x);
+  const by=x=>pool(g).find(v=>v.version===x);
   if(picked[g.repository])return by(picked[g.repository])||null;
+  if(relSet){const m=setEntry(g);return m&&m.version?by(m.version)||null:null}
   return relAll?by(relAll)||null:latestOf(g);
+}
+function missingText(g){
+  if(picked[g.repository]||!relSet)return `This repository has no ${esc(picked[g.repository]||relAll)} version.`;
+  const m=setEntry(g),s=curSet();
+  return m?`Tag <code>${esc(m.tag)}</code> is not among this repository's versions (not a version name, or older than <code>releases.max_versions</code>).`:`Not part of ${esc(s.label)}.`;
 }
 function relRow(g){
   const v=relPick(g),id='ver-'+g.repository.replace(/[^\w-]/g,'_'),want=picked[g.repository]||relAll;
-  const gone=v?'':`<option value="" selected disabled>No ${esc(want)}</option>`;
-  const opts=gone+gv(g).map(x=>`<option value="${esc(x.version)}"${x===v?' selected':''}>${esc(x.version)}${x.prerelease?' (pre-release)':''}${x===latestOf(g)?' · latest':''}</option>`).join('');
-  if(!v)return `<tr><td><a class="repo" href="${esc(g.html_url)}" target="_blank" rel="noopener">${esc(g.repository)}</a> ${tagChips(g)}<div><label class="sr" for="${id}">Version of ${esc(g.repository)}</label><select class="ver" id="${id}" data-repo="${esc(g.repository)}">${opts}</select></div></td><td colspan="2" data-label="Code coverage" class="muted">This repository has no ${esc(want)} version.</td></tr>`;
+  const gone=v?'':`<option value="" selected disabled>${relSet&&!picked[g.repository]?'Not in this release':'No '+esc(want)}</option>`;
+  const opts=gone+pool(g).map(x=>`<option value="${esc(x.version)}"${x===v?' selected':''}>${esc(x.version)}${x.prerelease?' (pre-release)':''}${x===latestOf(g)?' · latest':''}</option>`).join('');
+  if(!v)return `<tr><td><a class="repo" href="${esc(g.html_url)}" target="_blank" rel="noopener">${esc(g.repository)}</a> ${tagChips(g)}<div><label class="sr" for="${id}">Version of ${esc(g.repository)}</label><select class="ver" id="${id}" data-repo="${esc(g.repository)}">${opts}</select></div></td><td colspan="2" data-label="Code coverage" class="muted">${missingText(g)}</td></tr>`;
   const more=g.not_measured>0?`<div class="sub">${g.not_measured} older ${g.not_measured===1?'version is':'versions are'} not shown (<code>releases.max_versions</code>).</div>`:'';
   const how=`${v.kinds.map(k=>KIND[k]).join(' + ')} · <code>${esc(v.branch)}</code>${day(v.published_at)?` · ${esc(day(v.published_at))}`:''}`;
   return row({...v,repository:g.repository,html_url:g.html_url,tags:g.tags,dpg:g.dpg},
@@ -152,8 +175,8 @@ function setView(v){
   view=v;try{localStorage.setItem('branchView',v)}catch(e){}
   $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
   $('dev-title').textContent=v==='main'?'Main':'Development';
-  $('stack-note').innerHTML=(v==='main'?'Each repository\'s default branch.':'Each repository\'s working branch.')+' <a href="deps.html">All dependencies →</a>';
-  $('dev-note').innerHTML=v==='main'?'Each repository\'s default branch.':'Each repository\'s working branch, set in <code>config/repos.json</code>.';
+  $('stack-note').innerHTML=(v==='main'?'Each repository\'s default branch.':'Each repository\'s development branch.')+' <a href="deps.html">All dependencies →</a>';
+  $('dev-note').innerHTML=v==='main'?'Each repository\'s default branch.':'Each repository\'s development branch: its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>, else the default branch.';
   if(bar)bar.setItems(repoItems());else{summary();render()}
 }
 let stack=null;
@@ -165,7 +188,7 @@ function stackRow(r){
   const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
     :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
     :'<span class="muted">None found</span>';
-  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}</div></td>`
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}${devDefault(r)}</div></td>`
     +`<td data-label="License">${lic}</td>`
     +`<td data-label="Stack">${esc(langs)||'<span class="muted">Nothing detected</span>'}${techs.length?`<div class="techs">${esc(techs.slice(0,8).join(', '))}${techs.length>8?` +${techs.length-8} more`:''}</div>`:''}</td>`
     +`<td data-label="Dependencies">${dep}</td></tr>`;
@@ -178,7 +201,7 @@ function fillStack(){
 function render(){
   if($('rel-all').options.length<2)fillRelAll();
   fill('dev-rows',viewList(),'No repositories configured. Add them to config/repos.json.');
-  fill('rel-rows',(data.releases||[]).filter(g=>gv(g).length),relAllowed?'No repository has a version that matches.':'No repository has a release version yet.',relRow);
+  fill('rel-rows',(data.releases||[]).filter(g=>pool(g).length),relAllowed?'No repository has a version that matches.':'No repository has a release version yet.',relRow);
   fillStack();
 }
 /* ---- filters: one bar for every table (a repository is shown when it passes all of them) ---- */
@@ -228,15 +251,15 @@ async function init(){
     data=await res.json();
     $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Not refreshed yet';
     if(!data.main)data.main=data.repositories||[];
-    setView(view);initFilters();fillRelAll();summary();render();
+    setView(view);initFilters();initRelSet();fillRelAll();summary();render();
   }catch(e){
     $('updated').textContent='Data unavailable';
     $('summary').textContent='Coverage data could not be loaded. Run the refresh workflow and check its logs.';
     ['dev-rows','rel-rows'].forEach(id=>$(id).innerHTML='<tr><td colspan="3" class="empty">data/coverage.json is missing or unreadable.</td></tr>');
   }
 }
-$('rel-all').addEventListener('change',e=>{relAll=e.target.value;for(const k in picked)delete picked[k];
-  const q=new URLSearchParams(location.search);relAll?q.set('ver',relAll):q.delete('ver');try{history.replaceState(null,'',q.toString()?'?'+q:location.pathname)}catch(_){}render()});
+$('rel-all').addEventListener('change',e=>{relAll=e.target.value;for(const k in picked)delete picked[k];setUrl('ver',relAll);render()});
+$('rel-set').addEventListener('change',e=>{relSet=e.target.value;relAll='';$('rel-all').value='';$('rel-all').disabled=!!relSet;for(const k in picked)delete picked[k];setUrl('ver','');setUrl('set',relSet||'latest');render()});
 $('rel-rows').addEventListener('change',e=>{const s=e.target.closest('select.ver');if(s){picked[s.dataset.repo]=s.value;render();const again=document.querySelector(`select.ver[data-repo="${CSS.escape(s.dataset.repo)}"]`);if(again)again.focus()}});
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
 init();initStack();

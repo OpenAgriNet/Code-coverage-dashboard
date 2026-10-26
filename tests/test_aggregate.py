@@ -119,3 +119,26 @@ def test_release_group_none_when_releases_off_or_none_found(monkeypatch):
     assert a.release_group({'name': 'na', 'releases': {}}) is None
     monkeypatch.setattr(a, 'find_versions', lambda *x: (_ for _ in ()).throw(RuntimeError('boom')))
     assert a.release_group({'name': 'na', 'releases': {}}) is None
+
+def test_main_record_is_labelled_default_and_dev_record_keeps_how_it_was_found(monkeypatch):
+    seen = []
+    monkeypatch.setattr(a, 'safe_inspect', lambda t: seen.append((t['branch'], t.get('branch_source'))) or {'repository': t['name'], 'branch': t['branch'], 'branch_source': t.get('branch_source')})
+    monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
+    monkeypatch.setattr(a, 'release_group', lambda t: None)
+    got = a.collect([{'name': 'na', 'branch': 'development', 'branch_source': 'pattern', 'tags': []}])
+    assert seen == [('development', 'pattern'), ('main', 'default')]
+    assert got['repositories'][0]['branch_source'] == 'pattern' and got['main'][0]['branch_source'] == 'default'
+
+def test_collect_adds_resolved_release_sets(monkeypatch):
+    monkeypatch.setattr(a, 'safe_inspect', lambda t: {'repository': t['name'], 'branch': 'main'})
+    monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
+    monkeypatch.setattr(a, 'release_group', lambda t: {'repository': t['name'], 'versions': [{'version': '0.1.0'}]})
+    sets = [{'alias': 'v1', 'label': 'v1', 'current': False, 'tags': {'na': 'v0.1.0'}}]
+    got = a.collect([{'name': 'na', 'branch': None, 'tags': [], 'releases': a.CFG['releases']}], sets)
+    assert got['release_sets'] == [{'alias': 'v1', 'label': 'v1', 'current': True, 'repos': {'na': {'tag': 'v0.1.0', 'version': '0.1.0'}}}]
+
+def test_collect_without_sets_has_an_empty_list(monkeypatch):
+    monkeypatch.setattr(a, 'safe_inspect', lambda t: {'repository': t['name'], 'branch': 'main'})
+    monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
+    monkeypatch.setattr(a, 'release_group', lambda t: None)
+    assert a.collect([{'name': 'na', 'branch': None, 'tags': []}])['release_sets'] == []

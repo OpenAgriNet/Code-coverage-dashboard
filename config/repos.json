@@ -5,34 +5,38 @@
     {
       "type": "query",
       "query": "props.project-name:\"OAN DPG\"",
-      "tags": ["DPG"],
-      "fallback": ["decision-support-system", "discovery-service", "helmcharts", "infra-automation", "network-adapter"]
-    },
-    {
-      "type": "project",
-      "org": "OpenAgriNet",
-      "number": 9,
-      "tags": ["DPG"],
-      "enabled": false
+      "tags": ["DPG"]
     }
   ],
 
+  "exclude": ["engineering-tracker", "Code-coverage-dashboard"],
+
   "repositories": [
-    { "name": "network-adapter", "branch": "development" },
-    { "name": "discovery-service", "branch": "development" },
-    { "name": "helmcharts", "branch": "development" },
-    { "name": "decision-support-system", "branch": "main" },
-    { "name": "knowledge-provider", "branch": "main" },
-    { "name": "experience-api", "branch": "main" },
-    { "name": "experience-ui", "branch": "main" },
-    { "name": "infra-automation", "branch": "main" }
+    { "name": "infra-automation" }
   ],
 
-  "exclude": ["engineering-tracker"],
+  "branches": {
+    "development": "^(dev|develop|development)$"
+  },
 
-  "defaults": { "security_workflow": "security.yml" },
-  "workflow_names": ["CI"],
-  "artifact_name_hints": [],
+  "release_sets": [],
+
+  "releases": {
+    "sources": ["branch", "tag", "release"],
+    "branch_prefix": "release-",
+    "tag_pattern": "^v?(?P<version>\\d+(?:\\.\\d+)*(?:-[0-9A-Za-z.]+)?)$",
+    "include_prereleases": true,
+    "max_versions": 10
+  },
+
+  "coverage": {
+    "workflow_names": ["CI"],
+    "artifact_name_hints": []
+  },
+
+  "security": {
+    "workflow": "security.yml"
+  },
 
   "stack": {
     "ignore_languages": ["Markdown", "JSON", "YAML", "TOML", "INI", "CSV", "Text", "SVG", "XML", "Jinja", "Smarty", "HTML", "CSS", "SCSS", "Shell", "Dockerfile", "Makefile", "AMPL", "JSONiq"],
@@ -46,13 +50,5 @@
     "green": [],
     "yellow": [],
     "red": []
-  },
-
-  "releases": {
-    "sources": ["branch", "tag", "release"],
-    "branch_prefix": "release-",
-    "tag_pattern": "^v?(?P<version>\\d+(?:\\.\\d+)*(?:-[0-9A-Za-z.]+)?)$",
-    "include_prereleases": true,
-    "max_versions": 10
   }
 }

@@ -4,7 +4,9 @@ import io, json, os, re, sys, zipfile
 from datetime import datetime, timezone
 import requests
 from repoconfig import load as load_config, resolve
+from repoconfig.resolve import SourceError
 from releasefind import find_versions
+from releasefind.sets import resolve_sets
 import xml.etree.ElementTree as ET
 MAX_ARTIFACT_BYTES=100*1024*1024  # artifacts are read into memory
 API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN')
@@ -82,7 +84,7 @@ def inspect(t):
  """Coverage and security of one ref: a branch, or (when t['sha'] is set) a tagged commit, which has no live badges."""
  repo=t['name'];url=f'https://github.com/{ORG}/{repo}';sha=t.get('sha')
  branch,exists=(t['branch'],True) if sha else resolve_branch(repo,t.get('branch'))
- out={'repository':repo,'html_url':url,'dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':branch,'ref_kind':'tag' if sha else 'branch','branch_exists':exists,
+ out={'repository':repo,'html_url':url,'dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':branch,'ref_kind':'tag' if sha else 'branch','branch_source':t.get('branch_source'),'branch_exists':exists,
   'coverage':None,'coverage_source':'Branch not found','coverage_commit':None,'coverage_detail':None,
   'coverage_badge_url':None if sha else f'https://codecov.io/gh/{ORG}/{repo}/branch/{branch}/graph/badge.svg','measured_at':None,
   'security':{'state':'branch not found','run_url':None,'badge_url':None,'finished_at':None}}
@@ -97,7 +99,7 @@ def branch_coverage(repo,branch,sha=None):
  cc=codecov(repo,branch,sha)
  if cc:out.update(coverage=cc['coverage'],source='Codecov',commit=cc['commit'],detail={k:cc[k] for k in ('files','lines','hits','misses','partials','report_url')},measured_at=commit_date(repo,cc['commit']))
  try:
-  d=api(f'/repos/{ORG}/{repo}/actions/runs?{"head_sha="+sha if sha else "branch="+branch}&per_page=100') or {};names=[n.lower() for n in CFG.get('workflow_names',[])]
+  d=api(f'/repos/{ORG}/{repo}/actions/runs?{"head_sha="+sha if sha else "branch="+branch}&per_page=100') or {};names=[n.lower() for n in CFG['coverage']['workflow_names']]
   runs=sorted([r for r in d.get('workflow_runs',[]) if r.get('status')=='completed' and (not names or r.get('name','').lower() in names)],key=lambda r:r.get('updated_at',''),reverse=True)
   run=next((r for r in runs if r.get('conclusion')=='success'),runs[0] if runs else None)
   if not run:
@@ -108,7 +110,7 @@ def branch_coverage(repo,branch,sha=None):
   if cc:return out
   out.update(commit=run.get('head_sha'),measured_at=run.get('updated_at'))
   arts=(api(f"/repos/{ORG}/{repo}/actions/runs/{run['id']}/artifacts?per_page=100") or {}).get('artifacts',[])
-  hints=CFG.get('artifact_name_hints',[])
+  hints=CFG['coverage']['artifact_name_hints']
   for a in arts:
    if a.get('expired') or a.get('size_in_bytes',0)>MAX_ARTIFACT_BYTES or (hints and not any(h.lower() in a.get('name','').lower() for h in hints)):continue
    try:
@@ -154,20 +156,21 @@ def release_group(t):
  if not recs:return None
  return {'repository':t['name'],'html_url':f'https://github.com/{ORG}/{t["name"]}','dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),
   'default':next((r['version'] for r in recs if not r['prerelease']),recs[0]['version']),'not_measured':found['total']-len(recs),'versions':recs}
-def collect(targets):
+def collect(targets,sets=()):
  """Configured-branch view, default-branch (main) view, and per-repo release versions for every target."""
  dev,main,rel=[],[],[]
  for t in targets:
   r=safe_inspect(t);dev.append(r)
   try:d=default_branch(t['name'])
   except Exception as e:print(f'ERROR {t["name"]} default branch: {e}',file=sys.stderr);d=None
-  main.append(r if d is None or r['branch']==d else safe_inspect({**t,'branch':d}))
+  main.append(r if d is None or r['branch']==d else safe_inspect({**t,'branch':d,'branch_source':'default'}))
   g=release_group(t)
   if g:rel.append(g)
- return {'repositories':dev,'main':main,'releases':rel}
+ return {'repositories':dev,'main':main,'releases':rel,'release_sets':resolve_sets(sets,rel,{t['name'].lower():t['releases'] for t in targets if t.get('releases')})}
 def main():
- targets=resolve(CFG,ORG,api,PROJECT_TOKEN)
- d=collect(targets);results=d['repositories']
+ try:targets=resolve(CFG,ORG,api,PROJECT_TOKEN)
+ except SourceError as e:sys.exit(f'ERROR {e}')
+ d=collect(targets,CFG['release_sets']);results=d['repositories']
  os.makedirs('data',exist_ok=True)
  with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),**d},f,indent=2);f.write('\n')
  print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")

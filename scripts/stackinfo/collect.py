@@ -11,5 +11,5 @@ def collect(targets,policy=None,stack=None,record=stack_record,default_branch=ac
   r=record(t,policy=policy,stack=stack);dev.append(r)
   try:d=default_branch(t['name'])
   except Exception as e:log(f'ERROR {t["name"]} default branch: {e}');d=None
-  main.append(r if d is None or r['branch']==d else record({**t,'branch':d},policy=policy,stack=stack))
+  main.append(r if d is None or r['branch']==d else record({**t,'branch':d,'branch_source':'default'},policy=policy,stack=stack))
  return {'repositories':dev,'main':main}
