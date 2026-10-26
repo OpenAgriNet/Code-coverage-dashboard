@@ -1,0 +1,2586 @@
+{
+  "organization": "OpenAgriNet",
+  "generated_at": "2026-10-26T06:03:42.933370+00:00",
+  "analyser": "@specfy/stack-analyser@1.27.6",
+  "repositories": [
+    {
+      "repository": "network-adapter",
+      "html_url": "https://github.com/OpenAgriNet/network-adapter",
+      "dpg": true,
+      "branch": "development",
+      "license": "MIT",
+      "languages": [
+        [
+          "Go",
+          310
+        ],
+        [
+          "YAML",
+          122
+        ],
+        [
+          "Markdown",
+          31
+        ],
+        [
+          "JSON",
+          21
+        ],
+        [
+          "Shell",
+          19
+        ],
+        [
+          "INI",
+          2
+        ],
+        [
+          "AMPL",
+          1
+        ],
+        [
+          "JSONiq",
+          1
+        ],
+        [
+          "Open Policy Agent",
+          1
+        ],
+        [
+          "Standard ML",
+          1
+        ],
+        [
+          "Text",
+          1
+        ]
+      ],
+      "techs": [
+        "bash",
+        "codecov",
+        "docker",
+        "github",
+        "github.actions",
+        "golang",
+        "grafana",
+        "opentelemetry",
+        "prometheus",
+        "redis",
+        "zipkin"
+      ],
+      "dependencies": [
+        {
+          "ecosystem": "docker",
+          "name": "fidedocker/onix-adapter",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "fidedocker/sandbox-2.0",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "grafana/grafana",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "grafana/loki",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "jaegertracing/all-in-one",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "openzipkin/zipkin",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "otel/opentelemetry-collector-contrib",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "prom/prometheus",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "redis",
+          "version": "alpine",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/checkout",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/download-artifact",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/upload-artifact",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/login-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/setup-buildx-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/alicebob/miniredis/v2",
+          "version": "v2.37.0",
+          "latest": "v2.40.0",
+          "license": "MIT OR BSL-1.0 OR Unlicense",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/beckn/catalog-core",
+          "version": "v0.2.0",
+          "latest": "v0.2.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/decred/dcrd/dcrec/secp256k1/v4",
+          "version": "v4.4.1",
+          "latest": "v4.4.1",
+          "license": "ISC",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/getkin/kin-openapi",
+          "version": "v0.149.0",
+          "latest": "v0.152.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/google/uuid",
+          "version": "v1.6.0",
+          "latest": "v1.6.0",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/hashicorp/go-retryablehttp",
+          "version": "v0.7.8",
+          "latest": "v0.7.8",
+          "license": "MPL-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/hashicorp/vault/api",
+          "version": "v1.23.0",
+          "latest": "v1.23.0",
+          "license": "MPL-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/jackc/pgx/v5",
+          "version": "v5.10.0",
+          "latest": "v5.11.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/jsonata-go/jsonata",
+          "version": "v0.0.0-20250709164031-599f35f32e5f",
+          "latest": "v0.0.0-20250709164031-599f35f32e5f",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/lestrrat-go/jwx/v3",
+          "version": "v3.1.0",
+          "latest": "v3.4.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/open-policy-agent/opa",
+          "version": "v1.15.2",
+          "latest": "v1.21.4",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/prometheus/client_golang",
+          "version": "v1.23.2",
+          "latest": "v1.25.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/rabbitmq/amqp091-go",
+          "version": "v1.14.0",
+          "latest": "v1.16.0",
+          "license": "BSD-2-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/redis/go-redis/extra/redisotel/v9",
+          "version": "v9.19.0",
+          "latest": "v9.23.0",
+          "license": "BSD-2-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/redis/go-redis/v9",
+          "version": "v9.19.0",
+          "latest": "v9.23.0",
+          "license": "BSD-2-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/rs/zerolog",
+          "version": "v1.35.1",
+          "latest": "v1.35.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/santhosh-tekuri/jsonschema/v6",
+          "version": "v6.0.3",
+          "latest": "v6.0.3",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/contrib/instrumentation/runtime",
+          "version": "v0.68.0",
+          "latest": "v0.72.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc",
+          "version": "v0.21.0",
+          "latest": "v0.23.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/exporters/prometheus",
+          "version": "v0.65.0",
+          "latest": "v0.69.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/log",
+          "version": "v0.21.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/metric",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/sdk",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/sdk/log",
+          "version": "v0.21.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/sdk/metric",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/trace",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.uber.org/automaxprocs",
+          "version": "v1.6.0",
+          "latest": "v1.6.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "golang.org/x/crypto",
+          "version": "v0.57.0",
+          "latest": "v0.58.0",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "golang.org/x/sync",
+          "version": "v0.23.0",
+          "latest": "v0.24.0",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "google.golang.org/grpc",
+          "version": "v1.83.2",
+          "latest": "v1.84.0",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "gopkg.in/natefinch/lumberjack.v2",
+          "version": "v2.2.1",
+          "latest": "v2.2.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "gopkg.in/yaml.v2",
+          "version": "v2.4.0",
+          "latest": "v2.4.0",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "gopkg.in/yaml.v3",
+          "version": "v3.0.1",
+          "latest": "v3.0.1",
+          "license": "MIT OR Apache-2.0",
+          "license_of": "pinned"
+        }
+      ],
+      "error": null
+    },
+    {
+      "repository": "discovery-service",
+      "html_url": "https://github.com/OpenAgriNet/discovery-service",
+      "dpg": true,
+      "branch": "development",
+      "license": null,
+      "languages": [
+        [
+          "Go",
+          180
+        ],
+        [
+          "Markdown",
+          33
+        ],
+        [
+          "JSON",
+          25
+        ],
+        [
+          "YAML",
+          13
+        ],
+        [
+          "AMPL",
+          2
+        ],
+        [
+          "Awk",
+          2
+        ],
+        [
+          "PLSQL",
+          2
+        ],
+        [
+          "Python",
+          2
+        ],
+        [
+          "JSONiq",
+          1
+        ],
+        [
+          "Shell",
+          1
+        ],
+        [
+          "Text",
+          1
+        ]
+      ],
+      "techs": [
+        "bash",
+        "codecov",
+        "docker",
+        "github",
+        "github.actions",
+        "golang",
+        "openapi",
+        "opentelemetry",
+        "python"
+      ],
+      "dependencies": [
+        {
+          "ecosystem": "docker",
+          "name": "otel/opentelemetry-collector-contrib",
+          "version": "0.160.0",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "pgvector/pgvector",
+          "version": "0.8.0-pg16",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "./.github/actions/dhi-login",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/checkout",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/login-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/caarlos0/env/v11",
+          "version": "v11.4.1",
+          "latest": "v11.4.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/getkin/kin-openapi",
+          "version": "v0.150.0",
+          "latest": "v0.152.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/golang-migrate/migrate/v4",
+          "version": "v4.19.1",
+          "latest": "v4.20.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/google/uuid",
+          "version": "v1.6.0",
+          "latest": "v1.6.0",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/jackc/pgerrcode",
+          "version": "v0.0.0-20220416144525-469b46aa5efa",
+          "latest": "v0.0.0-20250907135507-afb5586c32a6",
+          "license": "MIT OR PostgreSQL",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/jackc/pgx/v5",
+          "version": "v5.10.0",
+          "latest": "v5.11.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/moby/moby/api",
+          "version": "v1.55.0",
+          "latest": "v1.56.1",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/pgvector/pgvector-go",
+          "version": "v0.4.1",
+          "latest": "v0.4.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/pgvector/pgvector-go/pgx",
+          "version": "v0.4.1",
+          "latest": "v0.4.1",
+          "license": null,
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/testcontainers/testcontainers-go",
+          "version": "v0.44.0",
+          "latest": "v0.44.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/testcontainers/testcontainers-go/modules/postgres",
+          "version": "v0.44.0",
+          "latest": "v0.44.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "github.com/uber/h3-go/v4",
+          "version": "v4.5.0",
+          "latest": "v4.5.0",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc",
+          "version": "v0.21.0",
+          "latest": "v0.23.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/log",
+          "version": "v0.21.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/metric",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/sdk",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/sdk/log",
+          "version": "v0.21.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/sdk/metric",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.opentelemetry.io/otel/trace",
+          "version": "v1.45.0",
+          "latest": "v1.47.0",
+          "license": "Apache-2.0 OR BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "go.uber.org/zap",
+          "version": "v1.27.0",
+          "latest": "v1.28.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "golang.org/x/crypto",
+          "version": "v0.57.0",
+          "latest": "v0.58.0",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "golang",
+          "name": "gopkg.in/yaml.v3",
+          "version": "v3.0.1",
+          "latest": "v3.0.1",
+          "license": "MIT OR Apache-2.0",
+          "license_of": "pinned"
+        }
+      ],
+      "error": null
+    },
+    {
+      "repository": "helmcharts",
+      "html_url": "https://github.com/OpenAgriNet/helmcharts",
+      "dpg": true,
+      "branch": "development",
+      "license": null,
+      "languages": [
+        [
+          "YAML",
+          589
+        ],
+        [
+          "Markdown",
+          66
+        ],
+        [
+          "Smarty",
+          52
+        ],
+        [
+          "JSON",
+          37
+        ],
+        [
+          "Text",
+          26
+        ],
+        [
+          "Shell",
+          7
+        ],
+        [
+          "Go",
+          2
+        ],
+        [
+          "XML",
+          2
+        ],
+        [
+          "AMPL",
+          1
+        ]
+      ],
+      "techs": [
+        "bash",
+        "docker",
+        "github",
+        "github.actions",
+        "golang",
+        "helm",
+        "opentelemetry",
+        "postgresql"
+      ],
+      "dependencies": [
+        {
+          "ecosystem": "docker",
+          "name": "clickhouse/clickstack-local",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "ghcr.io/sunbird-rc/sunbird-rc-core",
+          "version": "${REGISTRY_IMAGE_TAG}",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "ghcr.io/sunbird-rc/sunbird-rc-keycloak",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "jc21/nginx-proxy-manager",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "pgvector/pgvector",
+          "version": "0.8.0-pg16",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "postgres",
+          "version": "14",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/checkout",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "azure/setup-helm",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        }
+      ],
+      "error": null
+    },
+    {
+      "repository": "decision-support-system",
+      "html_url": "https://github.com/OpenAgriNet/decision-support-system",
+      "dpg": true,
+      "branch": "main",
+      "license": null,
+      "languages": [
+        [
+          "Python",
+          171
+        ],
+        [
+          "Markdown",
+          57
+        ],
+        [
+          "YAML",
+          23
+        ],
+        [
+          "Jinja",
+          11
+        ],
+        [
+          "JSON",
+          9
+        ],
+        [
+          "Shell",
+          3
+        ],
+        [
+          "TOML",
+          2
+        ],
+        [
+          "CSV",
+          1
+        ]
+      ],
+      "techs": [
+        "bash",
+        "codecov",
+        "docker",
+        "github",
+        "github.actions",
+        "openai",
+        "openapi",
+        "opentelemetry",
+        "python",
+        "redis"
+      ],
+      "dependencies": [
+        {
+          "ecosystem": "docker",
+          "name": "cgr.dev/chainguard/minio",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "docker.io/clickhouse/clickhouse-server",
+          "version": "25.12",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "docker.io/postgres",
+          "version": "${POSTGRES_VERSION",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "docker.io/redis",
+          "version": "7",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "docker.langfuse.com/langfuse/langfuse",
+          "version": "4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "docker.langfuse.com/langfuse/langfuse-worker",
+          "version": "4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/cache",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/checkout",
+          "version": "v7",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "astral-sh/setup-uv",
+          "version": "v7",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/build-push-action",
+          "version": "v6",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/login-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/setup-buildx-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "python",
+          "name": "anyio",
+          "version": "4.14.2",
+          "latest": "4.15.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "async-lru",
+          "version": "2.3.0",
+          "latest": "2.4.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "en-core-web-sm",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": "not found"
+        },
+        {
+          "ecosystem": "python",
+          "name": "fastapi",
+          "version": "0.141.1",
+          "latest": "0.162.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "httpx",
+          "version": "0.28.1",
+          "latest": "0.28.1",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "jinja2",
+          "version": "3.1.0",
+          "latest": "3.1.6",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "logfire",
+          "version": "3.0.0",
+          "latest": "5.3.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "opentelemetry-exporter-otlp-proto-http",
+          "version": "1.44.0",
+          "latest": "1.45.1",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "opentelemetry-instrumentation-fastapi",
+          "version": "0.65",
+          "latest": "0.66.0b1",
+          "license": "Apache-2.0",
+          "license_of": "latest"
+        },
+        {
+          "ecosystem": "python",
+          "name": "opentelemetry-instrumentation-logging",
+          "version": "0.65",
+          "latest": "0.66.0b1",
+          "license": "Apache-2.0",
+          "license_of": "latest"
+        },
+        {
+          "ecosystem": "python",
+          "name": "opentelemetry-sdk",
+          "version": "1.44.0",
+          "latest": "1.45.1",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "pydantic",
+          "version": "2.13.4",
+          "latest": "2.14.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "pydantic-settings",
+          "version": "2.5.0",
+          "latest": "2.16.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "pyyaml",
+          "version": "6.0.3",
+          "latest": "6.0.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "spacy",
+          "version": "3.8",
+          "latest": "3.8.16",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "uvicorn",
+          "version": "0.52.4",
+          "latest": "0.54.0",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        }
+      ],
+      "error": null
+    },
+    {
+      "repository": "knowledge-provider",
+      "html_url": "https://github.com/OpenAgriNet/knowledge-provider",
+      "dpg": false,
+      "branch": "main",
+      "license": null,
+      "languages": [
+        [
+          "JavaScript",
+          150
+        ],
+        [
+          "Python",
+          71
+        ],
+        [
+          "Markdown",
+          18
+        ],
+        [
+          "JSON",
+          16
+        ],
+        [
+          "YAML",
+          6
+        ],
+        [
+          "Shell",
+          5
+        ],
+        [
+          "HTML",
+          4
+        ],
+        [
+          "CSS",
+          2
+        ],
+        [
+          "INI",
+          1
+        ],
+        [
+          "PowerShell",
+          1
+        ],
+        [
+          "TOML",
+          1
+        ],
+        [
+          "Text",
+          1
+        ]
+      ],
+      "techs": [
+        "bash",
+        "codecov",
+        "css",
+        "docker",
+        "eslint",
+        "github",
+        "github.actions",
+        "huggingface",
+        "javascript",
+        "jsx",
+        "lucideicons",
+        "mistralai",
+        "nodejs",
+        "npm",
+        "postgresql",
+        "python",
+        "qdrant",
+        "radixui",
+        "react",
+        "reactrouterdom",
+        "redis",
+        "segment",
+        "shadcn",
+        "tailwind",
+        "vite",
+        "vitest"
+      ],
+      "dependencies": [
+        {
+          "ecosystem": "docker",
+          "name": "ghcr.io/openagrinet/knowledge-provider",
+          "version": "${IMAGE_TAG",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "ghcr.io/openagrinet/knowledge-provider-keycloak",
+          "version": "${IMAGE_TAG",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "ghcr.io/openagrinet/knowledge-provider-ui",
+          "version": "${IMAGE_TAG",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "minio/mc",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "minio/minio",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "postgres",
+          "version": "15-alpine",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "qdrant/qdrant",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "temporalio/auto-setup",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "docker",
+          "name": "temporalio/ui",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/cache",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/checkout",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/build-push-action",
+          "version": "v6",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/login-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/setup-buildx-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@eslint/js",
+          "version": "^10.0.1",
+          "latest": "10.0.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-alert-dialog",
+          "version": "^1.1.15",
+          "latest": "1.2.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-checkbox",
+          "version": "^1.3.3",
+          "latest": "1.4.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-dialog",
+          "version": "^1.1.15",
+          "latest": "1.3.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-dropdown-menu",
+          "version": "^2.1.16",
+          "latest": "2.2.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-select",
+          "version": "^2.2.6",
+          "latest": "2.4.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-separator",
+          "version": "^1.1.8",
+          "latest": "1.2.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-slot",
+          "version": "^1.2.4",
+          "latest": "1.5.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-switch",
+          "version": "^1.2.6",
+          "latest": "1.4.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-tabs",
+          "version": "^1.1.13",
+          "latest": "1.2.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-tooltip",
+          "version": "^1.2.8",
+          "latest": "1.4.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tailwindcss/vite",
+          "version": "^4.2.1",
+          "latest": "4.3.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@types/react",
+          "version": "^18.2.37",
+          "latest": "19.3.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@types/react-dom",
+          "version": "^18.2.15",
+          "latest": "19.3.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@vitejs/plugin-react",
+          "version": "^4.2.0",
+          "latest": "6.1.2",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@vitest/coverage-v8",
+          "version": "^4.1.11",
+          "latest": "5.0.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "class-variance-authority",
+          "version": "^0.7.1",
+          "latest": "0.7.1",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "clsx",
+          "version": "^2.1.1",
+          "latest": "2.1.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint",
+          "version": "^10.9.1",
+          "latest": "10.13.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint-plugin-react-hooks",
+          "version": "^7.1.1",
+          "latest": "7.1.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint-plugin-react-refresh",
+          "version": "^0.5.4",
+          "latest": "0.5.7",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "globals",
+          "version": "^17.11.0",
+          "latest": "17.13.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "jsdom",
+          "version": "^29.1.1",
+          "latest": "30.1.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "lucide-react",
+          "version": "^0.577.0",
+          "latest": "1.61.0",
+          "license": "ISC",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "react",
+          "version": "^18.2.0",
+          "latest": "19.3.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "react-dom",
+          "version": "^18.2.0",
+          "latest": "19.3.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "react-markdown",
+          "version": "^9.0.1",
+          "latest": "10.1.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "react-pdf",
+          "version": "^7.7.0",
+          "latest": "11.0.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "react-router-dom",
+          "version": "^6.20.0",
+          "latest": "7.18.4",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "remark-gfm",
+          "version": "^4.0.0",
+          "latest": "4.0.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "tailwind-merge",
+          "version": "^3.5.0",
+          "latest": "3.7.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "tailwindcss",
+          "version": "^4.2.1",
+          "latest": "4.3.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "vite",
+          "version": "^5.0.0",
+          "latest": "8.3.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "vitest",
+          "version": "^4.1.11",
+          "latest": "5.0.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "chandra-ocr",
+          "version": "0.2.0",
+          "latest": "0.2.0",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "fastapi",
+          "version": "0.100.0",
+          "latest": "0.162.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "httpx",
+          "version": "0.24.0",
+          "latest": "0.28.1",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "huggingface-hub",
+          "version": "0.35.3",
+          "latest": "2.3.0",
+          "license": "non-standard",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "langchain-text-splitters",
+          "version": "0.0.1",
+          "latest": "1.1.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "minio",
+          "version": "7.0.0",
+          "latest": "7.2.20",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "openpyxl",
+          "version": "3.1.0",
+          "latest": "3.1.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "pdf-inspector",
+          "version": "1.14.0",
+          "latest": "1.25.2",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "Pillow",
+          "version": "10.0.0",
+          "latest": "13.0.0",
+          "license": "HPND",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "psycopg2-binary",
+          "version": "2.9.0",
+          "latest": "2.9.13",
+          "license": "non-standard",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "pydantic",
+          "version": "2.0.0",
+          "latest": "2.14.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "pyfranc",
+          "version": "0.2.3",
+          "latest": "0.2.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "PyMuPDF",
+          "version": "1.27.0",
+          "latest": "2.0.0",
+          "license": "non-standard",
+          "license_of": "latest"
+        },
+        {
+          "ecosystem": "python",
+          "name": "pypdf",
+          "version": "5.0.0",
+          "latest": "6.21.2",
+          "license": "non-standard",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "python-multipart",
+          "version": "0.0.6",
+          "latest": "0.0.32",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "qdrant-client",
+          "version": "1.12.0",
+          "latest": "1.20.0",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "redis",
+          "version": "5.0.0",
+          "latest": "8.1.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "sentence-transformers",
+          "version": "5.1.0",
+          "latest": "6.2.0",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "slowapi",
+          "version": "0.1.9",
+          "latest": "0.1.10",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "temporalio",
+          "version": "1.0.0",
+          "latest": "1.34.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "tiktoken",
+          "version": "0.5.0",
+          "latest": "0.14.0",
+          "license": "non-standard",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "torch",
+          "version": "latest",
+          "latest": "2.14.1",
+          "license": "Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT AND Apache-2.0 WITH LLVM-exception",
+          "license_of": "latest"
+        },
+        {
+          "ecosystem": "python",
+          "name": "transformers",
+          "version": "4.56.1",
+          "latest": "5.20.2",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "uvicorn",
+          "version": "0.20.0",
+          "latest": "0.54.0",
+          "license": "non-standard",
+          "license_of": "pinned"
+        }
+      ],
+      "error": null
+    },
+    {
+      "repository": "experience-api",
+      "html_url": "https://github.com/OpenAgriNet/experience-api",
+      "dpg": false,
+      "branch": "main",
+      "license": null,
+      "languages": [
+        [
+          "Python",
+          22
+        ],
+        [
+          "Markdown",
+          12
+        ],
+        [
+          "YAML",
+          5
+        ],
+        [
+          "JSON",
+          1
+        ],
+        [
+          "TOML",
+          1
+        ]
+      ],
+      "techs": [
+        "codecov",
+        "docker",
+        "github",
+        "github.actions",
+        "python"
+      ],
+      "dependencies": [
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/checkout",
+          "version": "v7",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "astral-sh/setup-uv",
+          "version": "v7",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "codecov/codecov-action",
+          "version": "v5",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/build-push-action",
+          "version": "v6",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/login-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/setup-buildx-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "python",
+          "name": "fastapi",
+          "version": "0.141.1",
+          "latest": "0.162.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "httpx",
+          "version": "0.28.1",
+          "latest": "0.28.1",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "httpx-sse",
+          "version": "0.4.3",
+          "latest": "0.4.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "pydantic-settings",
+          "version": "2.5.0",
+          "latest": "2.16.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "python",
+          "name": "uvicorn",
+          "version": "0.52.4",
+          "latest": "0.54.0",
+          "license": "BSD-3-Clause",
+          "license_of": "pinned"
+        }
+      ],
+      "error": null
+    },
+    {
+      "repository": "experience-ui",
+      "html_url": "https://github.com/OpenAgriNet/experience-ui",
+      "dpg": false,
+      "branch": "main",
+      "license": "MIT",
+      "languages": [
+        [
+          "TypeScript",
+          192
+        ],
+        [
+          "JSON",
+          42
+        ],
+        [
+          "SVG",
+          18
+        ],
+        [
+          "Markdown",
+          12
+        ],
+        [
+          "CSS",
+          4
+        ],
+        [
+          "JavaScript",
+          4
+        ],
+        [
+          "YAML",
+          4
+        ],
+        [
+          "HTML",
+          2
+        ]
+      ],
+      "techs": [
+        "css",
+        "docker",
+        "eslint",
+        "github",
+        "github.actions",
+        "javascript",
+        "jsx",
+        "lucideicons",
+        "nginx",
+        "nodejs",
+        "npm",
+        "prettier",
+        "radixui",
+        "react",
+        "shadcn",
+        "tailwind",
+        "tanstackrouter",
+        "typescript",
+        "vite",
+        "vitest"
+      ],
+      "dependencies": [
+        {
+          "ecosystem": "docker",
+          "name": "experience-ui",
+          "version": "latest",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/cache",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/checkout",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "actions/setup-node",
+          "version": "v4",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/build-push-action",
+          "version": "v6",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/login-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "githubAction",
+          "name": "docker/setup-buildx-action",
+          "version": "v3",
+          "latest": null,
+          "license": null,
+          "license_of": null
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@eslint/eslintrc",
+          "version": "^3.3.7",
+          "latest": "3.3.7",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@eslint/js",
+          "version": "^9.39.5",
+          "latest": "10.0.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-avatar",
+          "version": "^1.2.6",
+          "latest": "1.3.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-dialog",
+          "version": "^1.1.23",
+          "latest": "1.3.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-popover",
+          "version": "^1.1.23",
+          "latest": "1.3.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-scroll-area",
+          "version": "^1.2.18",
+          "latest": "1.4.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@radix-ui/react-slot",
+          "version": "^1.3.3",
+          "latest": "1.5.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@stylistic/eslint-plugin",
+          "version": "^5.10.0",
+          "latest": "5.10.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tailwindcss/postcss",
+          "version": "^4.3.3",
+          "latest": "4.3.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tailwindcss/typography",
+          "version": "^0.5.20",
+          "latest": "0.5.20",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tanstack/eslint-plugin-router",
+          "version": "^1.162.0",
+          "latest": "1.162.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tanstack/react-query",
+          "version": "^5.103.2",
+          "latest": "5.104.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tanstack/react-query-devtools",
+          "version": "^5.103.2",
+          "latest": "5.104.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tanstack/react-router",
+          "version": "1.153.2",
+          "latest": "1.170.46",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tanstack/react-router-devtools",
+          "version": "1.153.2",
+          "latest": "1.167.2",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tanstack/router-plugin",
+          "version": "1.153.2",
+          "latest": "1.168.48",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@tanstack/virtual-file-routes",
+          "version": "^1.162.0",
+          "latest": "1.162.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@types/node",
+          "version": "^25.9.8",
+          "latest": "26.6.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@types/react",
+          "version": "^19.3.0",
+          "latest": "19.3.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@types/react-dom",
+          "version": "^19.3.0",
+          "latest": "19.3.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@vitejs/plugin-react-swc",
+          "version": "^4.3.3",
+          "latest": "4.3.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "@vitest/coverage-v8",
+          "version": "^5.0.1",
+          "latest": "5.0.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "autoprefixer",
+          "version": "^10.6.1",
+          "latest": "10.6.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "axios",
+          "version": "^1.20.0",
+          "latest": "1.20.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "baseline-browser-mapping",
+          "version": "^2.11.25",
+          "latest": "2.11.33",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "caniuse-lite",
+          "version": "^1.0.30001810",
+          "latest": "1.0.30001819",
+          "license": "CC-BY-4.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "class-variance-authority",
+          "version": "^0.7.1",
+          "latest": "0.7.1",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "clsx",
+          "version": "^2.1.1",
+          "latest": "2.1.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "cssnano",
+          "version": "^7.1.9",
+          "latest": "9.9.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint",
+          "version": "^9.39.5",
+          "latest": "10.13.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint-config-prettier",
+          "version": "^10.1.8",
+          "latest": "10.1.8",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint-plugin-import",
+          "version": "^2.32.0",
+          "latest": "2.32.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint-plugin-react-hooks",
+          "version": "^7.1.1",
+          "latest": "7.1.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint-plugin-react-refresh",
+          "version": "^0.4.26",
+          "latest": "0.5.7",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "eslint-plugin-simple-import-sort",
+          "version": "^12.1.1",
+          "latest": "14.0.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "globals",
+          "version": "^16.5.0",
+          "latest": "17.13.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "happy-dom",
+          "version": "^20.14.5",
+          "latest": "21.0.4",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "husky",
+          "version": "^9.1.7",
+          "latest": "9.1.7",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "knip",
+          "version": "^6.37.0",
+          "latest": "6.43.0",
+          "license": "ISC",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "lottie-react",
+          "version": "^2.4.2",
+          "latest": "3.1.2",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "lucide-react",
+          "version": "^0.562.0",
+          "latest": "1.61.0",
+          "license": "ISC",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "postcss",
+          "version": "^8.5.28",
+          "latest": "8.5.31",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "prettier",
+          "version": "^3.9.8",
+          "latest": "3.9.10",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "prettier-plugin-tailwindcss",
+          "version": "^0.7.4",
+          "latest": "0.8.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "react",
+          "version": "^19.3.0",
+          "latest": "19.3.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "react-dom",
+          "version": "^19.3.0",
+          "latest": "19.3.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "react-markdown",
+          "version": "^10.1.0",
+          "latest": "10.1.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "remark-gfm",
+          "version": "^4.0.1",
+          "latest": "4.0.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "tailwind-merge",
+          "version": "^3.7.0",
+          "latest": "3.7.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "tailwindcss",
+          "version": "^4.3.3",
+          "latest": "4.3.3",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "tw-animate-css",
+          "version": "^1.4.0",
+          "latest": "1.4.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "typescript",
+          "version": "~5.9.3",
+          "latest": "7.0.2",
+          "license": "Apache-2.0",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "typescript-eslint",
+          "version": "^8.70.1",
+          "latest": "8.72.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "vite",
+          "version": "^7.3.6",
+          "latest": "8.3.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "vite-plugin-node-polyfills",
+          "version": "^0.24.0",
+          "latest": "0.28.0",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "vite-tsconfig-paths",
+          "version": "^6.1.1",
+          "latest": "6.1.1",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "vitest",
+          "version": "^5.0.1",
+          "latest": "5.0.5",
+          "license": "MIT",
+          "license_of": "pinned"
+        },
+        {
+          "ecosystem": "npm",
+          "name": "zustand",
+          "version": "^5.0.15",
+          "latest": "5.0.16",
+          "license": "MIT",
+          "license_of": "pinned"
+        }
+      ],
+      "error": null
+    },
+    {
+      "repository": "infra-automation",
+      "html_url": "https://github.com/OpenAgriNet/infra-automation",
+      "dpg": true,
+      "branch": "main",
+      "license": null,
+      "languages": [
+        [
+          "Markdown",
+          1
+        ]
+      ],
+      "techs": [],
+      "dependencies": [],
+      "error": null
+    }
+  ]
+}
