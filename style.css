@@ -74,3 +74,8 @@ table.wide th:first-child{width:24%}table.wide th:nth-child(2){width:16%}table.w
 .pkg{font-weight:600;word-break:break-all}
 .back{font-size:14px;font-weight:600}
 @media (max-width:700px){.controls select{width:100%}}
+
+.ver{font:inherit;font-weight:600;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;margin-top:3px;max-width:100%}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.pct{font-weight:600}
+a.pct.good,a.pct.bad{text-decoration:none}

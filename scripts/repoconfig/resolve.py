@@ -16,13 +16,13 @@ def lookup(src,org,get,project_token):
  if src['type']=='query':return sources.query_repos(src,org,get)
  return sources.project_repos(src,org,project_token)
 def resolve(cfg,org,get,project_token=None,log=lambda m:print(m,file=sys.stderr)):
- """[{'name','branch','tags','security_workflow'}]: explicit repos first, then discovered ones in source order."""
+ """[{'name','branch','tags','security_workflow','releases'}]: explicit repos first, then discovered ones in source order."""
  skip={n.lower() for n in cfg['exclude']};found={}
- def target(name,branch,tags,workflow,explicit):
-  return {'name':name,'branch':branch,'tags':list(tags),'security_workflow':workflow or cfg['default_security_workflow'],'explicit':explicit}
+ def target(name,branch,tags,workflow,explicit,releases):
+  return {'name':name,'branch':branch,'tags':list(tags),'security_workflow':workflow or cfg['default_security_workflow'],'releases':releases,'explicit':explicit}
  for r in cfg['repositories']:
   if r['name'].lower() in skip:log(f'config: {r["name"]} is listed and excluded; skipping');continue
-  found[r['name'].lower()]=target(r['name'],r['branch'],r['tags'],r['security_workflow'],True)
+  found[r['name'].lower()]=target(r['name'],r['branch'],r['tags'],r['security_workflow'],True,r['releases'])
  for src in cfg['sources']:
   if not src['enabled']:continue
   try:matches=lookup(src,org,get,project_token);log(f'{src["label"]}: {len(matches)} repos')
@@ -33,7 +33,7 @@ def resolve(cfg,org,get,project_token=None,log=lambda m:print(m,file=sys.stderr)
    key=m['name'].lower()
    if key in skip:continue
    if m['private'] and key not in found:log(f'{src["label"]}: skipping private repo {m["name"]}');continue
-   if key not in found:found[key]=target(m['name'],src.get('branch'),src['tags'],None,False);continue
+   if key not in found:found[key]=target(m['name'],src.get('branch'),src['tags'],None,False,cfg['releases']);continue
    t=found[key];t['tags']=merge_tags(t['tags'],src['tags'])
    if src.get('branch') and not t['explicit']:
     if t['branch'] is None:t['branch']=src['branch']

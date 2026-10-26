@@ -22,7 +22,7 @@ def names(got):
 def test_explicit_repos_first_then_discovered_with_source_tags():
     got, _ = run(cfg(repositories=[{'name': 'a', 'branch': 'development'}], sources=[Q]), search(('b', False), ('a', False)))
     assert names(got) == ['a', 'b']
-    assert got[0] == {'name': 'a', 'branch': 'development', 'tags': ['DPG'], 'security_workflow': 'security.yml'}
+    assert got[0] == {'name': 'a', 'branch': 'development', 'tags': ['DPG'], 'security_workflow': 'security.yml', 'releases': config.RELEASE_DEFAULTS}
     assert got[1]['branch'] is None and got[1]['tags'] == ['DPG']
 
 def test_explicit_branch_beats_source_branch_and_tags_merge():
@@ -73,3 +73,11 @@ def test_per_repo_security_workflow_and_default():
     c = cfg(repositories=[{'name': 'a', 'security_workflow': 'sec.yml'}, 'b'], defaults={'security_workflow': 'scan.yml'})
     got, _ = run(c)
     assert [t['security_workflow'] for t in got] == ['sec.yml', 'scan.yml']
+
+def test_releases_setting_flows_to_targets_listed_off_and_discovered():
+    c = cfg(releases={'max_versions': 3}, repositories=[{'name': 'a', 'releases': {'sources': ['tag']}}, {'name': 'b', 'releases': False}, 'c'], sources=[Q])
+    got, _ = run(c, search(('d', False)))
+    by = {t['name']: t['releases'] for t in got}
+    assert by['a']['sources'] == ['tag'] and by['a']['max_versions'] == 3
+    assert by['b'] is None
+    assert by['c']['max_versions'] == 3 and by['d']['max_versions'] == 3
