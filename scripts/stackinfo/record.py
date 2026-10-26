@@ -15,7 +15,7 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,policy=None
  """Never raises: any failure becomes an `error` on the record, and the repo license is kept when it was read.
  `policy` is the green/yellow/red license lists; every license gets a license_class from it."""
  repo=t['name'];policy=policy or {}
- out={'repository':repo,'html_url':f'https://github.com/{ac.ORG}/{repo}','dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':t.get('branch'),
+ out={'repository':repo,'html_url':f'https://github.com/{ac.ORG}/{repo}','dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':t.get('branch'),'branch_source':t.get('branch_source'),
   'license':None,'license_class':None,'languages':[],'techs':[],'dependencies':[],'error':None}
  try:out['license']=repo_license(repo)
  except Exception as e:print(f'WARN license {repo}: {e}',file=sys.stderr)

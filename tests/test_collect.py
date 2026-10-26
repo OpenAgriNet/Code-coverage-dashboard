@@ -33,3 +33,7 @@ def test_default_branch_lookup_failure_reuses_the_working_branch_record():
 def test_order_follows_the_targets():
     got, _ = run([{'name': 'a', 'branch': 'x'}, {'name': 'b', 'branch': 'main'}], {'a': 'main', 'b': 'main'})
     assert [r['repository'] for r in got['repositories']] == ['a', 'b'] == [r['repository'] for r in got['main']]
+
+def test_the_default_branch_record_is_labelled_default():
+    got, _ = run([{'name': 'na', 'branch': 'development', 'branch_source': 'pattern'}], {'na': 'main'})
+    assert got['repositories'][0]['branch'] == 'development' and got['main'][0]['branch'] == 'main'
