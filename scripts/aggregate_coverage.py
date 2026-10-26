@@ -3,9 +3,10 @@
 import io, json, os, re, sys, zipfile
 from datetime import datetime, timezone
 import requests
+from repoconfig import load as load_config, resolve
 import xml.etree.ElementTree as ET
 API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN')
-CFG=json.load(open('config/repos.json',encoding='utf-8')); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+CFG=load_config('config/repos.json'); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
 if TOKEN: S.headers['Authorization']='Bearer '+TOKEN
 
 def api(path):
@@ -76,7 +77,7 @@ def resolve_branch(repo,branch):
  return branch,bool(api(f'/repos/{ORG}/{repo}/branches/{branch}'))
 def inspect(t):
  repo=t['name'];url=f'https://github.com/{ORG}/{repo}';branch,exists=resolve_branch(repo,t.get('branch'))
- out={'repository':repo,'html_url':url,'dpg':repo in CFG.get('dpg_repositories',[]),'branch':branch,'branch_exists':exists,
+ out={'repository':repo,'html_url':url,'dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':branch,'branch_exists':exists,
   'coverage':None,'coverage_source':'Branch not found','coverage_commit':None,'coverage_detail':None,
   'coverage_badge_url':f'https://codecov.io/gh/{ORG}/{repo}/branch/{branch}/graph/badge.svg','measured_at':None,
   'security':{'state':'branch not found','run_url':None,'badge_url':None,'finished_at':None}}
@@ -116,28 +117,6 @@ def branch_coverage(repo,branch):
   out['source']=f'No coverage report in latest {branch} run'
  except Exception as e:out.update(workflow_conclusion='error',source=str(e)[:180]);print(f'ERROR {repo}@{branch}: {e}',file=sys.stderr)
  return out
-PROJECT_QUERY="""query($org:String!,$num:Int!,$after:String){organization(login:$org){projectV2(number:$num){
- items(first:100,after:$after){pageInfo{hasNextPage endCursor}
-  nodes{content{... on Issue{repository{nameWithOwner isPrivate}} ... on PullRequest{repository{nameWithOwner isPrivate}}}}}}}}"""
-def dpg_project_repos():
- """Public repos with an issue or PR on the DPG org project, or None if the project can't be read.
- The dashboard is published openly, so private repos found on the project are never added."""
- proj=CFG.get('dpg_project') or {}
- if not proj.get('number') or not PROJECT_TOKEN:return None
- org=proj.get('org',ORG);names=set();after=None
- try:
-  while True:
-   r=requests.post(API+'/graphql',json={'query':PROJECT_QUERY,'variables':{'org':org,'num':int(proj['number']),'after':after}},headers={'Authorization':'Bearer '+PROJECT_TOKEN},timeout=45)
-   r.raise_for_status();j=r.json()
-   if j.get('errors'):raise RuntimeError(j['errors'][0].get('message'))
-   items=j['data']['organization']['projectV2']['items']
-   for n in items['nodes']:
-    repo=((n or {}).get('content') or {}).get('repository') or {}
-    owner,_,name=(repo.get('nameWithOwner') or '').partition('/')
-    if name and owner.lower()==ORG.lower() and repo.get('isPrivate') is False:names.add(name)
-   if not items['pageInfo']['hasNextPage']:return sorted(names)
-   after=items['pageInfo']['endCursor']
- except Exception as e:print(f'WARN DPG project #{proj.get("number")}: {e}; using dpg_repositories from config',file=sys.stderr);return None
 def security_status(repo,branch,workflow):
  """Latest completed run of the security workflow on `branch`."""
  out={'state':'no workflow','run_url':None,'badge_url':None,'finished_at':None}
@@ -156,20 +135,12 @@ def latest_release_branch(repo,prefix):
   key=(tuple(int(x) for x in m.group(1).split('.')),0 if m.group(2) else 1,int(m.group(2) or 0))
   if best is None or key>best[0]:best=(key,name)
  return best[1] if best else None
-def repo_targets(cfg,dpg):
- """Configured repos (objects or plain names) plus project-discovered ones, minus exclusions; first entry wins."""
- skip=set(cfg.get('exclude_repositories',[]));out={}
- for e in cfg.get('repositories',[])+list(dpg):
-  e={'name':e} if isinstance(e,str) else dict(e)
-  if e['name'] in skip or e['name'] in out:continue
-  out[e['name']]={'name':e['name'],'branch':e.get('branch'),'security_workflow':e.get('security_workflow','security.yml')}
- return list(out.values())
 def safe_inspect(t):
  """inspect(), but one repo's API failure becomes an 'unknown' row instead of stopping the whole refresh."""
  try:return inspect(t)
  except Exception as e:
   print(f'ERROR {t["name"]}@{t.get("branch")}: {e}',file=sys.stderr)
-  return {'repository':t['name'],'html_url':f'https://github.com/{ORG}/{t["name"]}','dpg':t['name'] in CFG.get('dpg_repositories',[]),'branch':t.get('branch') or 'default','branch_exists':None,
+  return {'repository':t['name'],'html_url':f'https://github.com/{ORG}/{t["name"]}','dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':t.get('branch') or 'default','branch_exists':None,
    'coverage':None,'coverage_source':f'Error: {str(e)[:120]}','coverage_commit':None,'coverage_detail':None,'coverage_badge_url':None,'measured_at':None,
    'security':{'state':'unknown','run_url':None,'badge_url':None,'finished_at':None}}
 def collect(targets,prefix):
@@ -185,11 +156,8 @@ def collect(targets,prefix):
   if rb:rel.append(safe_inspect({**t,'branch':rb}))
  return {'repositories':dev,'main':main,'releases':rel}
 def main():
- dpg=dpg_project_repos()
- if dpg is None:dpg=CFG.get('dpg_repositories',[])
- else:print(f"DPG project lists {len(dpg)} repos: {', '.join(dpg)}")
- CFG['dpg_repositories']=dpg
- d=collect(repo_targets(CFG,dpg),CFG.get('release_branch_prefix','release-'));results=d['repositories']
+ targets=resolve(CFG,ORG,api,PROJECT_TOKEN)
+ d=collect(targets,CFG.get('release_branch_prefix','release-'));results=d['repositories']
  os.makedirs('data',exist_ok=True)
  with open('data/coverage.json','w',encoding='utf-8') as f:json.dump({'organization':ORG,'generated_at':datetime.now(timezone.utc).isoformat(),**d},f,indent=2);f.write('\n')
  print(f"Wrote data/coverage.json for {len(results)} repos; coverage found for {sum(r['coverage'] is not None for r in results)}.")

@@ -83,7 +83,7 @@ const isNum=v=>v!=null&&v!==''&&Number.isFinite(Number(v));
 const num=v=>Number(v).toLocaleString();
 const day=v=>{if(!v)return '';const d=new Date(v);return isNaN(d)?'':d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})};
 const repoUrl=r=>r.html_url||`https://github.com/OpenAgriNet/${r.repository}`;
-const dpgTag=r=>r.dpg?'<span class="tag" title="Part of the OpenAgriNet DPG project">DPG</span>':'';
+const tagChips=r=>(r.tags||(r.dpg?['DPG']:[])).map(g=>`<span class="tag"${g==='DPG'?' title="Part of the OpenAgriNet DPG project"':''}>${esc(g)}</span>`).join(' ');
 const STALE_DAYS=14;
 document.addEventListener('error',e=>{const i=e.target;if(i.tagName==='IMG'&&i.dataset.fallback){const t=document.createElement('span');t.className='fallback';t.textContent=i.dataset.fallback;i.replaceWith(t)}},true);
 const SEC={passing:'Passing',failing:'Failing','no runs':'No runs on this branch','no workflow':'No security workflow','branch not found':'Branch not found'};
@@ -101,7 +101,7 @@ function row(r){
     ?`<a class="badge" href="${esc(s.run_url||url+'/actions')}" target="_blank" rel="noopener"><img src="${esc(s.badge_url)}" data-fallback="${esc(label)}" alt="Security ${esc(label)}"></a>`
     :`<span class="muted">${esc(label)}</span>`)
     +(day(s.finished_at)?`<div class="sub">Last run ${esc(day(s.finished_at))}</div>`:'');
-  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${dpgTag(r)}<div class="sub">${esc(r.branch)}</div></td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}</div></td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
 }
 function fill(id,list,empty){
   const q=$('search').value.toLowerCase(),cv=r=>isNum(r.coverage)?+r.coverage:-1;
@@ -129,7 +129,7 @@ function stackRow(r){
   const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
     :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>`
     :'<span class="muted">None found</span>';
-  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${dpgTag(r)}<div class="sub">${esc(r.branch)}</div></td>`
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}</div></td>`
     +`<td data-label="License">${lic}</td>`
     +`<td data-label="Stack">${esc(langs)||'<span class="muted">Nothing detected</span>'}${techs.length?`<div class="techs">${esc(techs.slice(0,8).join(', '))}${techs.length>8?` +${techs.length-8} more`:''}</div>`:''}</td>`
     +`<td data-label="Dependencies">${dep}</td></tr>`;
