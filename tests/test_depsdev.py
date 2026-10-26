@@ -16,7 +16,7 @@ def test_dep_info_uses_pinned_version_license():
 def test_dep_info_falls_back_to_latest_when_pinned_version_unknown():
     got = d.dep_info('python', 'fastapi', '>=99', fake_fetch({
         'PYPI/packages/fastapi': PKG, 'PYPI/packages/fastapi/versions/0.162.0': {'licenses': ['MIT', 'Apache-2.0']}}))
-    assert got['license'] == 'MIT OR Apache-2.0' and got['license_of'] == 'latest'
+    assert got['license'] == 'MIT, Apache-2.0' and got['license_of'] == 'latest'
 
 def test_dep_info_quotes_scoped_npm_names_and_prefixes_go_versions():
     seen = []

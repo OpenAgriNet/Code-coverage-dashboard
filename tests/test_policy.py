@@ -23,6 +23,32 @@ def test_or_takes_the_better_choice_and_and_the_worse():
     assert classify('(MIT AND Zlib)', P) == 'unclassified'
     assert classify('MIT OR Apache-2.0', P) == 'green'
 
+def test_and_binds_tighter_than_or():
+    assert classify('MIT OR GPL-3.0-only AND AGPL-3.0-only', P) == 'green'   # MIT OR (GPL AND AGPL)
+    assert classify('GPL-3.0-only AND AGPL-3.0-only OR MPL-2.0', P) == 'yellow'
+
+def test_parentheses_change_the_grouping():
+    assert classify('(MIT OR GPL-3.0-only) AND AGPL-3.0-only', P) == 'red'   # the old splitter said green here
+    assert classify('(MIT OR Apache-2.0) AND MPL-2.0', P) == 'yellow'
+    assert classify('((MIT))', P) == 'green'
+
+def test_several_licenses_listed_together_all_apply():
+    assert classify('MIT, Apache-2.0', P) == 'green'
+    assert classify('MIT, GPL-3.0-only', P) == 'red'
+    assert classify('MIT,GPL-3.0-only', P) == 'red'
+
+def test_with_exception_uses_the_listed_exception_or_the_base_license():
+    assert classify('GPL-2.0-only WITH Classpath-exception-2.0', P) == 'red'
+    assert classify('GPL-2.0-only WITH Classpath-exception-2.0', {**P, 'yellow': P['yellow'] + ['GPL-2.0-only WITH Classpath-exception-2.0']}) == 'red'  # red pattern GPL-* also matches; most restrictive wins
+    assert classify('GPL-2.0-only WITH Classpath-exception-2.0', {'green': [], 'yellow': ['GPL-2.0-only WITH Classpath-exception-2.0'], 'red': []}) == 'yellow'
+
+@pytest.mark.parametrize('bad', ['(MIT', 'MIT)', 'MIT OR', 'AND MIT', 'MIT AND OR GPL-3.0-only', '()', 'MIT WITH', 'MIT Apache-2.0'])
+def test_unparseable_expressions_are_unclassified_never_friendly(bad):
+    assert classify(bad, P) == 'unclassified'
+
+def test_lowercase_operators_are_not_operators():
+    assert classify('MIT or GPL-3.0-only', P) == 'unclassified'
+
 def test_overlapping_patterns_most_restrictive_wins():
     assert classify('LGPL-3.0-only', {'green': [], 'yellow': ['LGPL-*'], 'red': ['*GPL-3.0*']}) == 'red'
 

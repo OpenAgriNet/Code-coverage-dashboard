@@ -27,6 +27,7 @@ def dep_info(eco,name,version,fetch=fetch):
   if system=='GO' and want and not want.startswith('v'):want='v'+want
   for v,tag in ((want,'pinned'),(out['latest'],'latest')):
    info=fetch(f'{system}/packages/{quote(name,safe="")}/versions/{quote(v,safe="")}') if v else None
-   if info:out.update(license=' OR '.join(info.get('licenses') or []) or None,license_of=tag);break
+   # deps.dev does not say whether several licenses mean any-of or all-of: show a neutral list; the policy treats it as all-of
+   if info:out.update(license=', '.join(info.get('licenses') or []) or None,license_of=tag);break
  except Exception as e:out['license_of']='error';print(f'WARN deps.dev {eco}/{name}: {e}',file=sys.stderr)  # 'error' so a lookup failure is not shown as 'no license'
  return out
