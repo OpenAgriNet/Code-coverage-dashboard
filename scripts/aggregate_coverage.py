@@ -9,13 +9,18 @@ from releasefind import find_versions
 from releasefind.sets import resolve_sets
 import xml.etree.ElementTree as ET
 MAX_ARTIFACT_BYTES=100*1024*1024  # artifacts are read into memory
-API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN')
+API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN'); QUERY_TOKEN=os.getenv('DPG_QUERY_TOKEN')
 CFG=load_config('config/repos.json'); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
 if TOKEN: S.headers['Authorization']='Bearer '+TOKEN
 
+def search_api(path):
+ """GET for the repository search with its own token: filtering by a custom property needs one that can read the organization's custom properties."""
+ r=requests.get(API+path,headers={**dict(S.headers),'Authorization':'Bearer '+QUERY_TOKEN},timeout=45)
+ r.raise_for_status();return r.json()
+SEARCH=search_api if QUERY_TOKEN else None
 def api(path):
  r=S.get(API+path,timeout=45)
- if r.status_code==404:return None
+ if r.status_code in (404,409):return None  # 409: GitHub's answer for refs and commits of an empty repository
  r.raise_for_status();return r.json()
 def xml_pct(raw):
  try: root=ET.fromstring(raw)
@@ -168,7 +173,7 @@ def collect(targets,sets=()):
   if g:rel.append(g)
  return {'repositories':dev,'main':main,'releases':rel,'release_sets':resolve_sets(sets,rel,{t['name'].lower():t['releases'] for t in targets if t.get('releases')})}
 def main():
- try:targets=resolve(CFG,ORG,api,PROJECT_TOKEN)
+ try:targets=resolve(CFG,ORG,api,PROJECT_TOKEN,search_get=SEARCH)
  except SourceError as e:sys.exit(f'ERROR {e}')
  d=collect(targets,CFG['release_sets']);results=d['repositories']
  os.makedirs('data',exist_ok=True)

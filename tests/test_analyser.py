@@ -52,3 +52,18 @@ def test_share_is_of_the_remaining_code_files_and_the_boundary_counts():
     assert a.summarize({'languages': {'Python': 90, 'Go': 10}, 'techs': []}, STACK)['languages'] == [('Python', 90), ('Go', 10)]
     assert a.summarize({'languages': {'Python': 91, 'Go': 9}, 'techs': []}, STACK)['languages'] == [('Python', 91)]
     assert a.summarize({'languages': {'Python': 91, 'Go': 9}, 'techs': []}, {**STACK, 'min_share': 0})['languages'] == [('Python', 91), ('Go', 9)]
+
+
+def test_clone_errors_are_explained():
+    assert a.clone_error("fatal: could not read Username for 'https://github.com': terminal prompts disabled", 'main').startswith('private repository: not analysed')
+    assert a.clone_error('warning: x\nfatal: Remote branch main not found in upstream origin\n', 'main') == 'branch main does not exist (an empty repository has no branches)'
+    assert a.clone_error('fatal: unable to access: Could not resolve host\n', 'dev') == 'could not clone: fatal: unable to access: Could not resolve host'
+    assert a.clone_error('', 'dev') == 'could not clone: git failed'
+
+def test_analyse_reports_a_failed_clone_readably(monkeypatch):
+    def fake_run(cmd, **kw):
+        raise a.subprocess.CalledProcessError(128, cmd, stderr=b"fatal: could not read Username for 'https://github.com': terminal prompts disabled")
+    monkeypatch.setattr(a.subprocess, 'run', fake_run)
+    import pytest
+    with pytest.raises(RuntimeError, match='^private repository: not analysed'):
+        a.analyse('infra-automation', 'main')

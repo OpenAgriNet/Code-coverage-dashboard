@@ -1,7 +1,9 @@
 """Ways to find repositories: a GitHub search query, or the issues and PRs of an org project board.
 Each returns [{'name','private'}]; callers decide what to do with private ones."""
+import re
 from urllib.parse import quote
 import requests
+PROPS=re.compile(r'(props\.[\w.-]+:)("[^"]*"|\S+)')
 PAGE=100; MAX_PAGES=10  # GitHub search stops at 1000 results
 PROJECT_QUERY="""query($org:String!,$num:Int!,$after:String){organization(login:$org){projectV2(number:$num){
  items(first:100,after:$after){pageInfo{hasNextPage endCursor}
@@ -13,8 +15,18 @@ def full_query(src,org):
  if 'org:' not in q:q=f'org:{org} {q}'
  if src.get('include_forks',True) and 'fork:' not in q:q+=' fork:true'
  return q
+def check_props_filter(query,get):
+ """GitHub ignores a props.<name> filter, without any error, when the token cannot read the organization's custom properties: the query
+ then matches every repository. Ask the same question with a value no repo can have; anything but zero means the filter is not being applied."""
+ control=PROPS.sub(r'\1"__no_such_value__"',query)
+ if control==query:return
+ n=(get(f'/search/repositories?q={quote(control,safe="")}&per_page=1') or {}).get('total_count',0)
+ if n:raise RuntimeError(f'GitHub search ignored the props. filter (a value no repository has still matched {n} repositories), so the results would be every repository in the organization. '
+  'The token used cannot read the organization\'s custom properties; set the DPG_QUERY_TOKEN secret to one that can (see README)')
 def query_repos(src,org,get):
- """Repos matching a GitHub repository-search query, e.g. props.project-name:"OAN DPG". Raises if GitHub says the results are incomplete."""
+ """Repos matching a GitHub repository-search query, e.g. props.project-name:"OAN DPG". Raises if GitHub says the results are incomplete,
+ or if a props. filter is silently not applied."""
+ check_props_filter(full_query(src,org),get)
  q=quote(full_query(src,org),safe='');out=[]
  for page in range(1,MAX_PAGES+1):
   d=get(f'/search/repositories?q={q}&per_page={PAGE}&page={page}') or {}

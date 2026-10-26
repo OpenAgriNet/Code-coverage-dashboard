@@ -9,7 +9,7 @@ from stackinfo.analyser import ANALYSER
 from stackinfo.collect import collect
 
 def main():
- try:targets=resolve(ac.CFG,ac.ORG,ac.api,ac.PROJECT_TOKEN)
+ try:targets=resolve(ac.CFG,ac.ORG,ac.api,ac.PROJECT_TOKEN,search_get=ac.SEARCH)
  except SourceError as e:sys.exit(f'ERROR {e}')
  d=collect(targets,policy=ac.CFG['licenses'],stack=ac.CFG['stack'])
  os.makedirs('data',exist_ok=True)

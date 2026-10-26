@@ -35,6 +35,7 @@ The config says only what the scripts cannot know. Repos are **found**, not list
 - `project` finds repos with an issue or PR on an org project board (`"number"`, optional `"org"`). It needs the `DPG_PROJECT_TOKEN` secret. Not used by default.
 - Both accept `tags` and `enabled`.
 - Private repos found by a source are skipped, because the dashboard is public.
+- **A `props.` query needs a token that can read the organization's custom properties.** The workflow's built-in token cannot. GitHub does not report an error in that case: it silently ignores the `props.` part and returns **every** repository (even a made-up value matches all of them). The refresh checks for this on every run, by asking the same question with a value no repo can have, and **stops with an error** instead of publishing the whole organization. Put a token that can read custom properties in the `DPG_QUERY_TOKEN` secret (used only for this search). A classic token with `read:org` worked in testing; for a fine-grained token use the organization permission for custom properties (read). If the refresh keeps failing after you add it, the check is telling you the token still cannot read them.
 - If a source fails (rate limit, bad token) the refresh **stops with an error naming it**, nothing is published, and the dashboard keeps its last data. A query that finds nothing only logs a warning. There is no fixed fallback list.
 
 **`exclude`**: repo names to drop, whatever finds them. This is where repos such as the engineering tracker or this dashboard go.
@@ -164,6 +165,7 @@ The coverage and security badges are loaded live by the browser, so they are alw
 | Secret | Needed for |
 |---|---|
 | `CODECOV_TOKEN` | Codecov API reads (public repos also work without it) |
+| `DPG_QUERY_TOKEN` | **Needed for the default config.** A token that can read the organization's custom properties, used only for the `props.` repository search. Without it the refresh stops with an error (see *Choosing repositories*) |
 | `DPG_PROJECT_TOKEN` | Optional. Only for a `project` source. Reads an org project board to discover repos. Classic token with `read:project`, or fine-grained with Organization → Projects: read |
 
 The workflow's built-in `GITHUB_TOKEN` is enough for public repositories' branches, workflow runs and artifacts.
