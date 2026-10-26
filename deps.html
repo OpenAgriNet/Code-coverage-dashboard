@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenAgriNet dependencies</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%232E7A3A%22/%3E%3Cpath d=%22M4 8.5l2.5 2.5L12 5.5%22 stroke=%22white%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+table.deps th:first-child{width:30%}table.deps th:nth-child(2){width:14%}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="./">← Coverage dashboard</a>
+  <header style="margin-top:12px">
+    <h1 id="title">Dependencies</h1>
+    <span class="updated" id="updated">Loading data…</span>
+  </header>
+  <p class="summary" id="summary">Reading the dependency list.</p>
+  <div class="controls">
+    <select id="repo" aria-label="Repository"><option value="">All repositories</option></select>
+    <select id="eco" aria-label="Ecosystem"><option value="">All ecosystems</option></select>
+    <input type="search" id="search" placeholder="Find a package or license" aria-label="Find a package or license">
+  </div>
+
+  <section aria-labelledby="dep-title">
+    <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div></div>
+    <div class="table-wrap"><table class="deps">
+      <thead><tr><th scope="col">Package</th><th scope="col">Ecosystem</th><th scope="col">Version</th><th scope="col">Latest</th><th scope="col">License</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <details class="how">
+    <summary>Where this comes from</summary>
+    <ul>
+      <li><b>Packages.</b> <a href="https://github.com/specfy/stack-analyser" target="_blank" rel="noopener">specfy/stack-analyser</a> reads the manifests (<code>package.json</code>, <code>go.mod</code>, <code>requirements.txt</code>, <code>pyproject.toml</code>, compose files, workflows) on each repository's working branch. These are direct dependencies, not the full lockfile tree.</li>
+      <li><b>License and latest.</b> From <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a> for npm, PyPI and Go. When the listed version is a range or unknown there, the license of the latest release is shown and marked <i>latest</i>.</li>
+      <li><b>Docker images and GitHub Actions</b> are listed for completeness; their licenses are not looked up.</li>
+    </ul>
+  </details>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ECO={npm:'npm',python:'PyPI',golang:'Go',docker:'Docker',githubAction:'GitHub Action'};
+const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
+  docker:n=>n.includes('/')&&n.split('/')[0].includes('.')?null:`https://hub.docker.com/r/${n.includes('/')?n:'_/'+n}`,githubAction:n=>`https://github.com/${n}`};
+let all=[];
+function cell(d){
+  const href=(LINK[d.ecosystem]||(()=>null))(d.name);
+  const name=href?`<a class="pkg" href="${esc(href)}" target="_blank" rel="noopener">${esc(d.name)}</a>`:`<span class="pkg">${esc(d.name)}</span>`;
+  const repo=$('repo').value?'':`<div class="sub">${esc(d.repository)}</div>`;
+  const looked=['npm','python','golang'].includes(d.ecosystem);
+  const lic=d.license?`<span class="lic">${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}`
+    :`<span class="muted">${looked?'Unknown':'Not looked up'}</span>`;
+  const latest=d.latest&&d.latest!==d.version&&d.latest!==String(d.version).replace(/^[\^~=v]+/,'')?`<span class="warn">${esc(d.latest)}</span>`:esc(d.latest||'—');
+  return `<tr><td>${name}${repo}</td><td data-label="Ecosystem">${esc(ECO[d.ecosystem]||d.ecosystem)}</td><td data-label="Version"><code>${esc(d.version)}</code></td><td data-label="Latest">${latest}</td><td data-label="License">${lic}</td></tr>`;
+}
+function render(){
+  const r=$('repo').value,e=$('eco').value,q=$('search').value.toLowerCase();
+  const list=all.filter(d=>(!r||d.repository===r)&&(!e||d.ecosystem===e)&&(!q||d.name.toLowerCase().includes(q)||String(d.license||'').toLowerCase().includes(q)));
+  $('title').textContent=r?`${r} dependencies`:'Dependencies';
+  const lic={};list.forEach(d=>{const k=d.license||(['npm','python','golang'].includes(d.ecosystem)?'Unknown':null);if(k)lic[k]=(lic[k]||0)+1});
+  const top=Object.entries(lic).sort((a,b)=>b[1]-a[1]);
+  $('summary').innerHTML=`<strong>${list.length}</strong> ${list.length===1?'dependency':'dependencies'}${r?'':` across <strong>${new Set(list.map(d=>d.repository)).size}</strong> repositories`}.`
+    +(top.length?` Licenses: ${top.slice(0,5).map(([k,n])=>`<strong>${esc(k)}</strong> ${n}`).join(', ')}${top.length>5?`, ${top.length-5} more`:''}.`:'');
+  const meta=r&&repos.find(x=>x.repository===r);
+  $('dep-note').innerHTML=meta?`Branch <code>${esc(meta.branch)}</code> · Repository license: ${meta.license?`<span class="lic">${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`:'';
+  $('rows').innerHTML=list.length?list.map(cell).join(''):`<tr><td colspan="5" class="empty">${all.length?'No dependencies match.':'No dependencies found.'}</td></tr>`;
+}
+let repos=[];
+function sync(){
+  const p=new URLSearchParams();if($('repo').value)p.set('repo',$('repo').value);
+  history.replaceState(null,'',p.toString()?'?'+p:location.pathname);render();
+}
+async function init(){
+  try{
+    const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
+    const data=await res.json();repos=(data.repositories||[]).slice().sort((a,b)=>a.repository.localeCompare(b.repository));
+    all=repos.flatMap(r=>(r.dependencies||[]).map(d=>({...d,repository:r.repository}))).sort((a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name));
+    $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+    repos.forEach(r=>$('repo').add(new Option(`${r.repository} (${(r.dependencies||[]).length})`,r.repository)));
+    [...new Set(all.map(d=>d.ecosystem))].sort().forEach(e=>$('eco').add(new Option(ECO[e]||e,e)));
+    const want=new URLSearchParams(location.search).get('repo');if(want&&repos.some(r=>r.repository===want))$('repo').value=want;
+    render();
+  }catch(e){
+    $('updated').textContent='Data unavailable';
+    $('summary').textContent='Dependency data could not be loaded. Run the refresh workflow and check its logs.';
+    $('rows').innerHTML='<tr><td colspan="5" class="empty">data/stack.json is missing or unreadable.</td></tr>';
+  }
+}
+$('repo').addEventListener('change',sync);$('eco').addEventListener('change',render);$('search').addEventListener('input',render);
+init();
+</script>
+</body>
+</html>

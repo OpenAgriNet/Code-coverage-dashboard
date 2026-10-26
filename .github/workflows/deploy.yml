@@ -5,7 +5,7 @@ on:
     - cron: '17 */24 * * *'
   push:
     branches: [main]
-    paths: ['index.html', 'config/**', 'scripts/**', '.github/workflows/deploy.yml']
+    paths: ['index.html', 'deps.html', 'style.css', 'config/**', 'scripts/**', '.github/workflows/deploy.yml']
 permissions:
   contents: read
   pages: write
@@ -24,6 +24,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - run: python -m pip install requests
       - name: Aggregate existing artifacts (does not run tests)
         env:
@@ -32,6 +35,13 @@ jobs:
           DPG_PROJECT_TOKEN: ${{ secrets.DPG_PROJECT_TOKEN }}
           GITHUB_ORG: OpenAgriNet
         run: python scripts/aggregate_coverage.py
+      - name: Stack, dependencies and licenses (stack-analyser + deps.dev)
+        continue-on-error: true  # keep the coverage refresh even if this step fails
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DPG_PROJECT_TOKEN: ${{ secrets.DPG_PROJECT_TOKEN }}
+          GITHUB_ORG: OpenAgriNet
+        run: python scripts/collect_stack.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -8,74 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#F1F4EC;--surface:#FFFFFF;--ink:#1D2A1F;--muted:#5D6B5F;--line:#D5DCCD;--track:#E2E8DA;
-  --good:#2E7A3A;--warn:#A87708;--bad:#B3261E;--link:#1F5F8B;--focus:#1F5F8B;
-  color-scheme:light;
-}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#121914;--surface:#19221B;--ink:#E3EBDD;--muted:#9AA99C;--line:#2C392F;--track:#243027;
-  --good:#5DBB6B;--warn:#D9A53A;--bad:#EF6A5F;--link:#7DB7E0;--focus:#7DB7E0;color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#121914;--surface:#19221B;--ink:#E3EBDD;--muted:#9AA99C;--line:#2C392F;--track:#243027;
-  --good:#5DBB6B;--warn:#D9A53A;--bad:#EF6A5F;--link:#7DB7E0;--focus:#7DB7E0;color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Public Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
-main{max-width:1160px;margin:0 auto;padding:40px 24px 64px}
-a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
-:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:3px}
-.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.muted{color:var(--muted)}
-
-header{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
-h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.15}
-.updated{color:var(--muted);font-size:13px}
-.refresh{display:flex;align-items:center;gap:12px}
-.btn{font-size:14px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:6px 12px;background:var(--surface);color:var(--ink)}
-.btn:hover{text-decoration:none;border-color:var(--muted)}
-.summary{font-size:18px;max-width:62ch;margin:14px 0 32px;color:var(--muted)}
-.summary strong{color:var(--ink);font-weight:600}
-
-/* Tables */
-section{margin-top:36px}
-.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:12px}
-.sec-head h2{font-size:20px;margin:0;font-weight:800;letter-spacing:-.01em}
-.sec-head p{margin:2px 0 0}
-.controls input[type=search]{font:inherit;font-size:14px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:220px}
-.table-wrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow-x:auto}
-table{border-collapse:collapse;width:100%;min-width:560px;table-layout:fixed}
-th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
-th{font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap}
-th:first-child{width:40%}th:nth-child(2){width:32%}
-tbody tr:last-child td{border-bottom:0}
-.repo{font-weight:600;font-size:15px}
-.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--good);color:var(--good);vertical-align:2px}
-.sub{font-size:13px;color:var(--muted);margin-top:3px}
-.switch{display:inline-flex;border:1px solid var(--line);border-radius:9px;padding:3px;background:var(--surface)}
-.switch button{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:6px;padding:6px 14px;background:none;color:var(--muted);cursor:pointer}
-.switch button[aria-pressed="true"]{background:var(--track);color:var(--ink)}
-.badge{display:inline-block;line-height:0}.badge img{height:20px}
-.empty{text-align:center;padding:32px;color:var(--muted)}
-.how{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 20px}
-.how summary{cursor:pointer;font-weight:600;padding:12px 0}
-.how ul{margin:0 0 16px;padding-left:20px;color:var(--muted);max-width:80ch}
-.how li{margin:6px 0}.how b{color:var(--ink);font-weight:600}
-code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
-
-@media (max-width:700px){
-  main{padding:28px 16px 48px}
-  h1{font-size:25px}.summary{font-size:16px}
-  .controls,.controls input[type=search]{width:100%}
-  table{min-width:0;table-layout:auto}
-  thead{display:none}
-  tbody tr{display:block;padding:12px 16px;border-bottom:1px solid var(--line)}
-  tbody tr:last-child{border-bottom:0}
-  td{display:block;border:0;padding:5px 0}
-  td[data-label]::before{content:attr(data-label);display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:3px}
-}
-.stale{color:var(--warn)}
-.fallback{font-weight:600}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
@@ -116,6 +49,17 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
     </table></div>
   </section>
 
+  <section aria-labelledby="stack-title">
+    <div class="sec-head"><div>
+      <h2 id="stack-title">Stack and licenses</h2>
+      <p class="sub">Each repository's working branch. <a href="deps.html">All dependencies →</a></p>
+    </div></div>
+    <div class="table-wrap"><table class="wide">
+      <thead><tr><th scope="col">Repository</th><th scope="col">License</th><th scope="col">Stack</th><th scope="col">Dependencies</th></tr></thead>
+      <tbody id="stack-rows"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
   <details class="how">
     <summary>How this is measured</summary>
     <ul>
@@ -125,6 +69,7 @@ code{font-size:.92em;background:var(--track);padding:1px 5px;border-radius:4px}
       <li><b>Refresh data</b> opens the refresh workflow on GitHub; click <i>Run workflow</i> there (needs write access to this repo). The badges are always live; line counts and run links update when the run finishes.</li>
       <li><b>Stale coverage.</b> A <i>Measured</i> date more than 14 days old is shown in amber: that branch has had no coverage upload for two weeks.</li>
       <li><b>Dates.</b> <i>Measured</i> is the commit time of the commit whose coverage is shown (or the CI run time). <i>Last run</i> is when the latest security run on that branch finished.</li>
+      <li><b>Stack and licenses.</b> <a href="https://github.com/specfy/stack-analyser" target="_blank" rel="noopener">specfy/stack-analyser</a> reads a fresh clone of the working branch for languages, technologies and dependencies. The repo license is GitHub's reading of its <code>LICENSE</code> file. Each npm, PyPI and Go dependency's license and latest version come from <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a>; Docker images and GitHub Actions are listed but not looked up.</li>
       <li><b>No report</b> or an <i>unknown</i> badge means nothing was uploaded for that branch. It does not mean 0%. This dashboard never reruns tests.</li>
     </ul>
   </details>
@@ -175,9 +120,33 @@ function setView(v){
   $('dev-note').innerHTML=v==='main'?'Each repository\'s default branch.':'Each repository\'s working branch, set in <code>config/repos.json</code>.';
   summary();render();
 }
+let stack=null;
+const LOOKED_UP=['npm','python','golang'];
+function stackRow(r){
+  const url=repoUrl(r),deps=r.dependencies||[],langs=(r.languages||[]).slice(0,3).map(l=>l[0]).join(' · '),techs=r.techs||[];
+  const lic=r.license?`<span class="lic">${esc(r.license)}</span>`:'<span class="lic none">No LICENSE file</span>';
+  const known=deps.filter(d=>d.license).length,pkgs=deps.filter(d=>LOOKED_UP.includes(d.ecosystem)).length;
+  const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
+    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>`
+    :'<span class="muted">None found</span>';
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${dpgTag(r)}<div class="sub">${esc(r.branch)}</div></td>`
+    +`<td data-label="License">${lic}</td>`
+    +`<td data-label="Stack">${esc(langs)||'<span class="muted">Nothing detected</span>'}${techs.length?`<div class="techs">${esc(techs.slice(0,8).join(', '))}${techs.length>8?` +${techs.length-8} more`:''}</div>`:''}</td>`
+    +`<td data-label="Dependencies">${dep}</td></tr>`;
+}
+function fillStack(){
+  if(!stack)return;
+  const q=$('search').value.toLowerCase(),a=(stack.repositories||[]).filter(r=>r.repository.toLowerCase().includes(q)).sort((x,y)=>x.repository.localeCompare(y.repository));
+  $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${q?'No repositories match.':'No repositories analysed yet.'}</td></tr>`;
+}
 function render(){
   fill('dev-rows',viewList(),'No repositories configured. Add them to config/repos.json.');
   fill('rel-rows',data.releases||[],'No repository has a release branch yet.');
+  fillStack();
+}
+async function initStack(){
+  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();fillStack()}
+  catch(e){$('stack-rows').innerHTML='<tr><td colspan="4" class="empty">data/stack.json is missing or unreadable.</td></tr>'}
 }
 async function init(){
   try{
@@ -194,7 +163,7 @@ async function init(){
 }
 $('search').addEventListener('input',render);
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
-init();
+init();initStack();
 </script>
 </body>
 </html>
