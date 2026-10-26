@@ -41,8 +41,11 @@
   <section aria-labelledby="rel-title">
     <div class="sec-head"><div>
       <h2 id="rel-title">Latest release</h2>
-      <p class="sub">Each repository's newest stable version. Pick another from the list to see it. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
-    </div></div>
+      <p class="sub">Each repository's newest stable version. Choose one version for every repository here, or change a single repository in its row. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
+    </div>
+      <div class="controls"><label class="sub" for="rel-kind">Found as</label><select class="ver" id="rel-kind"><option value="">Any</option><option value="release">GitHub Release</option><option value="tag">Tag</option><option value="branch">Release branch</option></select>
+        <label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select></div>
+    </div>
     <div class="table-wrap"><table>
       <thead><tr><th scope="col">Repository</th><th scope="col">Code coverage</th><th scope="col">Security</th></tr></thead>
       <tbody id="rel-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
@@ -106,12 +109,27 @@ function row(r,picker){
     +(day(s.finished_at)?`<div class="sub">Last run ${esc(day(s.finished_at))}</div>`:'');
   return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}${picker||`<div class="sub">${esc(r.branch)}</div>`}</td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
 }
-const picked={};
+const picked={};let relAll='',relKind='';
+const gv=g=>relKind?g.versions.filter(v=>v.kinds.includes(relKind)):g.versions;
+const latestOf=g=>gv(g).find(v=>!v.prerelease)||gv(g)[0];
+const verCmp=(a,b)=>{const p=v=>{const[n,...r]=v.split('-');return[n.split('.').map(Number),r.join('-')]},[an,ap]=p(a),[bn,bp]=p(b);
+  for(let i=0;i<Math.max(an.length,bn.length);i++){const d=(an[i]||0)-(bn[i]||0);if(d)return d}
+  return(ap?0:1)-(bp?0:1)||ap.localeCompare(bp,undefined,{numeric:true})};
+function fillRelAll(){
+  const sel=$('rel-all'),all=[...new Set((data.releases||[]).flatMap(g=>gv(g).map(v=>v.version)))].sort(verCmp).reverse();
+  sel.innerHTML='<option value="">Latest</option>'+all.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');sel.value=all.includes(relAll)?relAll:'';relAll=sel.value;
+}
 const KIND={branch:'release branch',tag:'tag',release:'GitHub Release'};
-function relPick(g){return g.versions.find(v=>v.version===picked[g.repository])||g.versions.find(v=>v.version===g.default)||g.versions[0]}
+function relPick(g){
+  const by=x=>gv(g).find(v=>v.version===x);
+  if(picked[g.repository])return by(picked[g.repository])||null;
+  return relAll?by(relAll)||null:latestOf(g);
+}
 function relRow(g){
-  const v=relPick(g),id='ver-'+g.repository.replace(/[^\w-]/g,'_');
-  const opts=g.versions.map(x=>`<option value="${esc(x.version)}"${x===v?' selected':''}>${esc(x.version)}${x.prerelease?' (pre-release)':''}${x.version===g.default?' · latest':''}</option>`).join('');
+  const v=relPick(g),id='ver-'+g.repository.replace(/[^\w-]/g,'_'),want=picked[g.repository]||relAll;
+  const gone=v?'':`<option value="" selected disabled>No ${esc(want)}</option>`;
+  const opts=gone+gv(g).map(x=>`<option value="${esc(x.version)}"${x===v?' selected':''}>${esc(x.version)}${x.prerelease?' (pre-release)':''}${x===latestOf(g)?' · latest':''}</option>`).join('');
+  if(!v)return `<tr><td><a class="repo" href="${esc(g.html_url)}" target="_blank" rel="noopener">${esc(g.repository)}</a> ${tagChips(g)}<div><label class="sr" for="${id}">Version of ${esc(g.repository)}</label><select class="ver" id="${id}" data-repo="${esc(g.repository)}">${opts}</select></div></td><td colspan="2" data-label="Code coverage" class="muted">This repository has no ${esc(want)} version.</td></tr>`;
   const more=g.not_measured>0?`<div class="sub">${g.not_measured} older ${g.not_measured===1?'version is':'versions are'} not shown (<code>releases.max_versions</code>).</div>`:'';
   const how=`${v.kinds.map(k=>KIND[k]).join(' + ')} · <code>${esc(v.branch)}</code>${day(v.published_at)?` · ${esc(day(v.published_at))}`:''}`;
   return row({...v,repository:g.repository,html_url:g.html_url,tags:g.tags,dpg:g.dpg},
@@ -154,8 +172,9 @@ function fillStack(){
   $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${q?'No repositories match.':'No repositories analysed yet.'}</td></tr>`;
 }
 function render(){
+  if($('rel-all').options.length<2)fillRelAll();
   fill('dev-rows',viewList(),'No repositories configured. Add them to config/repos.json.');
-  fill('rel-rows',data.releases||[],'No repository has a release version yet.',relRow);
+  fill('rel-rows',(data.releases||[]).filter(g=>gv(g).length),relKind?'No repository has a version found that way.':'No repository has a release version yet.',relRow);
   fillStack();
 }
 async function initStack(){
@@ -176,6 +195,8 @@ async function init(){
   }
 }
 $('search').addEventListener('input',render);
+$('rel-kind').addEventListener('change',e=>{relKind=e.target.value;for(const k in picked)delete picked[k];fillRelAll();render()});
+$('rel-all').addEventListener('change',e=>{relAll=e.target.value;for(const k in picked)delete picked[k];render()});
 $('rel-rows').addEventListener('change',e=>{const s=e.target.closest('select.ver');if(s){picked[s.dataset.repo]=s.value;render();const again=document.querySelector(`select.ver[data-repo="${CSS.escape(s.dataset.repo)}"]`);if(again)again.focus()}});
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
 init();initStack();
