@@ -147,7 +147,7 @@ function relPick(g){
   return relAll?by(relAll)||null:latestOf(g);
 }
 function missingText(g){
-  if(picked[g.repository]||!relSet)return `This repository has no ${picked[g.repository]||relAll} version.`;
+  if(picked[g.repository]||!relSet)return `This repository has no ${esc(picked[g.repository]||relAll)} version.`;
   const m=setEntry(g),s=curSet();
   return m?`Tag <code>${esc(m.tag)}</code> is not among this repository's versions (not a version name, or older than <code>releases.max_versions</code>).`:`Not part of ${esc(s.label)}.`;
 }
