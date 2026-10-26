@@ -9,12 +9,19 @@ def child_env():
  env={k:os.environ[k] for k in SAFE_ENV if k in os.environ}
  env.update(npm_config_ignore_scripts='true',GIT_TERMINAL_PROMPT='0')
  return env
+def clone_error(stderr,branch):
+ """A readable reason for a failed git clone."""
+ if 'could not read Username' in stderr or 'Authentication failed' in stderr:return 'private repository: not analysed (the analyser clones without a token, so no secret reaches third-party code)'
+ if 'Remote branch' in stderr and 'not found' in stderr:return f'branch {branch} does not exist (an empty repository has no branches)'
+ last=stderr.strip().splitlines()[-1] if stderr.strip() else 'git failed'
+ return f'could not clone: {last[:150]}'
 def analyse(repo,branch):
  """Raw stack-analyser output (flat) for a shallow clone of repo@branch."""
  env=child_env()
  with tempfile.TemporaryDirectory() as tmp:
   src=os.path.join(tmp,'src')
-  subprocess.run(['git','clone','-q','--depth','1','-b',branch,f'https://github.com/{ac.ORG}/{repo}.git',src],check=True,timeout=300,env=env)
+  try:subprocess.run(['git','clone','-q','--depth','1','-b',branch,f'https://github.com/{ac.ORG}/{repo}.git',src],check=True,timeout=300,env=env,stderr=subprocess.PIPE)
+  except subprocess.CalledProcessError as e:raise RuntimeError(clone_error((e.stderr or b'').decode('utf-8','replace'),branch)) from None
   # the CLI joins -o onto the working directory, so pass a bare file name
   subprocess.run(['npx','--yes',ANALYSER,src,'--flat','-o','out.json'],cwd=tmp,check=True,timeout=600,stdout=subprocess.DEVNULL,env=env)
   with open(os.path.join(tmp,'out.json'),encoding='utf-8') as f:return json.load(f)

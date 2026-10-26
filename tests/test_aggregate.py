@@ -142,3 +142,12 @@ def test_collect_without_sets_has_an_empty_list(monkeypatch):
     monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
     monkeypatch.setattr(a, 'release_group', lambda t: None)
     assert a.collect([{'name': 'na', 'branch': None, 'tags': []}])['release_sets'] == []
+
+
+def test_api_treats_an_empty_repository_like_a_missing_one(monkeypatch):
+    class R:
+        def __init__(self, code): self.status_code = code
+        def raise_for_status(self): raise AssertionError('should not be called for %s' % self.status_code)
+    for code in (404, 409):
+        monkeypatch.setattr(a.S, 'get', lambda url, timeout=None, code=code: R(code))
+        assert a.api('/repos/o/empty/git/matching-refs/heads/release-') is None

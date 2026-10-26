@@ -20,7 +20,7 @@ def search_api(path):
 SEARCH=search_api if QUERY_TOKEN else None
 def api(path):
  r=S.get(API+path,timeout=45)
- if r.status_code==404:return None
+ if r.status_code in (404,409):return None  # 409: GitHub's answer for refs and commits of an empty repository
  r.raise_for_status();return r.json()
 def xml_pct(raw):
  try: root=ET.fromstring(raw)
