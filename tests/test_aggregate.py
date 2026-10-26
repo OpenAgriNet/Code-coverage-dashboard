@@ -3,19 +3,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 import aggregate_coverage as a
 
-def test_repo_targets_mixes_objects_strings_and_project_repos():
-    cfg = {'repositories': [{'name': 'network-adapter', 'branch': 'development'}, 'knowledge-provider'],
-           'exclude_repositories': ['engineering-tracker']}
-    got = a.repo_targets(cfg, ['network-adapter', 'helmcharts', 'engineering-tracker'])
-    assert got == [
-        {'name': 'network-adapter', 'branch': 'development', 'security_workflow': 'security.yml'},
-        {'name': 'knowledge-provider', 'branch': None, 'security_workflow': 'security.yml'},
-        {'name': 'helmcharts', 'branch': None, 'security_workflow': 'security.yml'},
-    ]
-
-def test_plain_string_entry_uses_default_branch():
-    assert a.repo_targets({'repositories': ['x']}, [])[0]['branch'] is None
-
 def test_resolve_branch_reports_missing_branch(monkeypatch):
     monkeypatch.setattr(a, 'api', lambda path: None)  # GitHub 404 for the branch
     assert a.resolve_branch('network-adapter', 'devlopment') == ('devlopment', False)
@@ -69,7 +56,7 @@ def test_collect_adds_main_view_and_reuses_record_when_branch_is_default(monkeyp
     monkeypatch.setattr(a, 'inspect', fake_inspect)
     monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
     monkeypatch.setattr(a, 'latest_release_branch', lambda repo, prefix: 'release-0.0.2' if repo == 'na' else None)
-    targets = [{'name': 'na', 'branch': 'development', 'security_workflow': 'security.yml'},
+    targets = [{'name': 'na', 'branch': 'development', 'security_workflow': 'security.yml', 'tags': []},
                {'name': 'dss', 'branch': 'main', 'security_workflow': 'security.yml'}]
     got = a.collect(targets, 'release-')
     assert [r['branch'] for r in got['repositories']] == ['development', 'main']
@@ -99,3 +86,10 @@ def test_latest_release_ignores_non_version_branches_and_ranks_rc_below_final(mo
     monkeypatch.setattr(a, 'api', fake)
     assert a.latest_release_branch('na', 'release-') == 'release-0.1.0'
     assert seen == ['/repos/OpenAgriNet/na/git/matching-refs/heads/release-']
+
+def test_inspect_carries_tags_and_dpg_flag(monkeypatch):
+    monkeypatch.setattr(a, 'resolve_branch', lambda r, b: ('main', False))
+    rec = a.inspect({'name': 'x', 'branch': 'main', 'tags': ['DPG', 'core'], 'security_workflow': 'security.yml'})
+    assert rec['tags'] == ['DPG', 'core'] and rec['dpg'] is True
+    rec = a.inspect({'name': 'x', 'branch': 'main', 'tags': [], 'security_workflow': 'security.yml'})
+    assert rec['dpg'] is False

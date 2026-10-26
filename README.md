@@ -12,32 +12,58 @@ Two tables, each with three columns:
 
 | Column | Source |
 |---|---|
-| Repository | Name, the branch being measured, and a DPG tag for repos on the DPG project |
+| Repository | Name, the branch being measured, and a tag chip per config tag (for example DPG) |
 | Code coverage | Codecov's live badge for that branch, with "N of M lines covered" from the last refresh |
 | Security | Latest completed run of the repo's `security.yml` on that branch, shown as the GitHub Actions badge |
 
 - **Development**: the branch configured per repository (see below).
 - **Latest release**: each repository's highest `release-*` branch (`release-0.0.10` beats `release-0.0.9`). Repos with no release branch are left out.
 
-## Choosing the branch per repository
+## Choosing repositories
 
-Edit `config/repos.json`:
+`config/repos.json` has three parts. Everything else in the file is a global setting (`workflow_names`, `artifact_name_hints`, `release_branch_prefix`, `defaults.security_workflow`).
+
+**`repositories`**: repos you name yourself, with their branch.
 
 ```json
 "repositories": [
   {"name": "network-adapter", "branch": "development"},
-  {"name": "decision-support-system", "branch": "main"},
-  {"name": "experience-api", "branch": "main", "security_workflow": "security.yml"},
+  {"name": "experience-api", "branch": "main", "tags": ["core"], "security_workflow": "security.yml"},
   "knowledge-provider"
-],
-"release_branch_prefix": "release-",
-"exclude_repositories": ["engineering-tracker"]
+]
 ```
 
-- `branch` is optional; a plain name (or no `branch`) uses the repository's default branch.
-- `security_workflow` is optional; it defaults to `security.yml`.
-- A branch that does not exist shows **Branch not found** instead of data.
-- Repositories with an issue or PR on OpenAgriNet project #9 are added automatically (public repos only) when the `DPG_PROJECT_TOKEN` secret is set. They use their default branch unless also listed here with a `branch`.
+- `branch` is optional; no `branch` uses the repository's default branch. A branch that does not exist shows **Branch not found**.
+- `tags` are optional chips shown next to the name.
+- `security_workflow` is optional and defaults to `defaults.security_workflow` (`security.yml`).
+
+**`sources`**: ways to find repos automatically. Every repo a source finds gets that source's `tags`.
+
+```json
+"sources": [
+  {"type": "query", "query": "props.project-name:\"OAN DPG\"", "tags": ["DPG"], "fallback": ["network-adapter"]},
+  {"type": "project", "number": 9, "tags": ["DPG"], "enabled": false}
+]
+```
+
+- `query` is a [GitHub repository search](https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories) query. `org:<organization>` and `fork:true` are added for you, because search hides forks by default; set `"include_forks": false` to opt out. Custom properties are searched with `props.<name>:"<value>"`.
+- `project` finds repos with an issue or PR on an org project board. It needs the `DPG_PROJECT_TOKEN` secret.
+- Both accept `branch` (used for repos they find that you did not list), `enabled` (default `true`) and `fallback`, a list of repo names used if the lookup fails (rate limit, missing token), so tags do not silently disappear.
+- Private repos found by a source are skipped, because the dashboard is public. List a private repo under `repositories` to track it anyway.
+
+**`exclude`**: repo names to drop from everything.
+
+### When the same repo turns up twice
+
+Names are compared ignoring case.
+
+1. A repo under `repositories` decides its own `branch` and `security_workflow`.
+2. `tags` are merged: its own first, then each source's, in file order.
+3. Between sources, the first one that sets a `branch` wins. A different branch from a later source is logged as `clash`.
+4. `exclude` beats everything, including a listed repo.
+5. A source that fails never stops the others, and the refresh log says which one and why.
+
+The same repo listed twice under `repositories`, an unknown source `type`, or a mistyped value stops the run with a message naming the entry. The old keys `dpg_repositories`, `dpg_project`, `dpg_source` and `exclude_repositories` are no longer read, and the error tells you what replaces them.
 
 **A branch only has data if the repository measures it.** Coverage exists only if that repo uploads to Codecov on pushes to the branch, and security status only if its `security.yml` runs on pushes to the branch. If not, the row shows an *unknown* coverage badge and *No runs on this branch*. That is not 0% and not a failure. To fix it, add the branch to `on.push.branches` in the repo's `coverage.yml` and `security.yml`.
 
@@ -52,7 +78,7 @@ The coverage and security badges are loaded live by the browser, so they are alw
 | Secret | Needed for |
 |---|---|
 | `CODECOV_TOKEN` | Codecov API reads (public repos also work without it) |
-| `DPG_PROJECT_TOKEN` | Optional. Reads OpenAgriNet project #9 to discover DPG repos. Classic token with `read:project`, or fine-grained with Organization → Projects: read |
+| `DPG_PROJECT_TOKEN` | Optional. Only for a `project` source. Reads an org project board to discover repos. Classic token with `read:project`, or fine-grained with Organization → Projects: read |
 
 The workflow's built-in `GITHUB_TOKEN` is enough for public repositories' branches, workflow runs and artifacts.
 

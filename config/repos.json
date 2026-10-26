@@ -1,58 +1,37 @@
 {
   "organization": "OpenAgriNet",
-  "repositories": [
+
+  "sources": [
     {
-      "name": "network-adapter",
-      "branch": "development"
+      "type": "query",
+      "query": "props.project-name:\"OAN DPG\"",
+      "tags": ["DPG"],
+      "fallback": ["decision-support-system", "discovery-service", "helmcharts", "infra-automation", "network-adapter"]
     },
     {
-      "name": "discovery-service",
-      "branch": "development"
-    },
-    {
-      "name": "helmcharts",
-      "branch": "development"
-    },
-    {
-      "name": "decision-support-system",
-      "branch": "main"
-    },
-    {
-      "name": "knowledge-provider",
-      "branch": "main"
-    },
-    {
-      "name": "experience-api",
-      "branch": "main"
-    },
-    {
-      "name": "experience-ui",
-      "branch": "main"
-    },
-    {
-      "name": "infra-automation",
-      "branch": "main"
+      "type": "project",
+      "org": "OpenAgriNet",
+      "number": 9,
+      "tags": ["DPG"],
+      "enabled": false
     }
   ],
+
+  "repositories": [
+    { "name": "network-adapter", "branch": "development" },
+    { "name": "discovery-service", "branch": "development" },
+    { "name": "helmcharts", "branch": "development" },
+    { "name": "decision-support-system", "branch": "main" },
+    { "name": "knowledge-provider", "branch": "main" },
+    { "name": "experience-api", "branch": "main" },
+    { "name": "experience-ui", "branch": "main" },
+    { "name": "infra-automation", "branch": "main" }
+  ],
+
+  "exclude": ["engineering-tracker"],
+
+  "defaults": { "security_workflow": "security.yml" },
+  "workflow_names": ["CI"],
   "artifact_name_hints": [],
-  "workflow_names": [
-    "CI"
-  ],
-  "dpg_repositories": [
-    "decision-support-system",
-    "discovery-service",
-    "engineering-tracker",
-    "helmcharts",
-    "infra-automation",
-    "network-adapter"
-  ],
-  "dpg_source": "Fallback only. Each refresh reads OpenAgriNet project #9 (needs DPG_PROJECT_TOKEN secret); any repo with an issue or PR there is tracked and tagged DPG automatically.",
-  "dpg_project": {
-    "org": "OpenAgriNet",
-    "number": 9
-  },
-  "exclude_repositories": [
-    "engineering-tracker"
-  ],
   "release_branch_prefix": "release-"
 }

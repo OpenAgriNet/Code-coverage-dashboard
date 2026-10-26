@@ -12,7 +12,7 @@ def repo_license(repo):
 def stack_record(t,analyse=run_analyser,info=dep_info):
  """Never raises: an analyser failure becomes an `error` on the record, the repo license is kept."""
  repo=t['name'];branch=t.get('branch') or ac.default_branch(repo)
- out={'repository':repo,'html_url':f'https://github.com/{ac.ORG}/{repo}','dpg':repo in ac.CFG.get('dpg_repositories',[]),'branch':branch,
+ out={'repository':repo,'html_url':f'https://github.com/{ac.ORG}/{repo}','dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':branch,
   'license':None,'languages':[],'techs':[],'dependencies':[],'error':None}
  try:out['license']=repo_license(repo)
  except Exception as e:print(f'WARN license {repo}: {e}',file=sys.stderr)
