@@ -10,7 +10,7 @@ def n(**kw):
 
 def test_defaults_and_string_entries():
     c = n(repositories=['a', {'name': 'b', 'branch': 'development', 'tags': [' X ']}])
-    assert c['repositories'][0] == {'name': 'a', 'branch': None, 'tags': [], 'security_workflow': None}
+    assert c['repositories'][0] == {'name': 'a', 'branch': None, 'tags': [], 'security_workflow': None, 'releases': config.RELEASE_DEFAULTS}
     assert c['repositories'][1]['tags'] == ['X'] and c['sources'] == [] and c['exclude'] == []
     assert c['default_security_workflow'] == 'security.yml'
 
@@ -28,6 +28,19 @@ def test_duplicate_repository_is_an_error_even_with_different_case():
     ({'exclude': 'a'}, 'exclude'),
     ({'dpg_repositories': ['a']}, 'no longer used'),
     ({'exclude_repositories': ['a']}, 'no longer used'),
+    ({'release_branch_prefix': 'release-'}, 'branch_prefix'),
+    ({'releases': {'sources': ['svn']}}, 'sources must be'),
+    ({'releases': {'sources': []}}, 'sources must be'),
+    ({'releases': {'sources': ['tag', 'tag']}}, 'sources must be'),
+    ({'releases': {'max_versions': 0}}, 'max_versions'),
+    ({'releases': {'max_versions': True}}, 'max_versions'),
+    ({'releases': {'include_prereleases': 'yes'}}, 'include_prereleases'),
+    ({'releases': {'tag_pattern': '('}}, 'not a valid regex'),
+    ({'releases': {'tag_pattern': '^v(\\\\d+)$'}}, 'named group'),
+    ({'releases': {'branch_prefix': ''}}, 'branch_prefix'),
+    ({'releases': {'colour': 'red'}}, 'unknown releases setting'),
+    ({'releases': 'tags'}, 'object or false'),
+    ({'repositories': [{'name': 'a', 'releases': {'max_versions': -1}}]}, r'repositories\[0\] \(a\): releases.max_versions'),
 ])
 def test_invalid_config_names_the_problem(bad, msg):
     with pytest.raises(ConfigError, match=msg):
@@ -41,3 +54,15 @@ def test_load_reports_invalid_json(tmp_path):
 def test_shipped_config_is_valid():
     c = config.load('config/repos.json')
     assert any(s['type'] == 'query' and s['tags'] == ['DPG'] for s in c['sources'])
+
+def test_repo_release_settings_override_global_and_false_turns_off():
+    c = n(releases={'max_versions': 4, 'sources': ['tag']}, repositories=['a', {'name': 'b', 'releases': {'sources': ['branch'], 'branch_prefix': 'rel/'}}, {'name': 'c', 'releases': False}])
+    a, b, off = (r['releases'] for r in c['repositories'])
+    assert a['max_versions'] == 4 and a['sources'] == ['tag']
+    assert b['max_versions'] == 4 and b['sources'] == ['branch'] and b['branch_prefix'] == 'rel/'
+    assert off is None
+
+def test_global_releases_false_turns_off_everywhere_unless_a_repo_sets_its_own():
+    c = n(releases=False, repositories=['a', {'name': 'b', 'releases': {'sources': ['tag']}}])
+    assert c['releases'] is None and c['repositories'][0]['releases'] is None
+    assert c['repositories'][1]['releases']['sources'] == ['tag'] and c['repositories'][1]['releases']['max_versions'] == 10

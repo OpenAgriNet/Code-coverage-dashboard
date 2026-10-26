@@ -17,11 +17,11 @@ Two tables, each with three columns:
 | Security | Latest completed run of the repo's `security.yml` on that branch, shown as the GitHub Actions badge |
 
 - **Development**: the branch configured per repository (see below).
-- **Latest release**: each repository's highest `release-*` branch (`release-0.0.10` beats `release-0.0.9`). Repos with no release branch are left out.
+- **Latest release**: each repository's newest stable version, with a dropdown of all its versions (see "Finding releases"). Repos with no version are left out.
 
 ## Choosing repositories
 
-`config/repos.json` has three parts. Everything else in the file is a global setting (`workflow_names`, `artifact_name_hints`, `release_branch_prefix`, `defaults.security_workflow`).
+`config/repos.json` has three parts. Everything else in the file is a global setting (`workflow_names`, `artifact_name_hints`, `defaults.security_workflow`, `releases`).
 
 **`repositories`**: repos you name yourself, with their branch.
 
@@ -63,7 +63,34 @@ Names are compared ignoring case.
 4. `exclude` beats everything, including a listed repo.
 5. A source that fails never stops the others, and the refresh log says which one and why.
 
-The same repo listed twice under `repositories`, an unknown source `type`, or a mistyped value stops the run with a message naming the entry. The old keys `dpg_repositories`, `dpg_project`, `dpg_source` and `exclude_repositories` are no longer read, and the error tells you what replaces them.
+The same repo listed twice under `repositories`, an unknown source `type`, or a mistyped value stops the run with a message naming the entry. The old keys `dpg_repositories`, `dpg_project`, `dpg_source`, `exclude_repositories` and `release_branch_prefix` are no longer read, and the error tells you what replaces them.
+
+## Finding releases
+
+Releases can exist as release branches, git tags, GitHub Releases, or a mix. The `releases` block says where to look:
+
+```json
+"releases": {
+  "sources": ["branch", "tag", "release"],
+  "branch_prefix": "release-",
+  "tag_pattern": "^v?(?P<version>\\d+(?:\\.\\d+)*(?:-[0-9A-Za-z.]+)?)$",
+  "include_prereleases": true,
+  "max_versions": 10
+}
+```
+
+| Setting | Meaning |
+|---|---|
+| `sources` | Which of `branch`, `tag`, `release` (GitHub Releases, drafts ignored) to read. The order decides which one is **measured** when a version exists in several |
+| `branch_prefix` | Branches named `<prefix><version>` count as releases |
+| `tag_pattern` | Regex for tag and release names. It needs a named group `version`. The default accepts `1.2.0`, `v1.2.0`, `v1.2.0-RC1` |
+| `include_prereleases` | `false` hides `-RC1`-style versions and GitHub pre-releases |
+| `max_versions` | Newest N versions are measured and listed; the table says when older ones are left out |
+
+- **One version, many names.** `v0.1.0`, `0.1.0` and `release-0.1.0` are the same version `0.1.0`. Names that are not versions (for example the tag `fork-point`) are ignored. Versions are compared as numbers (`0.0.10` is newer than `0.0.9`) and a pre-release ranks below its final release.
+- **What gets measured.** A branch is measured as it is now and keeps the live badges. A tag or release is measured at its tagged commit (Codecov by commit, and the security run for that commit), so it shows plain numbers and the run date instead of a badge. With the default order a version that is both a branch and a tag is measured as the branch.
+- **Per repository.** Add `"releases": {...}` to a `repositories` entry to override single settings for that repo, for example `{"sources": ["tag"]}`, or `"releases": false` to leave it out of the release table. `"releases": false` at the top level turns releases off everywhere unless a repo sets its own.
+- **The dropdown** lists every measured version of a repo, newest first, with the latest stable one selected.
 
 **A branch only has data if the repository measures it.** Coverage exists only if that repo uploads to Codecov on pushes to the branch, and security status only if its `security.yml` runs on pushes to the branch. If not, the row shows an *unknown* coverage badge and *No runs on this branch*. That is not 0% and not a failure. To fix it, add the branch to `on.push.branches` in the repo's `coverage.yml` and `security.yml`.
 

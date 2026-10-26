@@ -32,21 +32,13 @@ def test_security_workflow_missing(monkeypatch):
 
 def test_inspect_record_shape(monkeypatch):
     monkeypatch.setattr(a, 'resolve_branch', lambda r, b: ('development', True))
-    monkeypatch.setattr(a, 'branch_coverage', lambda r, b: {'coverage': 74.35, 'source': 'Codecov', 'commit': 'abc',
+    monkeypatch.setattr(a, 'branch_coverage', lambda r, b, sha=None: {'coverage': 74.35, 'source': 'Codecov', 'commit': 'abc',
         'detail': {'lines': 10, 'hits': 7, 'files': 1, 'report_url': 'x'}, 'measured_at': 't'})
-    monkeypatch.setattr(a, 'security_status', lambda r, b, w: {'state': 'failing'})
+    monkeypatch.setattr(a, 'security_status', lambda r, b, w, sha=None: {'state': 'failing'})
     rec = a.inspect({'name': 'network-adapter', 'branch': 'development', 'security_workflow': 'security.yml'})
     assert rec['branch'] == 'development' and rec['coverage'] == 74.35 and rec['security']['state'] == 'failing'
     assert rec['coverage_badge_url'] == 'https://codecov.io/gh/OpenAgriNet/network-adapter/branch/development/graph/badge.svg'
     assert 'last_merged_pr' not in rec and 'main_commits_recent' not in rec and 'dev_coverage' not in rec
-
-def test_latest_release_picks_highest_version(monkeypatch):
-    monkeypatch.setattr(a, 'api', lambda p: [{'ref': 'refs/heads/release-0.0.9'}, {'ref': 'refs/heads/release-0.0.10'}])
-    assert a.latest_release_branch('na', 'release-') == 'release-0.0.10'
-
-def test_latest_release_none_when_no_release_branch(monkeypatch):
-    monkeypatch.setattr(a, 'api', lambda p: [])
-    assert a.latest_release_branch('kp', 'release-') is None
 
 def test_collect_adds_main_view_and_reuses_record_when_branch_is_default(monkeypatch):
     calls = []
@@ -55,13 +47,13 @@ def test_collect_adds_main_view_and_reuses_record_when_branch_is_default(monkeyp
         return {'repository': t['name'], 'branch': t['branch']}
     monkeypatch.setattr(a, 'inspect', fake_inspect)
     monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
-    monkeypatch.setattr(a, 'latest_release_branch', lambda repo, prefix: 'release-0.0.2' if repo == 'na' else None)
+    monkeypatch.setattr(a, 'release_group', lambda t: {'repository': t['name'], 'versions': [{'branch': 'release-0.0.2'}]} if t['name'] == 'na' else None)
     targets = [{'name': 'na', 'branch': 'development', 'security_workflow': 'security.yml', 'tags': []},
                {'name': 'dss', 'branch': 'main', 'security_workflow': 'security.yml'}]
-    got = a.collect(targets, 'release-')
+    got = a.collect(targets)
     assert [r['branch'] for r in got['repositories']] == ['development', 'main']
     assert [r['branch'] for r in got['main']] == ['main', 'main']
-    assert [r['branch'] for r in got['releases']] == ['release-0.0.2']
+    assert [g['repository'] for g in got['releases']] == ['na']
     assert calls.count(('dss', 'main')) == 1  # main record reused, not measured twice
 
 def test_collect_survives_api_error_for_one_repo(monkeypatch):
@@ -71,21 +63,12 @@ def test_collect_survives_api_error_for_one_repo(monkeypatch):
         return {'repository': t['name'], 'branch': 'main'}
     monkeypatch.setattr(a, 'inspect', fake_inspect)
     monkeypatch.setattr(a, 'default_branch', lambda repo: 'main')
-    monkeypatch.setattr(a, 'latest_release_branch', lambda repo, prefix: None)
+    monkeypatch.setattr(a, 'release_group', lambda t: None)
     got = a.collect([{'name': 'broken', 'branch': None, 'security_workflow': 'security.yml'},
-                     {'name': 'ok', 'branch': None, 'security_workflow': 'security.yml'}], 'release-')
+                     {'name': 'ok', 'branch': None, 'security_workflow': 'security.yml'}])
     assert [r['repository'] for r in got['repositories']] == ['broken', 'ok']
     assert got['repositories'][0]['security']['state'] == 'unknown'
     assert got['repositories'][0]['coverage'] is None
-
-def test_latest_release_ignores_non_version_branches_and_ranks_rc_below_final(monkeypatch):
-    seen = []
-    def fake(path):
-        seen.append(path)
-        return [{'ref': 'refs/heads/' + n} for n in ['release-notes', 'release-0.1.0-rc1', 'release-0.1.0', 'release-0.0.9']]
-    monkeypatch.setattr(a, 'api', fake)
-    assert a.latest_release_branch('na', 'release-') == 'release-0.1.0'
-    assert seen == ['/repos/OpenAgriNet/na/git/matching-refs/heads/release-']
 
 def test_inspect_carries_tags_and_dpg_flag(monkeypatch):
     monkeypatch.setattr(a, 'resolve_branch', lambda r, b: ('main', False))
@@ -93,3 +76,46 @@ def test_inspect_carries_tags_and_dpg_flag(monkeypatch):
     assert rec['tags'] == ['DPG', 'core'] and rec['dpg'] is True
     rec = a.inspect({'name': 'x', 'branch': 'main', 'tags': [], 'security_workflow': 'security.yml'})
     assert rec['dpg'] is False
+
+def test_inspect_tag_uses_commit_and_has_no_live_badges(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(a, 'resolve_branch', lambda r, b: (_ for _ in ()).throw(AssertionError('a tag is not a branch')))
+    def cov(r, b, sha=None):
+        seen['cov'] = (b, sha)
+        return {'coverage': 95.4, 'source': 'Codecov', 'commit': sha, 'detail': None, 'measured_at': 't'}
+    def sec(r, b, w, sha=None):
+        seen['sec'] = (b, sha)
+        return {'state': 'passing', 'badge_url': None}
+    monkeypatch.setattr(a, 'branch_coverage', cov)
+    monkeypatch.setattr(a, 'security_status', sec)
+    rec = a.inspect({'name': 'dss', 'branch': 'v0.1.0', 'sha': 'abc123', 'tags': [], 'security_workflow': 'security.yml'})
+    assert rec['ref_kind'] == 'tag' and rec['branch_exists'] is True and rec['coverage_badge_url'] is None
+    assert seen == {'cov': ('v0.1.0', 'abc123'), 'sec': ('v0.1.0', 'abc123')}
+
+def test_security_for_a_commit_queries_head_sha_and_has_no_badge(monkeypatch):
+    paths = []
+    def fake(path):
+        paths.append(path)
+        return {'workflow_runs': [{'conclusion': 'success', 'html_url': 'u', 'updated_at': 't'}]} if 'runs' in path else {'id': 1}
+    monkeypatch.setattr(a, 'api', fake)
+    s = a.security_status('dss', 'v0.1.0', 'security.yml', 'abc123')
+    assert s['state'] == 'passing' and s['badge_url'] is None
+    assert any('head_sha=abc123' in p and 'branch=' not in p for p in paths)
+
+def test_release_group_measures_each_version_and_picks_newest_stable(monkeypatch):
+    versions = [{'version': '0.2.0-RC1', 'ref': 'v0.2.0-RC1', 'ref_kind': 'tag', 'sha': 's3', 'kinds': ['tag'], 'prerelease': True, 'published_at': None},
+                {'version': '0.1.0', 'ref': 'release-0.1.0', 'ref_kind': 'branch', 'sha': 's2', 'kinds': ['branch'], 'prerelease': False, 'published_at': None},
+                {'version': '0.0.9', 'ref': 'v0.0.9', 'ref_kind': 'tag', 'sha': 's1', 'kinds': ['tag'], 'prerelease': False, 'published_at': None}]
+    monkeypatch.setattr(a, 'find_versions', lambda org, repo, rc, get: {'versions': versions, 'total': 5})
+    calls = []
+    monkeypatch.setattr(a, 'safe_inspect', lambda t: calls.append((t['branch'], t.get('sha'))) or {'repository': t['name'], 'branch': t['branch']})
+    g = a.release_group({'name': 'na', 'tags': ['DPG'], 'releases': {'sources': ['branch']}})
+    assert calls == [('v0.2.0-RC1', 's3'), ('release-0.1.0', None), ('v0.0.9', 's1')]  # only tags are measured by commit
+    assert g['default'] == '0.1.0' and g['not_measured'] == 2 and g['dpg'] is True and len(g['versions']) == 3
+
+def test_release_group_none_when_releases_off_or_none_found(monkeypatch):
+    assert a.release_group({'name': 'na', 'releases': None}) is None
+    monkeypatch.setattr(a, 'find_versions', lambda *x: {'versions': [], 'total': 0})
+    assert a.release_group({'name': 'na', 'releases': {}}) is None
+    monkeypatch.setattr(a, 'find_versions', lambda *x: (_ for _ in ()).throw(RuntimeError('boom')))
+    assert a.release_group({'name': 'na', 'releases': {}}) is None
