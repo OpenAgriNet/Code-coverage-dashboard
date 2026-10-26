@@ -17,12 +17,23 @@ def analyse(repo,branch):
   subprocess.run(['git','clone','-q','--depth','1','-b',branch,f'https://github.com/{ac.ORG}/{repo}.git',src],check=True,timeout=300,env=env)
   # the CLI joins -o onto the working directory, so pass a bare file name
   subprocess.run(['npx','--yes',ANALYSER,src,'--flat','-o','out.json'],cwd=tmp,check=True,timeout=600,stdout=subprocess.DEVNULL,env=env)
-  return json.load(open(os.path.join(tmp,'out.json'),encoding='utf-8'))
-def summarize(raw):
- """Languages by file count, tech keys, and deduplicated [ecosystem, name, version] dependencies."""
+  with open(os.path.join(tmp,'out.json'),encoding='utf-8') as f:return json.load(f)
+def main_stack(langs,techs,stack):
+ """Only the main stack: drop markup, data and tooling (stack['ignore_*'], compared ignoring case), then keep languages that are
+ at least min_share of the remaining files (stack-analyser labels a stray go.mod as AMPL) and at most max_languages of them."""
+ skip_l={x.lower() for x in stack['ignore_languages']};skip_t={x.lower() for x in stack['ignore_techs']}
+ code=[l for l in langs if l[0].lower() not in skip_l];total=sum(n for _,n in code)
+ return ([l for l in code if total and l[1]/total>=stack['min_share']][:stack['max_languages']],[t for t in techs if t.lower() not in skip_t][:stack['max_techs']])
+def summarize(raw,stack=None):
+ """Languages by file count, tech keys, and deduplicated [ecosystem, name, version] dependencies.
+ With `stack` (the config's stack settings) languages and techs are cut down to the main stack."""
  langs=sorted((raw.get('languages') or {}).items(),key=lambda x:(-x[1],x[0]))
  seen=set();deps=[]
- for e,n,v in raw.get('dependencies') or []:
-  if (e,n,v) in seen:continue
-  seen.add((e,n,v));deps.append([e,n,v])
- return {'languages':langs,'techs':sorted(set(raw.get('techs') or [])),'dependencies':sorted(deps,key=lambda d:(d[0],d[1].lower()))}
+ for dep in raw.get('dependencies') or []:
+  if not isinstance(dep,(list,tuple)) or len(dep)!=3:continue  # one odd manifest entry must not lose the whole repo
+  key=tuple(dep)
+  if key in seen:continue
+  seen.add(key);deps.append(list(key))
+ techs=sorted(set(raw.get('techs') or []))
+ if stack:langs,techs=main_stack(langs,techs,stack)
+ return {'languages':langs,'techs':techs,'dependencies':sorted(deps,key=lambda d:(d[0],d[1].lower()))}

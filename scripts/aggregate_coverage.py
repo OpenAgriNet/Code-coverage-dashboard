@@ -6,6 +6,7 @@ import requests
 from repoconfig import load as load_config, resolve
 from releasefind import find_versions
 import xml.etree.ElementTree as ET
+MAX_ARTIFACT_BYTES=100*1024*1024  # artifacts are read into memory
 API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN')
 CFG=load_config('config/repos.json'); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
 if TOKEN: S.headers['Authorization']='Bearer '+TOKEN
@@ -109,7 +110,7 @@ def branch_coverage(repo,branch,sha=None):
   arts=(api(f"/repos/{ORG}/{repo}/actions/runs/{run['id']}/artifacts?per_page=100") or {}).get('artifacts',[])
   hints=CFG.get('artifact_name_hints',[])
   for a in arts:
-   if a.get('expired') or (hints and not any(h.lower() in a.get('name','').lower() for h in hints)):continue
+   if a.get('expired') or a.get('size_in_bytes',0)>MAX_ARTIFACT_BYTES or (hints and not any(h.lower() in a.get('name','').lower() for h in hints)):continue
    try:
     zresp=S.get(f"{API}/repos/{ORG}/{repo}/actions/artifacts/{a['id']}/zip",timeout=90);zresp.raise_for_status()
     with zipfile.ZipFile(io.BytesIO(zresp.content)) as z:

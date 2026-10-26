@@ -94,6 +94,35 @@ Releases can exist as release branches, git tags, GitHub Releases, or a mix. The
 
 **A branch only has data if the repository measures it.** Coverage exists only if that repo uploads to Codecov on pushes to the branch, and security status only if its `security.yml` runs on pushes to the branch. If not, the row shows an *unknown* coverage badge and *No runs on this branch*. That is not 0% and not a failure. To fix it, add the branch to `on.push.branches` in the repo's `coverage.yml` and `security.yml`.
 
+## License policy (green, yellow, red)
+
+List the licenses your team accepts under `licenses` in `config/repos.json`:
+
+```json
+"licenses": {
+  "green":  ["MIT", "Apache-2.0", "BSD-*"],
+  "yellow": ["MPL-2.0", "LGPL-*"],
+  "red":    ["AGPL-*", "GPL-*", "SSPL-1.0"]
+}
+```
+
+- Entries are SPDX ids or patterns (`*` matches anything), compared ignoring case. The same entry in two lists is a config error. If patterns overlap, the most restrictive class wins.
+- Every repo license and dependency license gets a class: **green**, **yellow**, **red**, or **unclassified** (on no list, or an expression that cannot be read). It is shown as a coloured dot, filterable as *License risk*, and the lists are printed under the dependency table.
+- Expressions follow SPDX: `A OR B` takes the better class (you may choose), `A AND B` the worse, `AND` binds tighter than `OR`, parentheses are respected, and `A WITH exception` uses the exception if you listed it, else `A`. Several licenses reported together for one package (`MIT, Apache-2.0`) are treated as all applying, so the worst counts, because deps.dev does not say whether they are alternatives.
+- Nothing is blocked or failed by this. It only colours and filters. An empty policy leaves everything *unclassified*.
+
+## Filters
+
+Both pages share one filter component (`filters.js`).
+
+- Tick several values in a filter to see any of them (OR). Different filters combine (AND). A filter with nothing ticked is off.
+- Each option shows how many results it would give with your other filters applied. An option that would give none is greyed out, so there are no dead ends.
+- Active filters appear as chips; click one to remove it, or *Clear all*. Escape closes a dropdown.
+- Filters live in the address bar (`?sec=failing&tag=DPG`), so a link shares the view. A link from the main page to `deps.html?repo=network-adapter&vuln=any` opens with that repository ticked and the vulnerability filter on.
+- **Main page**: one bar filters every table at once (Repository, Tag, Security, Coverage, License risk, License, Vulnerabilities, Language). Security and Coverage follow the Development/Main switch. The release table has its own *Found as* and *Stability* filters and a *Show version* selector.
+- **Dependency page**: Repository, Ecosystem, License, License risk, Vulnerabilities, Update status, and a text search.
+- Tests: `node --test tests/filters.test.mjs` (also run in CI before the dashboard is built).
+
 ## Stack, dependencies and vulnerabilities
 
 `scripts/collect_stack.py` writes `data/stack.json` on every refresh. It shows each repo's license, languages and technologies, and `deps.html` lists every dependency.
@@ -105,6 +134,9 @@ Releases can exist as release branches, git tags, GitHub Releases, or a mix. The
 | Dependency license and latest version (npm, PyPI, Go) | [deps.dev](https://deps.dev) | None, public API |
 | Known vulnerabilities and the fixed version | [OSV.dev](https://osv.dev) (Google's open vulnerability database, which includes the GitHub advisories) | None: public API, no key or login. Only package names and versions are sent |
 
+- **Main stack only.** The Stack column lists the repo's real languages and frameworks, not every file type. `stack` in `config/repos.json` controls it: `ignore_languages` and `ignore_techs` (markup, data, CI and tooling by default), `max_languages`, `max_techs`, and `min_share` (a language must be at least that share of the remaining code files; stack-analyser labels a stray `go.mod` as AMPL). Names are compared ignoring case. Languages and tools that are already implied (for example `python` as a tool next to the language Python) are in the ignore list.
+- **Development / Main.** Both the stack table and `deps.html` have the same switch as the coverage tables: each repo's working branch, or its default branch. A repo whose working branch is its default branch is analysed once. The choice is remembered across the two pages and kept in the address bar (`?branch=main`).
+- **"OR", commas and AND in licenses.** A license can be an SPDX expression. `Apache-2.0 OR BSD-3-Clause` (for example `cryptography`) is a real choice. Several licenses reported together (`Apache-2.0, BSD-3-Clause`, for example Go modules that contain files under both) all apply, so the policy takes the strictest; each comma-separated item is classified on its own before that. Names such as `GPL-3.0-or-later` contain "or" as part of the id and are not expressions.
 - A package is checked at the version in its manifest. For a range such as `^5.0.0` that is the lowest version the range allows, so the version actually installed may be newer and already fixed; the page says so on those rows. Exact pins (`==`, Go modules) are checked exactly.
 - **Fixed in** is the single lowest version that fixes every advisory that has a fix. Advisories with no released fix are counted separately and shown as *no fix released*.
 - Docker images, GitHub Actions and unpinned versions (`latest`, `${VAR}`) are listed but not checked. They show *Not checked*, which is not the same as *None known*.

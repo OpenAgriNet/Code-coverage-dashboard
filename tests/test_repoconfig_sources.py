@@ -43,3 +43,8 @@ def test_project_repos_keeps_same_org_only_and_flags_private():
 def test_project_repos_needs_token():
     with pytest.raises(RuntimeError, match='DPG_PROJECT_TOKEN'):
         s.project_repos({'number': 9}, 'Org', None)
+
+def test_query_repos_rejects_a_result_set_cut_off_by_the_search_limit():
+    full = {'items': [{'name': 'r', 'private': False} for _ in range(100)]}
+    with pytest.raises(RuntimeError, match='narrow the query'):
+        s.query_repos({'query': 'topic:x'}, 'Org', lambda p: full)

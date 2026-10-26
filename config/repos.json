@@ -34,6 +34,20 @@
   "workflow_names": ["CI"],
   "artifact_name_hints": [],
 
+  "stack": {
+    "ignore_languages": ["Markdown", "JSON", "YAML", "TOML", "INI", "CSV", "Text", "SVG", "XML", "Jinja", "Smarty", "HTML", "CSS", "SCSS", "Shell", "Dockerfile", "Makefile", "AMPL", "JSONiq"],
+    "ignore_techs": ["github", "github.actions", "github.pages", "codecov", "bash", "docker", "eslint", "prettier", "npm", "nodejs", "vitest", "css", "jsx", "javascript", "typescript", "python", "golang", "openapi", "opentelemetry", "lucideicons", "radixui", "shadcn", "segment"],
+    "max_languages": 3,
+    "min_share": 0.1,
+    "max_techs": 6
+  },
+
+  "licenses": {
+    "green": [],
+    "yellow": [],
+    "red": []
+  },
+
   "releases": {
     "sources": ["branch", "tag", "release"],
     "branch_prefix": "release-",
