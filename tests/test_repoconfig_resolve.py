@@ -15,7 +15,9 @@ def api(repos=(), branches=None, fail_search=None):
         if path.startswith('/search/repositories'):
             if fail_search:
                 raise RuntimeError(fail_search)
-            return {'items': [{'name': n, 'private': p} for n, p in repos]}
+            if '__no_such_value__' in path:
+                return {'total_count': 0, 'items': []}
+            return {'total_count': len(repos), 'items': [{'name': n, 'private': p} for n, p in repos]}
         if '/branches?' in path:
             repo = path.split('/repos/o/')[1].split('/')[0]
             if isinstance(branches.get(repo), Exception):
@@ -114,3 +116,24 @@ def test_releases_setting_flows_to_targets_custom_off_and_discovered():
     assert rel['a']['sources'] == ['tag'] and rel['a']['max_versions'] == 3
     assert rel['b'] is None
     assert rel['c']['max_versions'] == 3 and rel['d']['max_versions'] == 3
+
+
+def test_a_search_that_ignores_props_filters_stops_the_run_with_the_fix():
+    def get(path):
+        if path.startswith('/search/repositories'):
+            return {'total_count': 48, 'items': [{'name': f'r{i}', 'private': False} for i in range(48)]}   # every repo, whatever the query says
+        raise AssertionError(path)
+    with pytest.raises(SourceError, match='query source #1 failed: GitHub search ignored the props. filter.*DPG_QUERY_TOKEN.*keeps its last data'):
+        run(cfg(sources=[{'type': 'query', 'query': 'props.project-name:"OAN DPG"', 'tags': ['DPG']}]), get)
+
+def test_the_search_uses_its_own_getter_when_given_and_everything_else_the_default():
+    searched, other = [], []
+    def search_get(path):
+        searched.append(path)
+        return {'total_count': 0, 'items': [{'name': 'a', 'private': False}]} if '__no_such_value__' not in path else {'total_count': 0, 'items': []}
+    def get(path):
+        other.append(path)
+        assert '/search/' not in path
+        return [{'name': 'development'}]
+    got = resolve(cfg(sources=[{'type': 'query', 'query': 'props.p:"v"'}]), 'o', get, None, log=lambda m: None, search_get=search_get)
+    assert got[0]['branch'] == 'development' and len(searched) == 2 and other and all('/branches?' in p for p in other)
