@@ -24,3 +24,7 @@ def test_analyse_hides_tokens_from_git_and_npx(monkeypatch):
     assert len(envs) == 2
     for env in envs:
         assert 'secret' not in env.values() and env['npm_config_ignore_scripts'] == 'true' and 'PATH' in env
+
+def test_summarize_skips_malformed_dependency_entries():
+    raw = {'dependencies': [['npm', 'a', '1'], ['npm', 'broken'], None, 'x', ['npm', 'b', '2', 'extra']]}
+    assert a.summarize(raw)['dependencies'] == [['npm', 'a', '1']]

@@ -14,6 +14,17 @@ def name_list(entry,key,where):
  names=entry.get(key,[])
  if not isinstance(names,list) or not all(isinstance(n,str) and n.strip() for n in names):raise ConfigError(f'{where}: "{key}" must be a list of repository names')
  return [n.strip() for n in names]
+LICENSE_CLASSES=('green','yellow','red')
+def license_policy(raw):
+ """{'green': [...], 'yellow': [...], 'red': [...]}: SPDX ids or patterns such as GPL-*. The same entry in two lists is an error."""
+ if raw is None:raw={}
+ if not isinstance(raw,dict) or set(raw)-set(LICENSE_CLASSES):raise ConfigError(f'licenses: use only the keys {", ".join(LICENSE_CLASSES)}')
+ out={};seen={}
+ for c in LICENSE_CLASSES:
+  out[c]=name_list(raw,c,'licenses')
+  for p in out[c]:
+   if seen.setdefault(p.lower(),c)!=c:raise ConfigError(f'licenses: "{p}" is in both {seen[p.lower()]} and {c}')
+ return out
 def releases(raw,base,where):
  """Effective release-finding settings: `base` (or the defaults) overridden by `raw`. None when `raw` is false (releases off)."""
  if raw is False:return None
@@ -52,7 +63,7 @@ def normalize(cfg):
   if r['name'].lower() in seen:raise ConfigError(f'repositories: "{r["name"]}" is listed twice (names are case-insensitive); merge the entries')
   seen[r['name'].lower()]=r
  defaults=cfg.get('defaults') or {}
- return {**cfg,'releases':rel,'repositories':repos,'sources':[source(s,i) for i,s in enumerate(cfg.get('sources',[]))],
+ return {**cfg,'licenses':license_policy(cfg.get('licenses')),'releases':rel,'repositories':repos,'sources':[source(s,i) for i,s in enumerate(cfg.get('sources',[]))],
   'exclude':name_list(cfg,'exclude','config'),'default_security_workflow':defaults.get('security_workflow','security.yml')}
 def load(path):
  try:

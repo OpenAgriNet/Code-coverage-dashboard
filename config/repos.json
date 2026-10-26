@@ -34,6 +34,12 @@
   "workflow_names": ["CI"],
   "artifact_name_hints": [],
 
+  "licenses": {
+    "green": [],
+    "yellow": [],
+    "red": []
+  },
+
   "releases": {
     "sources": ["branch", "tag", "release"],
     "branch_prefix": "release-",
