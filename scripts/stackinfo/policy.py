@@ -1,7 +1,8 @@
 """Green, yellow or red for a license, from the lists under "licenses" in config/repos.json (pure, no network).
 
 A license is an SPDX expression: ids joined by AND / OR (AND binds tighter), parentheses, and `id WITH exception`.
-A comma list ("MIT, Apache-2.0", how several licenses reported for one package are shown) means all of them apply.
+A comma list ("MIT, Apache-2.0", how several licenses reported for one package are shown) is a list of separate expressions that all apply:
+each is classified on its own and the worst counts, so "GPL-3.0-or-later OR MIT, Apache-2.0" is (GPL OR MIT) AND Apache, never GPL OR (MIT AND Apache).
 Anything that does not parse is 'unclassified', never the friendlier reading."""
 import re
 from fnmatch import fnmatchcase
@@ -18,9 +19,17 @@ def tokens(expr):
  while pos<len(expr):
   m=TOKEN.match(expr,pos)
   if not m:raise ValueError('bad license expression')
-  pos=m.end()
-  out+=[x for x in re.split(r'(,)',m.group(1)) if x]  # a comma separates like AND
- return ['AND' if t==',' else t for t in out]
+  pos=m.end();out.append(m.group(1))
+ if any(',' in t for t in out):raise ValueError('comma inside an expression')
+ return out
+def split_list(expr):
+ """The comma-separated expressions at the top level (commas inside parentheses are left in, and rejected by the parser)."""
+ parts=[];depth=0;cur=''
+ for ch in expr:
+  depth+=(ch=='(')-(ch==')')
+  if ch==',' and depth==0:parts.append(cur);cur=''
+  else:cur+=ch
+ return parts+[cur]
 def parse(toks,policy):
  """Recursive descent over expr := term (OR term)*, term := factor (AND factor)*, factor := '(' expr ')' | id [WITH id]."""
  i=0
@@ -55,5 +64,5 @@ def parse(toks,policy):
 def classify(expr,policy):
  """None when there is no license; otherwise green, yellow, red or unclassified (also for an expression that does not parse)."""
  if not expr or not str(expr).strip():return None
- try:return parse(tokens(str(expr)),policy)
+ try:return max((parse(tokens(p),policy) for p in split_list(str(expr))),key=RANK.get)
  except ValueError:return 'unclassified'

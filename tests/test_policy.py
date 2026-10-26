@@ -37,6 +37,17 @@ def test_several_licenses_listed_together_all_apply():
     assert classify('MIT, GPL-3.0-only', P) == 'red'
     assert classify('MIT,GPL-3.0-only', P) == 'red'
 
+def test_a_comma_list_of_expressions_is_classified_item_by_item():
+    q = {'green': ['MIT', 'Apache-2.0'], 'yellow': [], 'red': ['GPL-*', 'AGPL-*']}
+    assert classify('GPL-3.0-or-later OR MIT, Apache-2.0', q) == 'green'    # (GPL OR MIT) AND Apache
+    q2 = {'green': ['MIT'], 'yellow': [], 'red': ['GPL-*', 'Apache-2.0']}
+    assert classify('GPL-3.0-or-later OR MIT, Apache-2.0', q2) == 'red'     # the old reading, GPL OR (MIT AND Apache), said green
+    assert classify('Apache-2.0 OR BSD-3-Clause, MIT', P) == 'green'
+    assert classify('MIT, , Apache-2.0', P) == 'unclassified'
+
+def test_a_comma_inside_parentheses_is_not_understood():
+    assert classify('(MIT, Apache-2.0) OR GPL-3.0-only', P) == 'unclassified'
+
 def test_with_exception_uses_the_listed_exception_or_the_base_license():
     assert classify('GPL-2.0-only WITH Classpath-exception-2.0', P) == 'red'
     assert classify('GPL-2.0-only WITH Classpath-exception-2.0', {**P, 'yellow': P['yellow'] + ['GPL-2.0-only WITH Classpath-exception-2.0']}) == 'red'  # red pattern GPL-* also matches; most restrictive wins

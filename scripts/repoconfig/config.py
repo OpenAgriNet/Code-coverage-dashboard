@@ -14,6 +14,23 @@ def name_list(entry,key,where):
  names=entry.get(key,[])
  if not isinstance(names,list) or not all(isinstance(n,str) and n.strip() for n in names):raise ConfigError(f'{where}: "{key}" must be a list of repository names')
  return [n.strip() for n in names]
+STACK_DEFAULTS={
+ 'ignore_languages':['Markdown','JSON','YAML','TOML','INI','CSV','Text','SVG','XML','Jinja','Smarty','HTML','CSS','SCSS','Shell','Dockerfile','Makefile',
+  'AMPL','JSONiq'],  # the last two are stack-analyser reading go.mod and .jq files as other languages
+ 'ignore_techs':['github','github.actions','github.pages','codecov','bash','docker','eslint','prettier','npm','nodejs','vitest','css','jsx','javascript','typescript','python','golang',
+  'openapi','opentelemetry','lucideicons','radixui','shadcn','segment'],
+ 'max_languages':3,'min_share':0.1,'max_techs':6}
+def stack_settings(raw):
+ """What counts as the 'main stack': languages and tools to leave out, and how many of each to keep."""
+ if raw is None:raw={}
+ if not isinstance(raw,dict) or set(raw)-set(STACK_DEFAULTS):raise ConfigError(f'stack: use only the keys {", ".join(STACK_DEFAULTS)}')
+ out={**STACK_DEFAULTS,**raw}
+ for k in ('ignore_languages','ignore_techs'):out[k]=name_list(out,k,'stack')
+ for k in ('max_languages','max_techs'):
+  if not isinstance(out[k],int) or isinstance(out[k],bool) or out[k]<1:raise ConfigError(f'stack: "{k}" must be a whole number, 1 or more')
+ share=out['min_share']
+ if not isinstance(share,(int,float)) or isinstance(share,bool) or not 0<=share<=1:raise ConfigError('stack: "min_share" must be a number from 0 to 1')
+ return out
 LICENSE_CLASSES=('green','yellow','red')
 def license_policy(raw):
  """{'green': [...], 'yellow': [...], 'red': [...]}: SPDX ids or patterns such as GPL-*. The same entry in two lists is an error."""
@@ -63,7 +80,7 @@ def normalize(cfg):
   if r['name'].lower() in seen:raise ConfigError(f'repositories: "{r["name"]}" is listed twice (names are case-insensitive); merge the entries')
   seen[r['name'].lower()]=r
  defaults=cfg.get('defaults') or {}
- return {**cfg,'licenses':license_policy(cfg.get('licenses')),'releases':rel,'repositories':repos,'sources':[source(s,i) for i,s in enumerate(cfg.get('sources',[]))],
+ return {**cfg,'stack':stack_settings(cfg.get('stack')),'licenses':license_policy(cfg.get('licenses')),'releases':rel,'repositories':repos,'sources':[source(s,i) for i,s in enumerate(cfg.get('sources',[]))],
   'exclude':name_list(cfg,'exclude','config'),'default_security_workflow':defaults.get('security_workflow','security.yml')}
 def load(path):
  try:

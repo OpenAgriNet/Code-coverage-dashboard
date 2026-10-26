@@ -55,7 +55,7 @@
   <section aria-labelledby="stack-title">
     <div class="sec-head"><div>
       <h2 id="stack-title">Stack and licenses</h2>
-      <p class="sub">Each repository's working branch. <a href="deps.html">All dependencies →</a></p>
+      <p class="sub" id="stack-note">Each repository's working branch. <a href="deps.html">All dependencies →</a></p>
     </div></div>
     <div class="table-wrap"><table class="wide">
       <thead><tr><th scope="col">Repository</th><th scope="col">License</th><th scope="col">Stack</th><th scope="col">Dependencies</th></tr></thead>
@@ -152,6 +152,7 @@ function setView(v){
   view=v;try{localStorage.setItem('branchView',v)}catch(e){}
   $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
   $('dev-title').textContent=v==='main'?'Main':'Development';
+  $('stack-note').innerHTML=(v==='main'?'Each repository\'s default branch.':'Each repository\'s working branch.')+' <a href="deps.html">All dependencies →</a>';
   $('dev-note').innerHTML=v==='main'?'Each repository\'s default branch.':'Each repository\'s working branch, set in <code>config/repos.json</code>.';
   if(bar)bar.setItems(repoItems());else{summary();render()}
 }
@@ -171,8 +172,8 @@ function stackRow(r){
 }
 function fillStack(){
   if(!stack)return;
-  const a=(stack.repositories||[]).filter(shown).sort((x,y)=>x.repository.localeCompare(y.repository));
-  $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${visibleSet&&(stack.repositories||[]).length?'No repositories match these filters.':'No repositories analysed yet.'}</td></tr>`;
+  const a=stackList().filter(shown).sort((x,y)=>x.repository.localeCompare(y.repository));
+  $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${visibleSet&&stackList().length?'No repositories match these filters.':'No repositories analysed yet.'}</td></tr>`;
 }
 function render(){
   if($('rel-all').options.length<2)fillRelAll();
@@ -183,15 +184,16 @@ function render(){
 /* ---- filters: one bar for every table (a repository is shown when it passes all of them) ---- */
 const SECL={passing:'Passing',failing:'Failing','no runs':'No runs','no workflow':'No security workflow','branch not found':'Branch not found',unknown:'Unknown'};
 const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No LICENSE file'};
-const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'},PLAIN=['Markdown','JSON','YAML','Text','SVG','Jinja','Smarty','CSS','HTML'];
+const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
+const stackList=()=>!stack?[]:(view==='main'?stack.main||stack.repositories:stack.repositories)||[];
 function repoItems(){
-  const st=Object.fromEntries(((stack&&stack.repositories)||[]).map(r=>[r.repository,r]));
+  const st=Object.fromEntries(stackList().map(r=>[r.repository,r]));
   return viewList().map(r=>{
     const s=st[r.repository]||{},deps=s.dependencies||[],c=isNum(r.coverage)?+r.coverage:null;
     const vul=!deps.some(d=>d.vulns)?['unchecked']:!deps.some(d=>d.vulns&&d.vulns.count)?['none']:deps.some(d=>d.vulns&&(d.vulns.severity==='CRITICAL'||d.vulns.severity==='HIGH'))?['any','critical-high']:['any'];
     return {repository:r.repository,tags:r.tags||(r.dpg?['DPG']:[]),sec:(r.security||{}).state||'unknown',cov:c===null?'none':c>=80?'high':c>=50?'mid':'low',
       license:stack?(s.license||'(no LICENSE file)'):null,risk:stack?(s.license?s.license_class||'unclassified':'none'):null,vuln:stack?vul:null,
-      langs:(s.languages||[]).map(l=>l[0]).filter(l=>!PLAIN.includes(l)).slice(0,2)};
+      langs:(s.languages||[]).map(l=>l[0])};
   });
 }
 const REPO_FACETS=[

@@ -82,3 +82,25 @@ def test_license_policy_is_kept_and_trimmed():
 def test_invalid_license_policy(bad, msg):
     with pytest.raises(ConfigError, match=msg):
         n(licenses=bad)
+
+def test_stack_settings_default_to_ignoring_markup_and_tooling():
+    s = n()['stack']
+    assert 'Markdown' in s['ignore_languages'] and 'YAML' in s['ignore_languages'] and 'github' in s['ignore_techs'] and s['max_languages'] == 3
+
+def test_stack_settings_can_be_overridden_one_key_at_a_time():
+    s = n(stack={'max_languages': 5, 'ignore_languages': ['Markdown']})['stack']
+    assert s['max_languages'] == 5 and s['ignore_languages'] == ['Markdown'] and 'github' in s['ignore_techs']
+
+@pytest.mark.parametrize('bad,msg', [
+    ({'colour': 1}, 'use only the keys'),
+    ({'max_techs': 0}, 'max_techs'),
+    ({'max_languages': True}, 'max_languages'),
+    ({'ignore_techs': 'github'}, 'must be a list'),
+    ({'min_share': 1.5}, 'min_share'),
+    ({'min_share': -0.1}, 'min_share'),
+    ({'min_share': True}, 'min_share'),
+    ({'min_share': '10%'}, 'min_share'),
+])
+def test_invalid_stack_settings(bad, msg):
+    with pytest.raises(ConfigError, match=msg):
+        n(stack=bad)

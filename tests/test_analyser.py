@@ -28,3 +28,27 @@ def test_analyse_hides_tokens_from_git_and_npx(monkeypatch):
 def test_summarize_skips_malformed_dependency_entries():
     raw = {'dependencies': [['npm', 'a', '1'], ['npm', 'broken'], None, 'x', ['npm', 'b', '2', 'extra']]}
     assert a.summarize(raw)['dependencies'] == [['npm', 'a', '1']]
+
+STACK = {'ignore_languages': ['Markdown', 'yaml', 'JSON'], 'ignore_techs': ['github', 'Docker', 'python'], 'max_languages': 2, 'min_share': 0.1, 'max_techs': 3}
+
+def test_main_stack_drops_markup_and_tooling_and_keeps_the_biggest_few():
+    raw = {'languages': {'Python': 171, 'Markdown': 57, 'YAML': 23, 'JSON': 9, 'Go': 30, 'Shell': 2}, 'techs': ['github', 'docker', 'python', 'redis', 'fastapi', 'qdrant', 'zipkin']}
+    got = a.summarize(raw, STACK)
+    assert got['languages'] == [('Python', 171), ('Go', 30)]   # Shell (2 files) is under the minimum share
+    assert got['techs'] == ['fastapi', 'qdrant', 'redis']   # sorted, ignored ones gone (compared ignoring case), capped at 3
+
+def test_without_stack_settings_nothing_is_dropped():
+    got = a.summarize({'languages': {'Markdown': 5, 'Go': 9}, 'techs': ['github']})
+    assert got['languages'] == [('Go', 9), ('Markdown', 5)] and got['techs'] == ['github']
+
+def test_a_repo_with_only_docs_has_an_empty_main_stack():
+    assert a.summarize({'languages': {'Markdown': 1}, 'techs': []}, STACK)['languages'] == []
+
+def test_stray_files_below_the_minimum_share_are_not_main_stack():
+    raw = {'languages': {'Go': 310, 'AMPL': 1, 'JSONiq': 1, 'Markdown': 99}, 'techs': []}
+    assert a.summarize(raw, STACK)['languages'] == [('Go', 310)]   # AMPL is a go.mod; Markdown is ignored and does not count toward the share
+
+def test_share_is_of_the_remaining_code_files_and_the_boundary_counts():
+    assert a.summarize({'languages': {'Python': 90, 'Go': 10}, 'techs': []}, STACK)['languages'] == [('Python', 90), ('Go', 10)]
+    assert a.summarize({'languages': {'Python': 91, 'Go': 9}, 'techs': []}, STACK)['languages'] == [('Python', 91)]
+    assert a.summarize({'languages': {'Python': 91, 'Go': 9}, 'techs': []}, {**STACK, 'min_share': 0})['languages'] == [('Python', 91), ('Go', 9)]

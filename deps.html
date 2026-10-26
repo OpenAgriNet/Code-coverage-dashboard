@@ -25,7 +25,9 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
   <div id="filters"></div>
 
   <section aria-labelledby="dep-title">
-    <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div></div>
+    <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div>
+      <div class="switch" role="group" aria-label="Branch to show"><button type="button" id="view-dev" aria-pressed="true">Development</button><button type="button" id="view-main" aria-pressed="false">Main</button></div>
+    </div>
     <div class="table-wrap"><table class="deps">
       <thead><tr><th scope="col">Package</th><th scope="col">Ecosystem</th><th scope="col">Version</th><th scope="col">Latest</th><th scope="col">License</th><th scope="col">Vulnerabilities</th><th scope="col">Fixed in</th></tr></thead>
       <tbody id="rows"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
@@ -60,7 +62,9 @@ const LOOKED=['npm','python','golang'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODER
 const RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
-let repos=[],all=[],policy={green:[],yellow:[],red:[]},bar=null;
+let data={},repos=[],all=[],policy={green:[],yellow:[],red:[]},bar=null,view='dev';
+try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
+{const b=new URLSearchParams(location.search).get('branch');if(b==='main'||b==='dev')view=b}
 
 const vnum=v=>{const m=String(v||'').replace(/^[\^~=<>v\s]+/,'').match(/^\d+(?:\.\d+)*/);return m?m[0].split('.').map(Number):null};
 function newer(a,b){const x=vnum(a),y=vnum(b);if(!x||!y)return null;for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0}return false}
@@ -91,7 +95,8 @@ function licCell(d){
   if(d.license_of==='error')return '<span class="warn" title="deps.dev did not answer; this is not a missing license">Lookup failed</span>';
   if(!d.license)return `<span class="muted">${LOOKED.includes(d.ecosystem)?'Unknown':'Not looked up'}</span>`;
   const r=riskOf(d);
-  return `<span class="lic risk risk-${r}" title="${esc(RISK[r])}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
+  const several=d.license.includes(', ')?' All of these licenses apply, so the strictest one counts.':'';
+  return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
 }
 function row(d,single){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
@@ -113,7 +118,7 @@ function render(list,state){
     +(unchecked&&!down?`${unchecked} not checked (Docker images, Actions, unpinned versions). `:'')
     +(risk?`<br>License risk: ${risk}`:'');
   const meta=single&&repos.find(x=>x.repository===single);
-  $('dep-note').innerHTML=meta?`Branch <code>${esc(meta.branch)}</code> · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`:'';
+  $('dep-note').innerHTML=!meta?(view==='main'?'Each repository\'s default branch.':'Each repository\'s working branch, set in <code>config/repos.json</code>.'):`Branch <code>${esc(meta.branch)}</code> · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`;
   $('rows').innerHTML=list.length?list.map(d=>row(d,single)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
 }
 function renderPolicy(){
@@ -121,22 +126,32 @@ function renderPolicy(){
   $('policy').innerHTML=any?`<ul class="policy">${['green','yellow','red'].map(k=>`<li><span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span><b>${RISK[k]}</b></span> ${(policy[k]||[]).length?(policy[k]).map(x=>`<code>${esc(x)}</code>`).join(' '):'<span class="muted">none listed</span>'}</li>`).join('')}</ul>`
     :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code>, <code>yellow</code> and <code>red</code> in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
 }
+function load(){   // the records of the branch being shown
+  repos=((view==='main'?data.main:null)||data.repositories||[]).slice().sort((a,b)=>a.repository.localeCompare(b.repository));
+  all=repos.flatMap(r=>(r.dependencies||[]).map(d=>({...d,repository:r.repository}))).sort((a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name));
+}
+function setView(v,store=true){
+  view=v;load();
+  $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
+  if(store){try{localStorage.setItem('branchView',v)}catch(e){}}
+  const q=new URLSearchParams(location.search);q.set('branch',v);try{history.replaceState(null,'',location.pathname+'?'+q)}catch(e){}
+  bar.setItems(all);   // re-renders through the filter bar, which keeps the filters
+}
 async function init(){
   try{
     const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
-    const data=await res.json();repos=(data.repositories||[]).slice().sort((a,b)=>a.repository.localeCompare(b.repository));
-    policy=data.license_policy||policy;
-    all=repos.flatMap(r=>(r.dependencies||[]).map(d=>({...d,repository:r.repository}))).sort((a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name));
+    data=await res.json();policy=data.license_policy||policy;load();
     $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
     renderPolicy();
     bar=Filters.createFilterBar($('filters'),{facets:FACETS,items:all,noun:'dependencies',text:{param:'q',placeholder:'Find a package or license',of:d=>d.name+' '+(d.license||'')},onChange:render});
-    render(bar.visible(),bar.state());
+    setView(view,false);
   }catch(e){
     $('updated').textContent='Data unavailable';
     $('summary').textContent='Dependency data could not be loaded. Run the refresh workflow and check its logs.';
     $('rows').innerHTML='<tr><td colspan="7" class="empty">data/stack.json is missing or unreadable.</td></tr>';
   }
 }
+$('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
 init();
 </script>
 </body>
