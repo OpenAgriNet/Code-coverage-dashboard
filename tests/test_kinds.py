@@ -16,7 +16,7 @@ def configured():
 def test_images_are_classed_by_what_they_are():
     assert [image_kind(n) for n in ('postgres', 'docker.io/postgres', 'redis', 'grafana/loki', 'jaegertracing/all-in-one',
             'docker.langfuse.com/langfuse/langfuse', 'cgr.dev/chainguard/minio', 'temporalio/ui', 'ghcr.io/openagrinet/knowledge-provider')] == \
-        ['Database', 'Database', 'Cache', 'Observability', 'Observability', 'AI / LLM', 'Object storage', 'Workflow', 'Application']
+        ['Database', 'Database', 'Cache', 'Observability', 'Observability', 'Observability', 'Object storage', 'Workflow', 'Application']
 
 def test_only_images_get_a_kind():
     deps = [{'ecosystem': 'docker', 'name': 'redis'}, {'ecosystem': 'npm', 'name': 'redis'}]

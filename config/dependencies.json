@@ -91,7 +91,7 @@
     "otel/": "Observability",
     "clickstack": "Observability",
     "hyperdx": "Observability",
-    "langfuse": "AI / LLM",
+    "langfuse": "Observability",
     "ollama": "AI / LLM",
     "temporal": "Workflow",
     "nginx": "Proxy",
