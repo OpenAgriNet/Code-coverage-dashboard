@@ -20,7 +20,7 @@ def _score(s):
  except (TypeError,ValueError):return None
  return 'CRITICAL' if x>=9 else 'HIGH' if x>=7 else 'MODERATE' if x>=4 else 'LOW' if x>0 else None
 def items_of(result):
- """One vulnerability item per package and advisory group in osv-scanner's JSON, in the shape vulns.py gives OSV advisories."""
+ """One vulnerability item per package and advisory group in osv-scanner's JSON, in the shape osv.py gives OSV advisories."""
  out=[];seen=set()
  for res in result.get('results') or []:
   for p in res.get('packages') or []:
@@ -38,7 +38,7 @@ def items_of(result):
      'severity':sev,'fixed':min(fixes,key=loose) if fixes else None,'url':f'https://osv.dev/vulnerability/{vid}'})
  return out
 def summarize(items):
- """Like vulns.summarize, but no single fixed_in: the fixes belong to different packages inside the image.
+ """Like osv.summarize, but no single fixed_in: the fixes belong to different packages inside the image.
  items keeps the worst dependencies.images.max_findings (fixable first within a severity; postgres alone has hundreds);
  count, fixable and unfixed cover all of them."""
  rank=lambda i:SEVERITIES.index(i['severity']) if i['severity'] in SEVERITIES else -1

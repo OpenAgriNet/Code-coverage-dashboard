@@ -1,7 +1,7 @@
 // Run with: node --test tests/filters.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import F from '../filters.js';
+import F from '../assets/filters.js';
 
 const items = [
   { repo: 'a', tags: ['DPG'], sec: 'Passing', langs: ['Go', 'YAML'] },

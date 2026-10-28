@@ -125,7 +125,7 @@ List the licenses your team accepts under `licenses` in `config/repos.json`:
 
 ## Filters
 
-Both pages share one filter component (`filters.js`).
+Both pages share one filter component (`assets/filters.js`).
 
 - Tick several values in a filter to see any of them (OR). Different filters combine (AND). A filter with nothing ticked is off.
 - Each option shows how many results it would give with your other filters applied. An option that would give none is greyed out, so there are no dead ends.
@@ -203,7 +203,8 @@ A mistake (an unknown key, a wrong type, a number out of range) stops the refres
 
 ```
 config/repos.json          what to track and how (see the sections above)
-index.html, deps.html      the two pages; filters.js and tabs.js are shared, style.css too
+index.html, deps.html      the two pages (markup only)
+assets/                    style.css and filters.js, tabs.js (shared); index.js, deps.js, deps.css (one page each)
 data/                      coverage.json and stack.json, written by the workflow
 scripts/
   aggregate_coverage.py    writes data/coverage.json
@@ -217,7 +218,7 @@ scripts/
     lookups/               what other services say: deps.dev, OSV, Actions, registries, image scans, releases, Terraform, stars
     rules/                 what the dashboard concludes: license class, why a value is missing, the shown name
     settings.py            the dependencies block, applied for the run
-tests/                     pytest for scripts/, node --test for filters.js
+tests/                     pytest for scripts/, node --test for assets/filters.js
 ```
 
 ## Refreshing

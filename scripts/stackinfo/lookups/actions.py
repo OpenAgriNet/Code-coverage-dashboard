@@ -37,7 +37,7 @@ def latest(repo,api):
  tags=[t['name'] for t in api(f'/repos/{repo}/tags?per_page=100') or [] if RELEASE.fullmatch(t['name'])]
  return max(tags,key=vkey) if tags else None
 def advisories(repo,version,api):
- """Known vulnerabilities of repo@version, in the item shape vulns.py gives OSV advisories."""
+ """Known vulnerabilities of repo@version, in the item shape osv.py gives OSV advisories."""
  out=[]
  for adv in api(f'/advisories?ecosystem=actions&affects={repo}@{version.lstrip("v")}&per_page=100') or []:
   if adv.get('withdrawn_at'):continue
