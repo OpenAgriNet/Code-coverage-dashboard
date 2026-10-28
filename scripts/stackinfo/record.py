@@ -14,7 +14,7 @@ from stackinfo.lookups.stars import annotate as annotate_stars, github_stars, fi
 from stackinfo.rules.policy import classify
 from stackinfo.rules.reasons import explain
 from stackinfo.rules.names import add_short
-from stackinfo.rules.kinds import add_vendors
+from stackinfo.rules.kinds import add_kinds
 
 def repo_license(repo):
  """SPDX id of the repo's own LICENSE file, 'Other' if GitHub can't classify it, None if there is none."""
@@ -41,7 +41,7 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   raw=analyse(repo,branch);s=summarize(raw,stack);found=raw.get('manifests') or {}
   rows=s['dependencies']+unlisted(found,s['dependencies'])   # what the analyser misses: dependency-groups, build requires, CI tools
   out.update(languages=s['languages'],techs=s['techs'],dependencies=[info(*d) for d in rows])
-  attach_groups(out['dependencies'],found);add_short(out['dependencies']);add_vendors(out['dependencies'])
+  attach_groups(out['dependencies'],found);add_short(out['dependencies']);add_kinds(out['dependencies'])
   deps=out['dependencies']
   # each lookup can be turned off under dependencies.checks; explain() then says so in the empty cells
   if settings.check('vulnerabilities'):vulns(deps)

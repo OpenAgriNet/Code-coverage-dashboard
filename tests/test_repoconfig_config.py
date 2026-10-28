@@ -193,14 +193,14 @@ def test_license_labels_default_and_can_be_renamed_one_at_a_time():
 def test_built_in_dependency_defaults_are_switches_and_limits_only():
     d = n()['dependencies']
     assert all(d['checks'].values()) and d['images']['workers'] == 4 and d['groups']['default_workflow_group'] == 'ci'
-    assert d['groups']['aliases'] == {} and d['image_vendor_aliases'] == {} and d['terraform']['trusted_registries'] == [] and d['ecosystem_names'] == {}
+    assert d['groups']['aliases'] == {} and d['image_kinds'] == {} and d['terraform']['trusted_registries'] == [] and d['ecosystem_names'] == {}
 
 def test_the_mappings_come_from_config_dependencies_json():
     d = config.load('config/repos.json')['dependencies']
     assert d['groups']['aliases']['tests'] == 'test' and d['groups']['by_ecosystem'] == {'docker': 'runtime', 'githubAction': 'ci'}
     assert d['terraform']['trusted_registries'] == ['registry.terraform.io', 'registry.opentofu.org'] and d['ecosystem_names']['golang'] == 'Go'
     assert d['image_sources']['fidedocker/onix-adapter'] == 'beckn/beckn-onix' and d['image_licenses']['redis:7'] == 'LicenseRef-RSALv2 OR SSPL-1.0'
-    assert '_note' not in d['image_vendor_aliases'] and '_note' not in d['checks']   # notes document the file and are dropped
+    assert '_note' not in d['image_kinds'] and '_note' not in d['checks']   # notes document the file and are dropped
 
 def test_dependencies_in_repos_json_points_to_the_new_file(tmp_path):
     (tmp_path / 'repos.json').write_text('{"organization": "o", "dependencies": {"image_sources": {}}}')

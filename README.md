@@ -167,7 +167,7 @@ Both pages share one filter component (`assets/filters.js`).
 {
   "image_sources":  {"_note": "beckn-onix per its Docker Hub page", "fidedocker/onix-adapter": "beckn/beckn-onix"},
   "image_licenses": {"postgres": "PostgreSQL", "redis:7": "LicenseRef-RSALv2 OR SSPL-1.0"},
-  "image_vendor_aliases": {"prom": "prometheus", "temporalio": "temporal"},
+  "image_kinds":    {"postgres": "Database", "redis": "Cache", "grafana": "Observability"},
   "checks":         {"images": true},
   "images":         {"workers": 4, "scan_timeout": 900}
 }
@@ -191,7 +191,8 @@ Every key is optional. A key left out keeps its built-in default, which is only 
 | `terraform.trusted_registries` | Registries whose providers take the license and stars of `<namespace>/terraform-provider-<type>`. |
 | `license_aliases` | License texts in image labels and the SPDX id they mean. The defaults cover the usual spellings of Apache, MIT, BSD, GPL, AGPL and MPL; giving this key replaces them. |
 | `ecosystem_names` | Names shown for each ecosystem, merged over the built-in ones: Node.js, Python, Go, GitHub Actions, Terraform, CLI tool, Container for (`npm`, `python`, `golang`, `docker`, `githubAction`, `terraform`, `githubRelease`). |
-| `image_vendor_aliases` | An image's ecosystem is its vendor, read from its own name: an official Docker Hub image is itself (`redis`, `postgres`), any other is its namespace (`grafana/loki` → grafana, `docker.langfuse.com/langfuse/…` → langfuse, `cgr.dev/chainguard/minio` → chainguard, `ghcr.io/openagrinet/…` → openagrinet). Only names that read badly need an alias here (`prom` → prometheus, `temporalio` → temporal). |
+| `image_kinds` | What each Docker image is, shown as its ecosystem: the first keyword its full name contains decides (`postgres` → Database, `redis` → Cache, `grafana` → Observability, `langfuse` → Observability). Giving this map replaces the built-in one. |
+| `default_image_kind` | The kind of an image no keyword matches (default *Application*: usually the project's own images). |
 | `image_sources` | An image's GitHub repository, written `owner/repo`, whose license is then looked up: `{"jaegertracing/all-in-one": "jaegertracing/jaeger"}`. Any spelling of the image matches (`postgres`, `docker.io/postgres`). |
 | `image_licenses` | The license the team states for an image when nothing machine-readable gives one: `{"postgres": "PostgreSQL"}`. A key may carry a tag when the license depends on the version (`"redis:7"`, `"redis:alpine"`); `name:tag` is tried before `name`. It wins over every other source and applies even when the image cannot be pulled. |
 
