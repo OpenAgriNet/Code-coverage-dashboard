@@ -64,7 +64,7 @@ DEPENDENCY_DEFAULTS={
  'images':{'workers':4,'scan_timeout':900,'max_findings':50,'resolve_limit':30,'max_tag_pages':50},
  'groups':{'aliases':{},'workflow_purposes':{},'default_workflow_group':'ci','by_ecosystem':{}},
  'terraform':{'trusted_registries':[]},
- 'license_aliases':{},'ecosystem_names':{},'image_kinds':{},'default_image_kind':'Application','image_sources':{},'image_licenses':{},
+ 'license_aliases':{},'ecosystem_names':{},'image_vendor_aliases':{},'image_sources':{},'image_licenses':{},
 }
 IMAGE_LIMITS={'workers':(1,16),'scan_timeout':(60,3600),'max_findings':(1,500),'resolve_limit':(0,200),'max_tag_pages':(1,500)}
 def _keys(raw,allowed,where):
@@ -107,8 +107,7 @@ def dependency_settings(raw):
  return {'checks':checks,'images':images,'groups':groups,'terraform':tf,
   'license_aliases':_text_map(raw.get('license_aliases',D['license_aliases']),'dependencies.license_aliases',lower_keys=True),
   'ecosystem_names':{**D['ecosystem_names'],**_text_map(raw.get('ecosystem_names',{}),'dependencies.ecosystem_names')},
-  'image_kinds':_text_map(raw.get('image_kinds',D['image_kinds']),'dependencies.image_kinds',lower_keys=True),
-  'default_image_kind':_name(raw.get('default_image_kind',D['default_image_kind']),'dependencies.default_image_kind'),
+  'image_vendor_aliases':_text_map(raw.get('image_vendor_aliases',D['image_vendor_aliases']),'dependencies.image_vendor_aliases',lower_keys=True),
   'image_sources':_image_sources(raw.get('image_sources',{})),
   'image_licenses':_text_map(raw.get('image_licenses',{}),'dependencies.image_licenses')}
 def releases(raw,base,where):

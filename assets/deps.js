@@ -16,8 +16,7 @@ const starCount=n=>!Number.isFinite(n)||n<0?'':n>=1e6?(n/1e6).toFixed(1).replace
 // GitHub's star octicon (MIT, primer/octicons)
 const STAR='<svg class="star-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Zm0 2.445L6.615 5.5a.75.75 0 0 1-.564.41l-3.097.45 2.24 2.184a.75.75 0 0 1 .216.664l-.528 3.084 2.769-1.456a.75.75 0 0 1 .698 0l2.77 1.456-.53-3.084a.75.75 0 0 1 .216-.664l2.24-2.183-3.096-.45a.75.75 0 0 1-.564-.41L8 2.694Z"/></svg>';
 const starChip=(n,of)=>!Number.isFinite(n)?'':` <span class="stars" title="${esc(n.toLocaleString()+' stars on '+of)}">${STAR}${starCount(n)}<span class="sr"> stars</span></span>`;
-// an image's ecosystem is what it is (Database, Cache, Observability, ...) as the collector classed it
-const ecoOf=d=>d.ecosystem==='docker'?d.kind||'docker':d.ecosystem;
+const ecoOf=d=>d.ecosystem==='docker'?d.vendor||d.kind||'docker':d.ecosystem;   // an image: its vendor (redis, grafana, langfuse, ...)
 const LOOKED=['npm','python','golang','githubAction'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
 const RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Restricted use (red)',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
