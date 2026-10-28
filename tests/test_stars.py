@@ -7,7 +7,7 @@ def test_source_repo_per_ecosystem():
     assert s.source_repo({'ecosystem': 'githubAction', 'name': 'github/codeql-action/init'}) == 'github/codeql-action'
     assert s.source_repo({'ecosystem': 'githubAction', 'name': './.github/actions/x'}) is None
     assert s.source_repo({'ecosystem': 'golang', 'name': 'github.com/jackc/pgx/v5'}) == 'jackc/pgx'
-    assert s.source_repo({'ecosystem': 'golang', 'name': 'golang.org/x/tools'}) is None
+    assert s.source_repo({'ecosystem': 'golang', 'name': 'golang.org/x/tools'}) == 'golang/tools'   # golang.org/x is mirrored on GitHub
     assert s.source_repo({'ecosystem': 'npm', 'name': 'react', 'project': 'github.com/facebook/react'}) == 'facebook/react'
     assert s.source_repo({'ecosystem': 'python', 'name': 'x', 'project': 'gitlab.com/a/b'}) is None
     assert s.source_repo({'ecosystem': 'npm', 'name': 'x', 'project': 'github.com/../evil'}) is None
@@ -78,3 +78,20 @@ def test_a_failed_license_lookup_is_not_no_license():
     s.fill_licenses(deps, license_of=boom)
     explain(deps)
     assert deps[0]['missing']['license']['kind'] == 'error' and 'deps.dev down' in deps[0]['missing']['license']['why']
+
+def test_go_modules_off_github_take_their_repository_from_deps_dev_or_the_host_rules():
+    assert s.source_repo({'ecosystem': 'golang', 'name': 'go.opentelemetry.io/otel', 'project': 'github.com/open-telemetry/opentelemetry-go'}) == 'open-telemetry/opentelemetry-go'
+    assert s.source_repo({'ecosystem': 'golang', 'name': 'golang.org/x/crypto'}) == 'golang/crypto'
+    assert s.source_repo({'ecosystem': 'golang', 'name': 'golang.org/x/vuln/cmd/govulncheck'}) == 'golang/vuln'
+    assert s.source_repo({'ecosystem': 'golang', 'name': 'gopkg.in/yaml.v3'}) == 'go-yaml/yaml'
+    assert s.source_repo({'ecosystem': 'golang', 'name': 'gopkg.in/natefinch/lumberjack.v2'}) == 'natefinch/lumberjack'
+    assert s.source_repo({'ecosystem': 'golang', 'name': 'github.com/jackc/pgx/v5', 'project': 'github.com/other/repo'}) == 'jackc/pgx'   # the module path wins
+    assert s.source_repo({'ecosystem': 'golang', 'name': 'k8s.io/client-go'}) is None
+
+def test_a_sponsors_page_is_not_a_source_repository():
+    assert s.source_repo({'ecosystem': 'python', 'name': 'uvicorn', 'project': 'github.com/sponsors/encode'}) is None
+
+def test_ghcr_images_take_the_repository_of_the_same_name():
+    from stackinfo.lookups import images as im
+    assert im.image_repo('ghcr.io/openagrinet/knowledge-provider', None, None) == 'openagrinet/knowledge-provider'
+    assert im.image_repo('docker.io/library/redis', None, None) is None

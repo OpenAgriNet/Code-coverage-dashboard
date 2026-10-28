@@ -46,3 +46,11 @@ def test_dep_info_records_the_source_repository():
                                                           {'projectKey': {'id': 'github.com/facebook/react'}, 'relationType': 'SOURCE_REPO'}]}
         return {'versions': [{'versionKey': {'version': '18.3.1'}, 'isDefault': True}]}
     assert d.dep_info('npm', 'react', '18.3.1', fetch=fetch)['project'] == 'github.com/facebook/react'
+
+def test_dep_info_skips_a_sponsors_page_listed_as_the_source_repository():
+    def fetch(path):
+        if path.endswith('/versions/0.38.0'):
+            return {'licenses': ['BSD-3-Clause'], 'relatedProjects': [{'projectKey': {'id': 'github.com/sponsors/encode'}, 'relationType': 'SOURCE_REPO'},
+                                                                   {'projectKey': {'id': 'github.com/kludex/uvicorn'}, 'relationType': 'SOURCE_REPO'}]}
+        return {'versions': [{'versionKey': {'version': '0.38.0'}, 'isDefault': True}]}
+    assert d.dep_info('python', 'uvicorn', '0.38.0', fetch=fetch)['project'] == 'github.com/kludex/uvicorn'

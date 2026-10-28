@@ -15,12 +15,26 @@ CACHE={}
 
 def _ok(repo):
  return bool(repo) and bool(NAME.fullmatch(repo)) and '..' not in repo
+def _project(d):
+ m=GH.fullmatch(d.get('project') or '')
+ return m.group(1) if m and not m.group(1).startswith('sponsors/') else None
+GOPKG=re.compile(r'gopkg\.in/(?:([A-Za-z0-9_-]+)/)?([A-Za-z0-9_.-]+?)\.v\d+(?:/.*)?')
+def go_vanity(name):
+ """The GitHub repository of a Go module path that names none, by the hosts' own rules: golang.org/x/<name> is mirrored at
+ github.com/golang/<name>; gopkg.in/<name>.vN is github.com/go-<name>/<name>, gopkg.in/<user>/<name>.vN github.com/<user>/<name>."""
+ p=name.split('/')
+ if len(p)>=3 and p[0]=='golang.org' and p[1]=='x':return f'golang/{p[2]}'
+ m=GOPKG.fullmatch(name)
+ if m:return f'{m.group(1)}/{m.group(2)}' if m.group(1) else f'go-{m.group(2)}/{m.group(2)}'
+ return None
 def source_repo(d):
  """'owner/repo' on GitHub the dependency is developed in, or None."""
  eco,name=d.get('ecosystem'),d.get('name','')
  if eco=='githubAction':repo=None if name.startswith(('./','docker://')) else repo_of(name)
- elif eco=='golang':m=GH.match(name);repo=m.group(1) if m else None
- else:m=GH.fullmatch(d.get('project') or '');repo=m.group(1) if m else None
+ elif eco=='golang':
+  m=GH.match(name)
+  repo=m.group(1) if m else _project(d) or go_vanity(name)   # deps.dev knows go.opentelemetry.io/otel's repository
+ else:repo=_project(d)
  return repo if _ok(repo) else None
 def _count(v):
  """A star count is a whole number of 0 or more; anything else an API sends back is dropped, so the page never prints it."""
