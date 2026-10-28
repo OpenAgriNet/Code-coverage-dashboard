@@ -240,3 +240,28 @@ def test_the_same_advisory_on_the_same_package_counts_once():
     pkg = SCAN['results'][0]['packages'][0]
     twice = {'results': [{'packages': [pkg, pkg]}]}
     assert len(im.items_of(twice)) == 2
+
+def test_image_license_from_label_then_source_repo():
+    repo = lambda r: {'grafana/grafana': 'AGPL-3.0'}.get(r)
+    assert im.image_license({'org.opencontainers.image.licenses': 'MIT'}, repo) == ('MIT', 'label')
+    assert im.image_license({'org.opencontainers.image.licenses': 'Apache License 2.0'}, repo) == ('Apache-2.0', 'label')
+    assert im.image_license({'org.opencontainers.image.source': 'https://github.com/grafana/grafana'}, repo) == ('AGPL-3.0', 'source')
+    assert im.image_license({'org.label-schema.vcs-url': 'https://github.com/grafana/grafana.git'}, repo) == ('AGPL-3.0', 'source')
+    assert im.image_license({'org.opencontainers.image.source': 'https://gitlab.com/a/b'}, repo) == (None, None)
+    assert im.image_license({'org.opencontainers.image.source': 'https://github.com/../x'}, repo) == (None, None)
+    assert im.image_license({}, repo) == (None, None)
+
+def test_scan_reads_labels_from_the_pulled_image():
+    def run(cmd, **kw):
+        class P: returncode = 0; stdout = '{}'; stderr = ''
+        if cmd[1:3] == ['image', 'inspect'] and '--format' in cmd:
+            P.stdout = '{"org.opencontainers.image.licenses": "MIT"}'
+        return P()
+    got = im.scan('a:1', run=run, binary='/bin/osv', docker='/bin/docker')
+    assert got['labels'] == {'org.opencontainers.image.licenses': 'MIT'} and got['count'] == 0
+
+def test_annotate_sets_the_image_license():
+    deps = [{'ecosystem': 'docker', 'name': 'grafana/grafana', 'version': '13.2.2', 'latest': None, 'vulns': None}]
+    scan = lambda ref: {**im.summarize([]), 'labels': {'org.opencontainers.image.source': 'https://github.com/grafana/grafana'}}
+    im.annotate(deps, tags_of=lambda n: ['13.2.2'], scan=scan, cache={}, is_public=lambda h: True, license_of=lambda r: 'AGPL-3.0')
+    assert deps[0]['license'] == 'AGPL-3.0' and deps[0]['license_of'] == 'source' and 'labels' not in deps[0]['vulns']

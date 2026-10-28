@@ -2,13 +2,14 @@
 known vulnerabilities of the packages inside the image from osv-scanner (it pulls and reads the image; nothing in it is run).
 Registries are asked anonymously, so private images stay unchecked."""
 import ipaddress, json, os, re, shutil, socket, subprocess, sys
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.connection import HTTPSConnection
 from urllib3.connectionpool import HTTPSConnectionPool
 from .analyser import child_env
+from .depsdev import D
 from .vulns import SEVERITIES, normal, severity as osv_severity
 WORKERS=4
 MAX_ITEMS=50   # postgres alone has hundreds; the counts stay exact, the list keeps the worst
@@ -159,16 +160,48 @@ def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
  if not binary:raise RuntimeError('osv-scanner is not installed')
  env=child_env()
  had=docker and run([docker,'image','inspect',ref],capture_output=True,env=env).returncode==0
- try:p=run([binary,'scan','image','--format','json',ref],capture_output=True,text=True,timeout=SCAN_TIMEOUT,env=env)
+ labels={}
+ try:
+  p=run([binary,'scan','image','--format','json',ref],capture_output=True,text=True,timeout=SCAN_TIMEOUT,env=env)
+  if docker:labels=_labels(run([docker,'image','inspect','--format','{{json .Config.Labels}}',ref],capture_output=True,text=True,env=env))
  finally:
   if docker and not had:run([docker,'image','rm','-f',ref],capture_output=True,env=env)
- if p.returncode==128:return summarize([])   # no packages found in the image
+ if p.returncode==128:return {**summarize([]),'labels':labels}   # no packages found in the image
  if p.returncode not in (0,1):
   last=(p.stderr or '').strip().splitlines()
   raise RuntimeError(f'osv-scanner exit {p.returncode}: {last[-1][:150] if last else "no output"}')
- return summarize(items_of(json.loads(p.stdout)))
+ return {**summarize(items_of(json.loads(p.stdout))),'labels':labels}
+def _labels(p):
+ """The image's config labels from docker image inspect (read from the pulled image: no extra registry request)."""
+ try:got=json.loads(p.stdout) if p.returncode==0 else None
+ except (TypeError,ValueError):return {}
+ return {str(k):str(v) for k,v in got.items()} if isinstance(got,dict) else {}
+# license texts images put in labels -> SPDX ids the policy knows
+SPDX={'apache license 2.0':'Apache-2.0','apache license, version 2.0':'Apache-2.0','apache 2.0':'Apache-2.0','apache-2':'Apache-2.0','apache2':'Apache-2.0',
+ 'mit license':'MIT','the mit license':'MIT','bsd':'BSD-3-Clause','gplv3':'GPL-3.0-only','gplv2':'GPL-2.0-only','agplv3':'AGPL-3.0-only','mpl 2.0':'MPL-2.0'}
+LABEL_LICENSE=('org.opencontainers.image.licenses','org.label-schema.license','license')
+LABEL_SOURCE=('org.opencontainers.image.source','org.label-schema.vcs-url')
+GITHUB_REPO=re.compile(r'(?:https?://|git@)?github\.com[/:]([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?(?:[#?].*)?')
+def image_license(labels,repo_license):
+ """(license, where): the image's own license label, else the license of the GitHub repo its source label names, else (None, None).
+ repo_license('owner/repo') gives that repo's SPDX id."""
+ lic=next((labels[k].strip() for k in LABEL_LICENSE if labels.get(k,'').strip()),None)
+ if lic:return SPDX.get(lic.lower(),lic),'label'
+ src=next((labels[k].strip() for k in LABEL_SOURCE if labels.get(k,'').strip()),'')
+ m=GITHUB_REPO.fullmatch(src)
+ if m and '..' not in m.group(1):
+  lic=repo_license(m.group(1))
+  if lic:return lic,'source'
+ return None,None
+def project_license(repo):
+ """SPDX license of a GitHub repo as deps.dev reports it (no GitHub API quota used)."""
+ r=D.get(f'https://api.deps.dev/v3/projects/{quote("github.com/"+repo,safe="")}',timeout=30)
+ if r.status_code==404:return None
+ r.raise_for_status();lic=r.json().get('license')
+ return lic if lic and lic not in ('non-standard','NOASSERTION') else None
 CACHE={}
-def lookup(name,tag,tags_of,scan,log,resolve=version_of):
+def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
+ license_of=license_of or project_license
  out={'latest':None,'latest_of':None,'vulns':None}
  try:
   if SHAPE.fullmatch(tag):out['latest']=latest_like(tag,tags_of(name));out['latest_of']='registry'
@@ -177,10 +210,14 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of):
    out['latest_of']='floating';ts=tags_of(name);v=resolve(name,tag,ts)
    if v:out.update(resolved=v,latest=latest_like(v,ts),latest_of='registry')
  except Exception as e:log(f'WARN registry tags failed for {name}: {e}')
- try:out['vulns']={'checked_version':tag,'exact':True,**scan(f'{name}:{tag}')}
+ try:
+  res=scan(f'{name}:{tag}');labels=res.pop('labels',{})
+  out['vulns']={'checked_version':tag,'exact':True,**res}
+  lic,where=image_license(labels,license_of)
+  if lic:out.update(license=lic,license_of=where)
  except Exception as e:log(f'WARN image scan failed for {name}:{tag}: {e}')
  return out
-def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,file=sys.stderr),workers=WORKERS,is_public=public_host,resolve=version_of):
+def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,file=sys.stderr),workers=WORKERS,is_public=public_host,resolve=version_of,license_of=None):
  """Fill latest, latest_of and vulns of every Docker image in deps. An unresolved ${VAR} tag, a malformed name, a refused pull or a
  failed scan leaves vulns None (not checked), never 'none known'. Each image:tag is looked up once per run, several at a time."""
  rows=[]
@@ -194,5 +231,5 @@ def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,fil
   rows.append((d,(name,tag)))
  todo=sorted({k for _,k in rows if k not in cache})
  with ThreadPoolExecutor(max_workers=workers) as ex:
-  for k,res in zip(todo,ex.map(lambda k:lookup(*k,tags_of,scan,log,resolve),todo)):cache[k]=res
+  for k,res in zip(todo,ex.map(lambda k:lookup(*k,tags_of,scan,log,resolve,license_of),todo)):cache[k]=res
  for d,k in rows:d.update({x:(dict(v) if isinstance(v,dict) else v) for x,v in cache[k].items()})
