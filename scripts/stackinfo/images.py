@@ -5,9 +5,11 @@ import ipaddress, json, os, re, shutil, socket, subprocess, sys
 from urllib.parse import urlsplit
 from concurrent.futures import ThreadPoolExecutor
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPSConnectionPool
 from .analyser import child_env
 from .vulns import SEVERITIES, normal, severity as osv_severity
-R=requests.Session()   # no GitHub headers or tokens: registries are third parties
 WORKERS=4
 MAX_ITEMS=50   # postgres alone has hundreds; the counts stay exact, the list keeps the worst
 SCAN_TIMEOUT=900
@@ -39,8 +41,35 @@ def latest_like(tag,tags):
  pre,nums,suf=m.group(1),m.group(2).count('.'),m.group(3)
  same=[t for t in tags for x in [SHAPE.fullmatch(t)] if x and x.group(1)==pre and x.group(2).count('.')==nums and x.group(3)==suf]
  return max(same,key=lambda t:tuple(int(n) for n in SHAPE.fullmatch(t).group(2).split('.')),default=None)
-def _get(url,headers=None,params=None):
- return R.get(url,headers=headers,params=params,timeout=30)
+def check_peer(sock):
+ """Refuse a connection whose peer is not a public address. Checked on the connected socket, so a DNS answer that changes
+ between public_host() and the request (rebinding) cannot reach the metadata service or a private network."""
+ ip=sock.getpeername()[0]
+ if not ipaddress.ip_address(ip.split('%')[0]).is_global:
+  sock.close();raise requests.ConnectionError(f'refused to talk to non-public address {ip}')
+ return sock
+class PublicHTTPSConnection(HTTPSConnection):
+ def _new_conn(self):return check_peer(super()._new_conn())
+class PublicHTTPSPool(HTTPSConnectionPool):
+ ConnectionCls=PublicHTTPSConnection
+class PublicAdapter(HTTPAdapter):
+ def init_poolmanager(self,*a,**kw):
+  super().init_poolmanager(*a,**kw);self.poolmanager.pool_classes_by_scheme={**self.poolmanager.pool_classes_by_scheme,'https':PublicHTTPSPool}
+R=requests.Session()   # no GitHub headers or tokens: registries are third parties
+R.trust_env=False      # no proxy or netrc credentials from the environment
+R.mount('https://',PublicAdapter());R.mount('http://',HTTPAdapter(max_retries=0))
+MAX_REDIRECTS=5
+def _get(url,headers=None,params=None,is_public=None):
+ """GET over https only, following redirects by hand so every hop is checked like the first one."""
+ is_public=is_public or public_host
+ for _ in range(MAX_REDIRECTS+1):
+  u=urlsplit(url)
+  if u.scheme!='https' or not u.hostname or not is_public(u.netloc):raise RuntimeError(f'refused to fetch {u.scheme}://{u.netloc}: not a public https host')
+  r=R.get(url,headers=headers,params=params,timeout=30,allow_redirects=False)
+  if r.status_code not in (301,302,303,307,308):return r
+  url=requests.compat.urljoin(url,r.headers.get('Location',''));params=None
+  if urlsplit(url).netloc!=u.netloc:headers=None   # never carry a registry token to another host
+ raise RuntimeError('too many redirects')
 def _challenge(header):
  return dict(re.findall(r'(\w+)="([^"]*)"',header or ''))
 def tags(host,path,get=_get,pages=50,is_public=public_host):

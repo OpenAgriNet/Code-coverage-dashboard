@@ -161,3 +161,43 @@ def test_token_realm_on_an_internal_host_is_refused():
         assert False
     except RuntimeError as e:
         assert 'realm' in str(e)
+
+class Sock:
+    def __init__(self, ip):
+        self.ip, self.closed = ip, False
+    def getpeername(self):
+        return (self.ip, 443)
+    def close(self):
+        self.closed = True
+
+def test_connections_to_non_public_peers_are_refused():
+    assert im.check_peer(Sock('44.208.254.194')).ip == '44.208.254.194'
+    for ip in ('169.254.169.254', '10.0.0.5', '127.0.0.1', '::1', 'fe80::1%eth0'):
+        s = Sock(ip)
+        try:
+            im.check_peer(s)
+            assert False, ip
+        except im.requests.ConnectionError:
+            assert s.closed
+
+def test_session_uses_the_peer_checking_pool():
+    adapter = im.R.get_adapter('https://registry-1.docker.io/v2/')
+    assert isinstance(adapter, im.PublicAdapter) and adapter.poolmanager.pool_classes_by_scheme['https'] is im.PublicHTTPSPool
+
+def test_redirects_are_followed_by_hand_and_checked(monkeypatch):
+    hops = []
+    def fake_get(url, headers=None, params=None, timeout=None, allow_redirects=True):
+        assert allow_redirects is False
+        hops.append((url, headers))
+        if url == 'https://reg.example/a':
+            return Resp(302, headers={'Location': 'https://cdn.example/b'})
+        if url == 'https://cdn.example/b':
+            return Resp(307, headers={'Location': 'http://169.254.169.254/latest/meta-data'})
+        return Resp(200, {})
+    monkeypatch.setattr(im.R, 'get', fake_get)
+    try:
+        im._get('https://reg.example/a', headers={'Authorization': 'Bearer t'}, is_public=lambda h: True)
+        assert False
+    except RuntimeError as e:
+        assert 'refused' in str(e)
+    assert hops == [('https://reg.example/a', {'Authorization': 'Bearer t'}), ('https://cdn.example/b', None)]
