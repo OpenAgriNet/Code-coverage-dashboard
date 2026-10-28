@@ -1,5 +1,5 @@
 table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth-child(2){width:9%}table.deps th:nth-child(6){width:24%}
-.vuln summary{cursor:pointer;font-weight:600}.vuln ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}.vuln li{margin:4px 0}.sev{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.sev{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 .fix-open{all:unset;cursor:pointer;display:block;border-radius:4px}.fix-open:hover .open-hint{text-decoration:underline}.fix-open:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .open-hint{display:block;font-size:12px;color:var(--link)}
 dialog.card{width:min(960px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);box-shadow:0 16px 48px rgba(0,0,0,.28)}
