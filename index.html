@@ -194,7 +194,7 @@ function stackRow(r){
   const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
     :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
     :'<span class="muted">None found</span>';
-  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}${devDefault(r)}</div></td>`
+  return `<tr${r.license_class==='red'||r.license_class==='yellow'?` class="row-risk-${r.license_class}"`:''}><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}${devDefault(r)}</div></td>`
     +`<td data-label="License">${lic}</td>`
     +`<td data-label="Stack">${esc(langs)||'<span class="muted">Nothing detected</span>'}${techs.length?`<div class="techs">${esc(techs.slice(0,8).join(', '))}${techs.length>8?` +${techs.length-8} more`:''}</div>`:''}</td>`
     +`<td data-label="Dependencies">${dep}</td></tr>`;
