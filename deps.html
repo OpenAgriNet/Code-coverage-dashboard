@@ -8,11 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
-<style>
-table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth-child(2){width:9%}table.deps th:nth-child(6){width:24%}
-.vuln summary{cursor:pointer;font-weight:600}.vuln ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}.vuln li{margin:4px 0}.sev{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
-</style>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/deps.css">
 </head>
 <body>
 <main>
@@ -24,7 +21,13 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
   <p class="summary" id="summary">Reading the dependency list.</p>
   <div id="filters"></div>
 
-  <section aria-labelledby="dep-title">
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab-packages" data-tab="packages" aria-controls="sec-packages" aria-selected="true">Packages</button>
+    <button type="button" role="tab" id="tab-policy" data-tab="policy" aria-controls="sec-policy" aria-selected="false" tabindex="-1">License policy</button>
+    <button type="button" role="tab" id="tab-about" data-tab="about" aria-controls="sec-about" aria-selected="false" tabindex="-1">Where this comes from</button>
+  </div>
+
+  <section id="sec-packages" role="tabpanel" aria-labelledby="tab-packages">
     <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div>
       <div class="switch" role="group" aria-label="Branch to show"><button type="button" id="view-dev" aria-pressed="true">Development</button><button type="button" id="view-main" aria-pressed="false">Main</button></div>
     </div>
@@ -34,140 +37,33 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
     </table></div>
   </section>
 
-  <details class="how" id="policy-box">
-    <summary>License policy (green, yellow, red)</summary>
+  <section id="sec-policy" role="tabpanel" aria-labelledby="tab-policy" hidden>
+    <h2 id="policy-title">License policy: Preferred, Not recommended, Not to use</h2>
     <div id="policy"></div>
-  </details>
+  </section>
 
-  <details class="how">
+  <section id="sec-about" role="tabpanel" aria-labelledby="tab-about" hidden>
+  <details class="how" open>
     <summary>Where this comes from</summary>
     <ul>
       <li><b>Packages.</b> <a href="https://github.com/specfy/stack-analyser" target="_blank" rel="noopener">specfy/stack-analyser</a> reads the manifests (<code>package.json</code>, <code>go.mod</code>, <code>requirements.txt</code>, <code>pyproject.toml</code>, compose files, workflows) on each repository's development branch and default branch. These are direct dependencies, not the full lockfile tree.</li>
       <li><b>Group.</b> Where the project declares each package: <code>package.json</code> <i>dependencies</i> (main), <i>devDependencies</i> (dev), <i>optional</i> and <i>peer</i>; <code>pyproject.toml</code> <i>[project] dependencies</i> (main) and every named group in <i>optional-dependencies</i>, <i>dependency-groups</i> and Poetry groups, as the repository names them (<i>tests</i>/<i>testing</i> read as test, <i>develop</i> as dev); <code>requirements.txt</code> (main) and <code>requirements-&lt;name&gt;.txt</code> or <code>requirements/&lt;name&gt;.txt</code> (that name, e.g. dev, test, prod); <code>go.mod</code> direct requires (main) and <i>tool</i> lines. Docker images are runtime and GitHub Actions are ci. When the manifest gives a range such as <code>^5.0.0</code>, the version the lockfile next to it installs (<code>package-lock.json</code>, <code>uv.lock</code>, <code>poetry.lock</code>) is shown and checked for vulnerabilities. Indirect packages from lockfiles are not listed.</li>
       <li><b>License and latest.</b> From <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a> for npm, PyPI and Go. When the listed version is a range or unknown there, the license of the latest release is shown and marked <i>latest</i>.</li>
       <li><b>Vulnerabilities.</b> From <a href="https://osv.dev" target="_blank" rel="noopener">OSV.dev</a>, Google's open vulnerability database (GitHub advisories, PyPI, Go and others). It is a public API that needs no key or login, and only package names and versions are sent. A package is checked at the version listed here; for a range such as <code>^5.0.0</code> that is the lowest version the range allows, so the real installed version may be newer and already fixed. <i>Fixed in</i> is the one version that fixes every fixable advisory; advisories with no released fix are counted separately.</li>
-      <li><b>License risk.</b> Each license is matched against the green, yellow and red lists under <code>licenses</code> in <code>config/repos.json</code>. For an expression <i>A OR B</i> the better class counts, for <i>A AND B</i> the worse (AND binds tighter, parentheses are respected). Several licenses listed together (<i>MIT, Apache-2.0</i>) are treated as all applying, so the worst counts. A license on no list, or one that cannot be read, is <i>unclassified</i>.</li>
+      <li><b>License risk.</b> Each license is matched against the <i>Preferred</i> (<code>green</code>), <i>Not recommended</i> (<code>yellow</code>) and <i>Not to use</i> (<code>red</code>) lists under <code>licenses</code> in <code>config/repos.json</code>. For an expression <i>A OR B</i> the better class counts, for <i>A AND B</i> the worse (AND binds tighter, parentheses are respected). Several licenses listed together (<i>MIT, Apache-2.0</i>) are treated as all applying, so the worst counts. A license on no list, or one that cannot be read, is <i>unclassified</i>.</li>
       <li><b>Filters.</b> Within one filter the ticked values are OR-ed; different filters are AND-ed. Each option shows how many dependencies it would give. The address bar holds the filters, so a link shares the view.</li>
       <li><b>GitHub Actions.</b> From the GitHub API. A tag such as <code>v4</code> is checked at the newest release it covers today (shown under the version, e.g. <code>v4.3.0</code>); a commit pin at the release tag on that commit. Latest is the action's latest release, license is the action repository's license, and vulnerabilities come from the <a href="https://github.com/advisories?query=ecosystem%3Aactions" target="_blank" rel="noopener">GitHub Advisory Database</a> (OSV holds these advisories but cannot match them to a version). Actions inside the repository (<code>./.github/actions/...</code>) are N/A.</li>
-      <li><b>Docker images.</b> Latest is the newest tag of the same shape in the image's registry (<code>17</code> &rarr; <code>18</code>, <code>25.7-alpine</code> &rarr; <code>25.12-alpine</code>), asked anonymously; a floating tag such as <code>latest</code> has none (N/A). Vulnerabilities come from <a href="https://github.com/google/osv-scanner" target="_blank" rel="noopener">osv-scanner</a>, which pulls the image and checks the operating-system packages and binaries inside it against OSV (nothing in the image is run). Fixes belong to packages inside the image, so <i>Fixed in</i> counts how many are fixable; a newer tag usually includes them. Private images, images built only locally and unresolved <code>${VAR}</code> tags are not scanned (nil). License is N/A: an image holds many packages, each with its own license.</li>
+      <li><b>Docker images.</b> Latest is the newest tag of the same shape in the image's registry (<code>17</code> &rarr; <code>18</code>, <code>25.7-alpine</code> &rarr; <code>25.12-alpine</code>), asked anonymously; a floating tag such as <code>latest</code> has none (N/A). Vulnerabilities come from <a href="https://github.com/google/osv-scanner" target="_blank" rel="noopener">osv-scanner</a>, which pulls the image and checks the operating-system packages and binaries inside it against OSV (nothing in the image is run). Fixes belong to packages inside the image, so <i>Fixed in</i> counts how many are fixable; a newer tag usually includes them. Private images, images built only locally and unresolved <code>${VAR}</code> tags are not scanned (nil). License is the image's own license label (<code>org.opencontainers.image.licenses</code>), else the license of the GitHub repository its source label names, read from the pulled image; N/A when it declares neither. The packages inside an image keep their own licenses, which are not listed.</li>
     </ul>
   </details>
+  </section>
+  <dialog id="vuln-card" class="card" aria-labelledby="vc-title">
+    <div class="card-head"><div><h2 id="vc-title"></h2><p class="sub" id="vc-sub"></p></div><button type="button" class="card-close" id="vc-close" aria-label="Close">&times;</button></div>
+    <div class="card-body" id="vc-body"></div>
+  </dialog>
 </main>
-<script src="filters.js"></script>
-<script>
-const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ECO={npm:'npm',python:'PyPI',golang:'Go',docker:'Docker',githubAction:'GitHub Action'};
-// a Docker image reference split into its registry (Docker Hub when none is named) and its own name, the last path segment
-function image(n){const p=n.split('/'),host=p.length>1&&/[.:]|^localhost$/.test(p[0]);return {registry:host?p[0]:'docker.io',path:(host?p.slice(1):p).join('/'),short:p[p.length-1]}}
-const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
-  docker:n=>{const i=image(n);return i.registry!=='docker.io'?null:`https://hub.docker.com/r/${i.path.includes('/')?i.path:'_/'+i.path}`},githubAction:n=>`https://github.com/${n}`};
-const ecoOf=d=>d.ecosystem==='docker'?image(d.name).registry:d.ecosystem;
-const LOOKED=['npm','python','golang','githubAction'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
-const RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
-const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
-const GROUP={main:'main (installed with the app)',dev:'dev',test:'test',security:'security',optional:'optional',peer:'peer',runtime:'runtime (Docker image)',ci:'ci (GitHub Action)',tool:'tool','(not found)':'not found in a manifest'};
-const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
-let data={},repos=[],all=[],policy={green:[],yellow:[],red:[]},bar=null,view='dev';
-try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
-{const b=new URLSearchParams(location.search).get('branch');if(b==='main'||b==='dev')view=b}
-
-const vnum=v=>{const m=String(v||'').replace(/^[\^~=<>v\s]+/,'').match(/^\d+(?:\.\d+)*/);return m?m[0].split('.').map(Number):null};
-function newer(a,b){const x=vnum(a),y=vnum(b);if(!x||!y)return null;for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0}return false}
-const updateOf=d=>{const n=newer(d.latest,d.version);return n===null?'unknown':n?'behind':'current'};
-const riskOf=d=>d.license?d.license_class||'unclassified':LOOKED.includes(d.ecosystem)&&!local(d)?'none':'na';
-function vulnOf(d){const q=d.vulns;if(!q)return['unchecked'];if(!q.count)return['none'];return q.severity==='CRITICAL'||q.severity==='HIGH'?['any','critical-high']:['any']}
-
-const FACETS=[
-  {key:'repository',param:'repo',label:'Repository',get:d=>d.repository},
-  {key:'ecosystem',param:'eco',label:'Ecosystem',get:ecoOf,valueLabel:v=>ECO[v]||v},
-  {key:'license',param:'license',label:'License',get:d=>d.license||'(none)'},
-  {key:'risk',label:'License risk',get:riskOf,valueLabel:v=>RISK[v]||v,order:['red','yellow','green','unclassified','none','na']},
-  {key:'vuln',label:'Vulnerabilities',get:vulnOf,valueLabel:v=>VULN[v]||v,order:['critical-high','any','none','unchecked']},
-  {key:'group',label:'Group',get:d=>d.groups&&d.groups.length?d.groups:['(not found)'],valueLabel:v=>GROUP[v]||v,order:['main','dev','test','security','optional','peer','runtime','ci','tool']},
-  {key:'update',label:'Update status',get:updateOf,valueLabel:v=>UPDATE[v]||v,order:['behind','current','unknown']},
-];
-
-// nil: the value exists but the dashboard could not get it; N/A: there is no such value for this dependency
-const local=d=>d.ecosystem==='githubAction'&&d.name.startsWith('./');
-const NIL=why=>`<span class="muted" title="${esc(why)}">nil</span>`,NA=why=>`<span class="muted" title="${esc(why)}">N/A</span>`;
-function vulnCells(d){
-  const q=d.vulns;
-  if(local(d))return[NA('An action in this repository, not a published package'),NA('No vulnerabilities to fix')];
-  if(!q)return[NIL(d.ecosystem==='docker'?'Not scanned: the tag is an unresolved ${VAR}, the image could not be pulled anonymously (private, or built locally), or the scan failed':d.ecosystem==='githubAction'?'Not checked: pinned to a branch or a commit no release tag points at, or the GitHub lookup failed':LOOKED.includes(d.ecosystem)?'Not checked: the version is not exact or the lookup failed':'Not checked: vulnerability lookup does not cover this ecosystem yet'),NA('No known vulnerabilities to fix')];
-  if(!q.count)return['<span class="good">None known</span>',NA('No known vulnerabilities to fix')];
-  const cls=SEVCLASS[q.severity]||'warn',worst=q.severity==='UNKNOWN'?'severity not rated':q.severity.toLowerCase();
-  const list=q.items.map(i=>`<li><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.cve||i.id)}</a> <span class="sev ${SEVCLASS[i.severity]||'warn'}">${esc(i.severity==='UNKNOWN'?'not rated':i.severity.toLowerCase())}</span> ${esc(i.summary)} — ${i.fixed?`fixed in <code>${esc(i.fixed)}</code>`:'no fix released'}</li>`).join('');
-  const note=q.exact?'':`<div class="sub">Checked at ${esc(q.checked_version)}, the lowest version the range allows</div>`;
-  const fixed=d.ecosystem==='docker'?(q.fixable?`<span class="warn" title="Fixed in newer versions of the packages inside the image; a newer image tag usually includes them">${q.fixable} fixable</span>`:'<span class="bad">No fix released</span>')+(q.fixable&&q.unfixed?`<div class="sub">${q.unfixed} with no fix released</div>`:'')
-    :q.fixed_in?`<code>${esc(q.fixed_in)}</code>${q.unfixed?`<div class="sub">${q.unfixed} more with no fix released</div>`:''}`:'<span class="bad">No fix released</span>';
-  return[`<details class="vuln"><summary class="${cls}">${q.count} known · ${esc(worst)}</summary><ul>${list}</ul>${q.count>q.items.length?`<div class="sub">The ${q.items.length} most severe of ${q.count} are listed.</div>`:''}</details>${note}`,fixed];
-}
-function licCell(d){
-  if(d.license_of==='error')return '<span class="warn" title="deps.dev did not answer; this is not a missing license">Lookup failed</span>';
-  if(local(d))return NA('An action in this repository, not a published package');
-  if(!d.license&&d.ecosystem==='docker')return NA('An image holds many packages, each with its own license');
-  if(!d.license)return LOOKED.includes(d.ecosystem)?'<span class="muted">Unknown</span>':NIL('Not looked up: license lookup does not cover this ecosystem yet');
-  const r=riskOf(d);
-  const several=d.license.includes(', ')?' All of these licenses apply, so the strictest one counts.':'';
-  return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
-}
-function row(d,single){
-  const href=(LINK[d.ecosystem]||(()=>null))(d.name);
-  const shown=d.ecosystem==='docker'?image(d.name).short:d.name,full=shown===d.name?'':` title="${esc(d.name)}"`;
-  const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
-  const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):d.latest_of==='floating'?NA('A floating tag such as latest always points at the newest image'):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
-  const [vc,fx]=vulnCells(d);
-  return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The release this tag points to today; vulnerabilities are checked at this version">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
-}
-function render(list,state){
-  const sel=(state.selected.repository||[]),single=sel.length===1?sel[0]:null;
-  $('title').textContent=single?`${single} dependencies`:'Dependencies';
-  const count=f=>list.filter(f).length,looked=list.filter(d=>LOOKED.includes(d.ecosystem)&&!local(d));
-  const nv=count(d=>d.vulns&&d.vulns.count),unchecked=count(d=>!d.vulns),down=looked.length>0&&looked.every(d=>!d.vulns);
-  const cls={};list.forEach(d=>{const r=riskOf(d);if(r!=='na')cls[r]=(cls[r]||0)+1});
-  const risk=['red','yellow','green','unclassified','none'].filter(k=>cls[k]).map(k=>`<span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span>${RISK[k]} <strong>${cls[k]}</strong></span>`).join(' · ');
-  $('summary').innerHTML=`<strong>${list.length}</strong> ${list.length===1?'dependency':'dependencies'}${single?'':` in <strong>${new Set(list.map(d=>d.repository)).size}</strong> ${new Set(list.map(d=>d.repository)).size===1?'repository':'repositories'}`}. `
-    +(down?'<strong class="warn">Vulnerability data is unavailable right now</strong> (the lookup failed; this is not a clean result). '
-      :nv?`<strong class="bad">${nv}</strong> with known vulnerabilities. `:unchecked===list.length&&list.length?'':'No known vulnerabilities. ')
-    +(unchecked&&!down?`${unchecked} not checked (unresolved or private images, local actions, unpinned versions). `:'')
-    +(risk?`<br>License risk: ${risk}`:'');
-  const meta=single&&repos.find(x=>x.repository===single);
-  $('dep-note').innerHTML=!meta?(view==='main'?'Each repository\'s default branch.':'Each repository\'s development branch.'):`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`;
-  $('rows').innerHTML=list.length?list.map(d=>row(d,single)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
-}
-function renderPolicy(){
-  const any=['green','yellow','red'].some(k=>(policy[k]||[]).length);
-  $('policy').innerHTML=any?`<ul class="policy">${['green','yellow','red'].map(k=>`<li><span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span><b>${RISK[k]}</b></span> ${(policy[k]||[]).length?(policy[k]).map(x=>`<code>${esc(x)}</code>`).join(' '):'<span class="muted">none listed</span>'}</li>`).join('')}</ul>`
-    :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code>, <code>yellow</code> and <code>red</code> in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
-}
-function load(){   // the records of the branch being shown
-  repos=((view==='main'?data.main:null)||data.repositories||[]).slice().sort((a,b)=>a.repository.localeCompare(b.repository));
-  all=repos.flatMap(r=>(r.dependencies||[]).map(d=>({...d,repository:r.repository}))).sort((a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name));
-}
-function setView(v,store=true){
-  view=v;load();
-  $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
-  if(store){try{localStorage.setItem('branchView',v)}catch(e){}}
-  const q=new URLSearchParams(location.search);q.set('branch',v);try{history.replaceState(null,'',location.pathname+'?'+q)}catch(e){}
-  bar.setItems(all);   // re-renders through the filter bar, which keeps the filters
-}
-async function init(){
-  try{
-    const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
-    data=await res.json();policy=data.license_policy||policy;load();
-    $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    renderPolicy();
-    bar=Filters.createFilterBar($('filters'),{facets:FACETS,items:all,noun:'dependencies',text:{param:'q',placeholder:'Find a package or license',of:d=>d.name+' '+(d.license||'')},onChange:render});
-    setView(view,false);
-  }catch(e){
-    $('updated').textContent='Data unavailable';
-    $('summary').textContent='Dependency data could not be loaded. Run the refresh workflow and check its logs.';
-    $('rows').innerHTML='<tr><td colspan="7" class="empty">data/stack.json is missing or unreadable.</td></tr>';
-  }
-}
-$('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
-init();
-</script>
+<script src="assets/filters.js"></script>
+<script src="assets/tabs.js"></script>
+<script src="assets/deps.js"></script>
 </body>
 </html>

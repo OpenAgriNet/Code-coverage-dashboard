@@ -1,0 +1,189 @@
+let data={repositories:[],main:[],releases:[]},view='dev';
+try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const isNum=v=>v!=null&&v!==''&&Number.isFinite(Number(v));
+const num=v=>Number(v).toLocaleString();
+const day=v=>{if(!v)return '';const d=new Date(v);return isNaN(d)?'':d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})};
+const repoUrl=r=>r.html_url||`https://github.com/OpenAgriNet/${r.repository}`;
+// GitHub stars of a tracked repo, from data/stack.json once it has loaded
+const repoStars=name=>{const r=((stack&&stack.repositories)||[]).find(x=>x.repository===name);return r?r.stars:null};
+const starCount=n=>!Number.isFinite(n)||n<0?'':n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':n>=1e4?Math.round(n/1e3)+'k':n>=1e3?(n/1e3).toFixed(1).replace(/\.0$/,'')+'k':String(n);
+// GitHub's star octicon (MIT, primer/octicons)
+const STAR='<svg class="star-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Zm0 2.445L6.615 5.5a.75.75 0 0 1-.564.41l-3.097.45 2.24 2.184a.75.75 0 0 1 .216.664l-.528 3.084 2.769-1.456a.75.75 0 0 1 .698 0l2.77 1.456-.53-3.084a.75.75 0 0 1 .216-.664l2.24-2.183-3.096-.45a.75.75 0 0 1-.564-.41L8 2.694Z"/></svg>';
+const starChip=name=>{const n=repoStars(name);return !Number.isFinite(n)?'':`<span class="stars" title="${esc(n.toLocaleString())} stars on GitHub">${STAR}${starCount(n)}<span class="sr"> stars</span></span> `};
+const tagChips=r=>starChip(r.repository)+(r.tags||(r.dpg?['DPG']:[])).map(g=>`<span class="tag"${g==='DPG'?' title="Part of the OpenAgriNet DPG project"':''}>${esc(g)}</span>`).join(' ');
+const STALE_DAYS=14;
+document.addEventListener('error',e=>{const i=e.target;if(i.tagName==='IMG'&&i.dataset.fallback){const t=document.createElement('span');t.className='fallback';t.textContent=i.dataset.fallback;i.replaceWith(t)}},true);
+const SEC={passing:'Passing',failing:'Failing','no runs':'No runs on this branch','no workflow':'No security workflow','branch not found':'Branch not found'};
+
+function row(r,picker){
+  const url=repoUrl(r),cd=r.coverage_detail||{},s=r.security||{},what=r.ref_kind==='tag'?'tag':'branch';
+  const age=r.measured_at?Math.floor((Date.now()-new Date(r.measured_at))/864e5):null;
+  const measured=day(r.measured_at)?`<div class="sub${age>STALE_DAYS?' stale':''}">Measured ${esc(day(r.measured_at))}${age>STALE_DAYS?` (${age} days ago)`:''}</div>`:'';
+  const cov=r.branch_exists===false?'<span class="muted">Branch not found</span>'
+    :!isNum(r.coverage)?`<span class="muted">${esc(r.coverage_badge_url?`No report on this ${what}`:(r.coverage_source||'Unknown'))}</span>`
+    :`<a class="badge" href="${esc(cd.report_url||url)}" target="_blank" rel="noopener">${r.coverage_badge_url?`<img src="${esc(r.coverage_badge_url)}" data-fallback="${(+r.coverage).toFixed(2)}%" alt="Coverage ${(+r.coverage).toFixed(2)}%">`:`<span class="pct">${(+r.coverage).toFixed(2)}%</span>`}</a>`
+     +(cd.lines?`<div class="sub">${num(cd.hits)} of ${num(cd.lines)} lines covered</div>`:'')+measured;
+  const label=s.state==='no runs'?`No runs on this ${what}`:SEC[s.state]||'Unknown';
+  const sec=(s.badge_url&&s.state!=='no runs'
+    ?`<a class="badge" href="${esc(s.run_url||url+'/actions')}" target="_blank" rel="noopener"><img src="${esc(s.badge_url)}" data-fallback="${esc(label)}" alt="Security ${esc(label)}"></a>`
+    :(s.run_url&&(s.state==='passing'||s.state==='failing')
+      ?`<a class="pct ${s.state==='passing'?'good':'bad'}" href="${esc(s.run_url)}" target="_blank" rel="noopener">${esc(label)}</a>`
+      :`<span class="muted">${esc(label)}</span>`))
+    +(day(s.finished_at)?`<div class="sub">Last run ${esc(day(s.finished_at))}</div>`:'');
+  return `<tr><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}${picker||`<div class="sub">${esc(r.branch)}${devDefault(r)}</div>`}</td><td data-label="Code coverage">${cov}</td><td data-label="Security">${sec}</td></tr>`;
+}
+const picked={};let relAll='',relSet='',relAllowed=null,relBar=null,bar=null,visibleSet=null;
+const devDefault=r=>view==='dev'&&r.branch_source==='default'&&r.ref_kind!=='tag'?' <span title="No branch matched the development pattern in config/repos.json, so the default branch is shown">· default branch</span>':'';
+const pool=g=>relSet?g.versions:gv(g);   // a named release ignores the Found as / Stability filters: it names its versions itself
+const curSet=()=>(data.release_sets||[]).find(s=>s.alias===relSet);
+const setEntry=g=>{const s=curSet();const e=s&&Object.entries(s.repos).find(([k])=>k.toLowerCase()===g.repository.toLowerCase());return e&&e[1]};
+function setUrl(k,v){const q=new URLSearchParams(location.search);v?q.set(k,v):q.delete(k);try{history.replaceState(null,'',q.toString()?'?'+q:location.pathname)}catch(_){}}
+function fillRelSet(){
+  const sets=data.release_sets||[],sel=$('rel-set');
+  $('rel-set').hidden=$('rel-set-label').hidden=!sets.length;
+  sel.innerHTML='<option value="">Each repo\'s latest</option>'+sets.map(s=>`<option value="${esc(s.alias)}">${esc(s.label)}${s.current?' (current)':''}</option>`).join('');
+  sel.value=sets.some(s=>s.alias===relSet)?relSet:'';relSet=sel.value;
+}
+function initRelSet(){
+  const sets=data.release_sets||[],q=new URLSearchParams(location.search),p=q.get('set'),cur=sets.find(s=>s.current);
+  relSet=p===null?(q.get('ver')?'':cur?cur.alias:''):p==='latest'?'':p;
+  fillRelSet();$('rel-all').disabled=!!relSet;
+}
+const shown=r=>!visibleSet||visibleSet.has(r.repository);
+const vkey=(g,v)=>g.repository+'@'+v.version;
+const gv=g=>relAllowed?g.versions.filter(v=>relAllowed.has(vkey(g,v))):g.versions;
+const latestOf=g=>gv(g).find(v=>!v.prerelease)||gv(g)[0];
+const verCmp=(a,b)=>{const p=v=>{const[n,...r]=v.split('-');return[n.split('.').map(Number),r.join('-')]},[an,ap]=p(a),[bn,bp]=p(b);
+  for(let i=0;i<Math.max(an.length,bn.length);i++){const d=(an[i]||0)-(bn[i]||0);if(d)return d}
+  return(ap?0:1)-(bp?0:1)||ap.localeCompare(bp,undefined,{numeric:true})};
+function fillRelAll(){
+  const sel=$('rel-all'),all=[...new Set((data.releases||[]).flatMap(g=>gv(g).map(v=>v.version)))].sort(verCmp).reverse();
+  sel.innerHTML='<option value="">Latest</option>'+all.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');sel.value=all.includes(relAll)?relAll:'';relAll=sel.value;
+}
+const KIND={branch:'release branch',tag:'tag',release:'GitHub Release'};
+function relPick(g){
+  const by=x=>pool(g).find(v=>v.version===x);
+  if(picked[g.repository])return by(picked[g.repository])||null;
+  if(relSet){const m=setEntry(g);return m&&m.version?by(m.version)||null:null}
+  return relAll?by(relAll)||null:latestOf(g);
+}
+function missingText(g){
+  if(picked[g.repository]||!relSet)return `This repository has no ${esc(picked[g.repository]||relAll)} version.`;
+  const m=setEntry(g),s=curSet();
+  return m?`Tag <code>${esc(m.tag)}</code> is not among this repository's versions (not a version name, or older than <code>releases.max_versions</code>).`:`Not part of ${esc(s.label)}.`;
+}
+function relRow(g){
+  const v=relPick(g),id='ver-'+g.repository.replace(/[^\w-]/g,'_'),want=picked[g.repository]||relAll;
+  const gone=v?'':`<option value="" selected disabled>${relSet&&!picked[g.repository]?'Not in this release':'No '+esc(want)}</option>`;
+  const opts=gone+pool(g).map(x=>`<option value="${esc(x.version)}"${x===v?' selected':''}>${esc(x.version)}${x.prerelease?' (pre-release)':''}${x===latestOf(g)?' · latest':''}</option>`).join('');
+  if(!v)return `<tr><td><a class="repo" href="${esc(g.html_url)}" target="_blank" rel="noopener">${esc(g.repository)}</a> ${tagChips(g)}<div><label class="sr" for="${id}">Version of ${esc(g.repository)}</label><select class="ver" id="${id}" data-repo="${esc(g.repository)}">${opts}</select></div></td><td colspan="2" data-label="Code coverage" class="muted">${missingText(g)}</td></tr>`;
+  const more=g.not_measured>0?`<div class="sub">${g.not_measured} older ${g.not_measured===1?'version is':'versions are'} not shown (<code>releases.max_versions</code>).</div>`:'';
+  const how=`${v.kinds.map(k=>KIND[k]).join(' + ')} · <code>${esc(v.branch)}</code>${day(v.published_at)?` · ${esc(day(v.published_at))}`:''}`;
+  return row({...v,repository:g.repository,html_url:g.html_url,tags:g.tags,dpg:g.dpg},
+    `<div><label class="sr" for="${id}">Version of ${esc(g.repository)}</label><select class="ver" id="${id}" data-repo="${esc(g.repository)}">${opts}</select></div><div class="sub">${how}</div>${more}`);
+}
+function fill(id,list,empty,render1=row){
+  const cv=r=>r.versions?0:isNum(r.coverage)?+r.coverage:-1;  // release rows keep name order so a row does not jump while its version is changed
+  const a=list.filter(shown).sort((x,y)=>cv(y)-cv(x)||x.repository.localeCompare(y.repository));
+  $(id).innerHTML=a.length?a.map(x=>render1(x)).join(''):`<tr><td colspan="3" class="empty">${visibleSet&&list.length?'No repositories match these filters.':empty}</td></tr>`;
+}
+const viewList=()=>(view==='main'?data.main:data.repositories)||[];
+function summary(){
+  const all=viewList().filter(shown),has=all.filter(r=>isNum(r.coverage)).length,st=k=>all.filter(r=>(r.security||{}).state===k).length,pass=st('passing'),fail=st('failing');
+  $('summary').innerHTML=all.length?`On their ${view==='main'?'main':'development'} branches, <strong>${has} of ${all.length}</strong> ${visibleSet?'matching ':''}repositories report coverage. Security: <strong>${pass}</strong> passing, <strong class="${fail?'bad':''}">${fail}</strong> failing.`:'No repositories are configured yet.';
+}
+function setView(v){
+  view=v;try{localStorage.setItem('branchView',v)}catch(e){}
+  $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
+  $('dev-title').textContent=v==='main'?'Main':'Development';
+  $('stack-note').innerHTML=(v==='main'?'Each repository\'s default branch.':'Each repository\'s development branch.')+' <a href="deps.html">All dependencies →</a>';
+  $('dev-note').innerHTML=v==='main'?'Each repository\'s default branch.':'Each repository\'s development branch: its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>, else the default branch.';
+  if(bar)bar.setItems(repoItems());else{summary();render()}
+}
+let stack=null;
+// a local action (./.github/actions/x) is not a published package and has no license to find
+const licensable=d=>!(d.ecosystem==='githubAction'&&d.name.startsWith('./'));
+function stackRow(r){
+  const url=repoUrl(r),deps=r.dependencies||[],langs=(r.languages||[]).slice(0,3).map(l=>l[0]).join(' · '),techs=r.techs||[];
+  const lic=r.license?`<span class="lic risk risk-${esc(r.license_class||'unclassified')}" title="${esc(RISK[r.license_class||'unclassified'])}"><span class="dot" aria-hidden="true"></span>${esc(r.license)}</span><span class="sr"> (${esc(RISK[r.license_class||'unclassified'])})</span>`:'<span class="lic none">No LICENSE file</span>';
+  const vuln=deps.filter(d=>d.vulns&&d.vulns.count).length,known=deps.filter(d=>d.license).length,pkgs=deps.filter(licensable).length;
+  const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
+    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} with a known license`:'Local actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
+    :'<span class="muted">None found</span>';
+  return `<tr${r.license_class==='red'||r.license_class==='yellow'?` class="row-risk-${r.license_class}"`:''}><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}${devDefault(r)}</div></td>`
+    +`<td data-label="License">${lic}</td>`
+    +`<td data-label="Stack">${esc(langs)||'<span class="muted">Nothing detected</span>'}${techs.length?`<div class="techs">${esc(techs.slice(0,8).join(', '))}${techs.length>8?` +${techs.length-8} more`:''}</div>`:''}</td>`
+    +`<td data-label="Dependencies">${dep}</td></tr>`;
+}
+function fillStack(){
+  if(!stack)return;
+  const a=stackList().filter(shown).sort((x,y)=>x.repository.localeCompare(y.repository));
+  $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${visibleSet&&stackList().length?'No repositories match these filters.':'No repositories analysed yet.'}</td></tr>`;
+}
+function render(){
+  if($('rel-all').options.length<2)fillRelAll();
+  fill('dev-rows',viewList(),'No repositories configured. Add them to config/repos.json.');
+  fill('rel-rows',(data.releases||[]).filter(g=>pool(g).length),relAllowed?'No repository has a version that matches.':'No repository has a release version yet.',relRow);
+  fillStack();
+}
+/* ---- filters: one bar for every table (a repository is shown when it passes all of them) ---- */
+const SECL={passing:'Passing',failing:'Failing','no runs':'No runs','no workflow':'No security workflow','branch not found':'Branch not found',unknown:'Unknown'};
+const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Preferred',yellow:'Not recommended',red:'Not to use',unclassified:'Unclassified',none:'No LICENSE file'};
+const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
+const stackList=()=>!stack?[]:(view==='main'?stack.main||stack.repositories:stack.repositories)||[];
+function repoItems(){
+  const st=Object.fromEntries(stackList().map(r=>[r.repository,r]));
+  return viewList().map(r=>{
+    const s=st[r.repository]||{},deps=s.dependencies||[],c=isNum(r.coverage)?+r.coverage:null;
+    const vul=!deps.some(d=>d.vulns)?['unchecked']:!deps.some(d=>d.vulns&&d.vulns.count)?['none']:deps.some(d=>d.vulns&&(d.vulns.severity==='CRITICAL'||d.vulns.severity==='HIGH'))?['any','critical-high']:['any'];
+    return {repository:r.repository,tags:r.tags||(r.dpg?['DPG']:[]),sec:(r.security||{}).state||'unknown',cov:c===null?'none':c>=80?'high':c>=50?'mid':'low',
+      license:stack?(s.license||'(no LICENSE file)'):null,risk:stack?(s.license?s.license_class||'unclassified':'none'):null,vuln:stack?vul:null,
+      langs:(s.languages||[]).map(l=>l[0])};
+  });
+}
+const REPO_FACETS=[
+  {key:'repository',param:'repo',label:'Repository',get:i=>i.repository},
+  {key:'tag',label:'Tag',get:i=>i.tags.length?i.tags:'(none)'},
+  {key:'sec',label:'Security',get:i=>i.sec,valueLabel:v=>SECL[v]||v,order:['failing','passing','no runs','no workflow']},
+  {key:'cov',label:'Coverage',get:i=>i.cov,valueLabel:v=>COVL[v],order:['low','mid','high','none']},
+  {key:'risk',label:'License risk',get:i=>i.risk,valueLabel:v=>RISK[v]||v,order:['red','yellow','green','unclassified','none']},
+  {key:'license',label:'License',get:i=>i.license},
+  {key:'vuln',label:'Vulnerabilities',get:i=>i.vuln,valueLabel:v=>VULNL[v]||v,order:['critical-high','any','none','unchecked']},
+  {key:'lang',label:'Language',get:i=>i.langs},
+];
+function onRepoFilter(list){visibleSet=new Set(list.map(i=>i.repository));summary();render()}
+function initFilters(){
+  bar=Filters.createFilterBar($('filters'),{facets:REPO_FACETS,items:repoItems(),noun:'repositories',text:{param:'q',placeholder:'Find a repository',of:i=>i.repository},onChange:onRepoFilter});
+  visibleSet=new Set(bar.visible().map(i=>i.repository));
+  const items=(data.releases||[]).flatMap(g=>g.versions.map(v=>({key:vkey(g,v),kinds:v.kinds,stable:v.prerelease?'pre':'stable'})));
+  relBar=Filters.createFilterBar($('rel-filters'),{facets:[
+    {key:'found',param:'found',label:'Found as',get:i=>i.kinds,valueLabel:v=>({branch:'Release branch',tag:'Tag',release:'GitHub Release'}[v]||v),order:['release','tag','branch']},
+    {key:'stable',param:'stab',label:'Stability',get:i=>i.stable,valueLabel:v=>v==='pre'?'Pre-release':'Stable',order:['stable','pre']},
+  ],items,noun:'versions',onChange:list=>{relAllowed=list.length===items.length?null:new Set(list.map(i=>i.key));fillRelAll();render()}});
+  relAllowed=relBar.visible().length===items.length?null:new Set(relBar.visible().map(i=>i.key));
+  const want=new URLSearchParams(location.search).get('ver');if(want)relAll=want;
+}
+async function initStack(){
+  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();Object.assign(RISK,(stack.license_policy||{}).labels||{});if(bar)bar.setItems(repoItems());fillStack();if(data.main.length)render()}   // repo stars come from stack.json
+  catch(e){$('stack-rows').innerHTML='<tr><td colspan="4" class="empty">data/stack.json is missing or unreadable.</td></tr>'}
+}
+async function init(){
+  try{
+    const res=await fetch('./data/coverage.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
+    data=await res.json();
+    $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Not refreshed yet';
+    if(!data.main)data.main=data.repositories||[];
+    setView(view);initFilters();initRelSet();fillRelAll();summary();render();
+  }catch(e){
+    $('updated').textContent='Data unavailable';
+    $('summary').textContent='Coverage data could not be loaded. Run the refresh workflow and check its logs.';
+    ['dev-rows','rel-rows'].forEach(id=>$(id).innerHTML='<tr><td colspan="3" class="empty">data/coverage.json is missing or unreadable.</td></tr>');
+  }
+}
+$('rel-all').addEventListener('change',e=>{relAll=e.target.value;for(const k in picked)delete picked[k];setUrl('ver',relAll);render()});
+$('rel-set').addEventListener('change',e=>{relSet=e.target.value;relAll='';$('rel-all').value='';$('rel-all').disabled=!!relSet;for(const k in picked)delete picked[k];setUrl('ver','');setUrl('set',relSet||'latest');render()});
+$('rel-rows').addEventListener('change',e=>{const s=e.target.closest('select.ver');if(s){picked[s.dataset.repo]=s.value;render();const again=document.querySelector(`select.ver[data-repo="${CSS.escape(s.dataset.repo)}"]`);if(again)again.focus()}});
+$('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
+init();initStack();

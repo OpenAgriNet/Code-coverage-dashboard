@@ -2,6 +2,16 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 from stackinfo import record as r
+import pytest
+
+@pytest.fixture(autouse=True)
+def no_star_lookups(monkeypatch):
+    monkeypatch.setattr(r, 'annotate_stars', lambda deps: None)
+    monkeypatch.setattr(r, 'fill_licenses', lambda deps: None)
+    monkeypatch.setattr(r, 'explain', lambda deps: None)
+    monkeypatch.setattr(r, 'annotate_terraform', lambda deps: None)
+    monkeypatch.setattr(r, 'annotate_releases', lambda deps: None)   # reasons have their own tests
+    monkeypatch.setattr(r, 'repo_stars', lambda repo: None)
 
 def test_stack_record_keeps_license_when_analyser_fails(monkeypatch):
     monkeypatch.setattr(r, 'repo_license', lambda repo: 'MIT')
@@ -15,7 +25,7 @@ def test_stack_record_adds_dependency_info(monkeypatch):
     raw = {'languages': {'Go': 3}, 'techs': ['golang'], 'dependencies': [['golang', 'github.com/a/b', 'v1.0.0']]}
     rec = r.stack_record({'name': 'na', 'branch': 'development'}, analyse=lambda repo, branch: raw,
                          info=lambda e, n, v: {'name': n, 'license': 'MIT'}, vulns=lambda deps: None)
-    assert rec['languages'] == [('Go', 3)] and rec['dependencies'] == [{'name': 'github.com/a/b', 'license': 'MIT', 'groups': [], 'license_class': 'unclassified'}] and rec['error'] is None
+    assert rec['languages'] == [('Go', 3)] and rec['dependencies'] == [{'name': 'github.com/a/b', 'license': 'MIT', 'groups': [], 'short': 'b', 'license_class': 'unclassified'}] and rec['error'] is None
 
 def test_stack_record_runs_vulnerability_check_on_the_dependencies(monkeypatch):
     monkeypatch.setattr(r, 'repo_license', lambda repo: None)
@@ -25,14 +35,14 @@ def test_stack_record_runs_vulnerability_check_on_the_dependencies(monkeypatch):
             d['vulns'] = {'count': 2}
     rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
                          info=lambda e, n, v: {'name': n}, vulns=vulns)
-    assert rec['dependencies'] == [{'name': 'jinja2', 'groups': [], 'vulns': {'count': 2}, 'license_class': None}]
+    assert rec['dependencies'] == [{'name': 'jinja2', 'groups': [], 'short': 'jinja2', 'vulns': {'count': 2}, 'license_class': None}]
 
 def test_repo_license(monkeypatch):
-    monkeypatch.setattr(r.ac, 'api', lambda p: {'license': {'spdx_id': 'MIT'}})
+    monkeypatch.setattr(r.github, 'api', lambda p: {'license': {'spdx_id': 'MIT'}})
     assert r.repo_license('na') == 'MIT'
-    monkeypatch.setattr(r.ac, 'api', lambda p: {'license': {'spdx_id': 'NOASSERTION'}})
+    monkeypatch.setattr(r.github, 'api', lambda p: {'license': {'spdx_id': 'NOASSERTION'}})
     assert r.repo_license('na') == 'Other'
-    monkeypatch.setattr(r.ac, 'api', lambda p: None)
+    monkeypatch.setattr(r.github, 'api', lambda p: None)
     assert r.repo_license('na') is None
 
 def test_stack_record_classifies_repo_and_dependency_licenses(monkeypatch):
@@ -47,7 +57,7 @@ def test_stack_record_survives_default_branch_failure(monkeypatch):
     monkeypatch.setattr(r, 'repo_license', lambda repo: 'MIT')
     def boom(repo):
         raise RuntimeError('502')
-    monkeypatch.setattr(r.ac, 'default_branch', boom)
+    monkeypatch.setattr(r.github, 'default_branch', boom)
     rec = r.stack_record({'name': 'na', 'branch': None}, analyse=lambda *a: {})
     assert rec['license'] == 'MIT' and rec['error'] == '502' and rec['dependencies'] == []
 
@@ -59,7 +69,7 @@ def test_stack_record_runs_the_actions_lookup_before_classifying(monkeypatch):
             d['license'] = 'MIT'
     rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
                          info=lambda e, n, v: {'name': n}, vulns=lambda deps: None, actions=actions, policy={'green': ['MIT']})
-    assert rec['dependencies'] == [{'name': 'actions/cache', 'groups': [], 'license': 'MIT', 'license_class': 'green'}]
+    assert rec['dependencies'] == [{'name': 'actions/cache', 'groups': [], 'short': 'cache', 'license': 'MIT', 'license_class': 'green'}]
 
 def test_stack_record_labels_groups_from_the_manifests(monkeypatch):
     monkeypatch.setattr(r, 'repo_license', lambda repo: None)
@@ -73,3 +83,15 @@ def test_stack_record_labels_groups_from_the_manifests(monkeypatch):
     by = {d['name']: d for d in rec['dependencies']}; vite, redis = by['vite'], by['redis']
     assert vite['groups'] == ['dev'] and vite['installed'] == '5.4.2' and redis['groups'] == ['runtime']
     assert seen == {'vite': '5.4.2', 'redis': None}   # groups and installed are known before the vulnerability check
+
+def test_stack_record_adds_packages_the_analyser_missed(monkeypatch):
+    monkeypatch.setattr(r, 'repo_license', lambda repo: None)
+    raw = {'dependencies': [['python', 'fastapi', '>=0.1']],
+           'manifests': {('python', 'fastapi'): {'name': 'fastapi', 'declared': '>=0.1', 'installed': None, 'groups': ['main'], 'sources': ['pyproject.toml']},
+                         ('python', 'pytest'): {'name': 'pytest', 'declared': '>=9.1.1', 'installed': '9.1.2', 'groups': ['dev'], 'sources': ['pyproject.toml']},
+                         ('githubRelease', 'aquasecurity/trivy'): {'name': 'aquasecurity/trivy', 'declared': 'latest', 'installed': None, 'groups': ['security'], 'sources': ['.github/workflows/security.yml']}}}
+    rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
+                         info=lambda e, n, v: {'ecosystem': e, 'name': n, 'version': v}, vulns=lambda d: None, actions=lambda d: None, images=lambda d: None)
+    by = {d['name']: d for d in rec['dependencies']}
+    assert by['pytest']['groups'] == ['dev'] and by['pytest']['installed'] == '9.1.2'
+    assert by['aquasecurity/trivy']['groups'] == ['security'] and by['aquasecurity/trivy']['version'] == 'latest'

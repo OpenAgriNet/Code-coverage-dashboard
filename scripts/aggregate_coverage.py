@@ -3,25 +3,15 @@
 import io, json, os, re, sys, zipfile
 from datetime import datetime, timezone
 import requests
+from common.github import API, ORG, PROJECT_TOKEN, S, SEARCH, api, default_branch
 from repoconfig import load as load_config, resolve
 from repoconfig.resolve import SourceError
 from releasefind import find_versions
 from releasefind.sets import resolve_sets
 import xml.etree.ElementTree as ET
 MAX_ARTIFACT_BYTES=100*1024*1024  # artifacts are read into memory
-API='https://api.github.com'; ORG=os.getenv('GITHUB_ORG','OpenAgriNet'); TOKEN=os.getenv('GH_TOKEN'); CODECOV_TOKEN=os.getenv('CODECOV_TOKEN'); PROJECT_TOKEN=os.getenv('DPG_PROJECT_TOKEN'); QUERY_TOKEN=os.getenv('DPG_QUERY_TOKEN')
-CFG=load_config('config/repos.json'); S=requests.Session(); S.headers.update({'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
-if TOKEN: S.headers['Authorization']='Bearer '+TOKEN
-
-def search_api(path):
- """GET for the repository search with its own token: filtering by a custom property needs one that can read the organization's custom properties."""
- r=requests.get(API+path,headers={**dict(S.headers),'Authorization':'Bearer '+QUERY_TOKEN},timeout=45)
- r.raise_for_status();return r.json()
-SEARCH=search_api if QUERY_TOKEN else None
-def api(path):
- r=S.get(API+path,timeout=45)
- if r.status_code in (404,409):return None  # 409: GitHub's answer for refs and commits of an empty repository
- r.raise_for_status();return r.json()
+CODECOV_TOKEN=os.getenv('CODECOV_TOKEN')
+CFG=load_config('config/repos.json')
 def xml_pct(raw):
  try: root=ET.fromstring(raw)
  except Exception:return None
@@ -79,8 +69,6 @@ def codecov(repo,branch,sha=None):
 def commit_date(repo,sha):
  c=api(f'/repos/{ORG}/{repo}/commits/{sha}') if sha else None
  return ((c or {}).get('commit') or {}).get('committer',{}).get('date')
-def default_branch(repo):
- return (api(f'/repos/{ORG}/{repo}') or {}).get('default_branch') or 'main'
 def resolve_branch(repo,branch):
  """(branch, exists). None means the repo's default branch."""
  if not branch:return default_branch(repo),True

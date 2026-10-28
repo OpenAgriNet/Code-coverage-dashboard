@@ -1,9 +1,12 @@
 """GitHub Actions: the exact version behind a tag such as v4, the latest release, the action repo's license and its known
 vulnerabilities, all from the GitHub API (GH_TOKEN). OSV holds Actions advisories but cannot match them to a version, so
 GitHub's advisory database is used instead."""
-import re, sys
-import aggregate_coverage as ac
-from .vulns import summarize, vkey
+import re
+from common import github
+from common.log import warn
+from common.versions import vkey
+from stackinfo.lookups.osv import summarize
+from stackinfo.rules.reasons import short_error
 SEV={'low':'LOW','medium':'MODERATE','moderate':'MODERATE','high':'HIGH','critical':'CRITICAL'}
 SHA=re.compile(r'[0-9a-f]{40}')
 FULL=re.compile(r'v?\d+\.\d+\.\d+.*')
@@ -34,7 +37,7 @@ def latest(repo,api):
  tags=[t['name'] for t in api(f'/repos/{repo}/tags?per_page=100') or [] if RELEASE.fullmatch(t['name'])]
  return max(tags,key=vkey) if tags else None
 def advisories(repo,version,api):
- """Known vulnerabilities of repo@version, in the item shape vulns.py gives OSV advisories."""
+ """Known vulnerabilities of repo@version, in the item shape osv.py gives OSV advisories."""
  out=[]
  for adv in api(f'/advisories?ecosystem=actions&affects={repo}@{version.lstrip("v")}&per_page=100') or []:
   if adv.get('withdrawn_at'):continue
@@ -54,7 +57,7 @@ def lookup(repo,ref,api):
  if exact:out['vulns']={'checked_version':exact,'exact':True,**summarize(advisories(repo,exact,api))}
  return out
 CACHE={}
-def annotate(deps,api=ac.api,cache=CACHE,log=lambda m:print(m,file=sys.stderr)):
+def annotate(deps,api=github.api,cache=CACHE,log=warn):
  """Fill latest, license and vulns of every published action in deps (local ./ actions and other ecosystems are left alone).
  One lookup per action and ref per run; a failed lookup leaves vulns None (not checked) and marks license_of 'error'."""
  for d in deps:
@@ -63,5 +66,7 @@ def annotate(deps,api=ac.api,cache=CACHE,log=lambda m:print(m,file=sys.stderr)):
   if not NAME.fullmatch(key[0]) or '..' in key[0] or not REF.fullmatch(key[1]):log(f'WARN action reference not checked: {d["name"]}@{key[1]}');continue
   if key not in cache:
    try:cache[key]=lookup(*key,api)
-   except Exception as e:cache[key]={'license_of':'error','vulns':None};log(f'WARN GitHub lookup failed for action {d["name"]}@{key[1]}: {e}')
+   except Exception as e:
+    m=f'GitHub: {short_error(e)}';cache[key]={'license_of':'error','vulns':None,'errors':{'latest':m,'license':m,'vulns':m}}
+    log(f'WARN GitHub lookup failed for action {d["name"]}@{key[1]}: {e}')
   d.update({k:(dict(v) if isinstance(v,dict) else v) for k,v in cache[key].items()})
