@@ -21,9 +21,7 @@ const RISK={green:'Preferred',yellow:'Not recommended',red:'Not to use',unclassi
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const GROUP={main:'main (installed with the app)',dev:'dev',test:'test',security:'security',optional:'optional',peer:'peer',runtime:'runtime (Docker image)',ci:'ci (GitHub Action)',tool:'tool','(not found)':'not found in a manifest'};
 const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
-let data={},repos=[],all=[],policy={green:[],yellow:[],red:[]},bar=null,view='dev';
-try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
-{const b=new URLSearchParams(location.search).get('branch');if(b==='main'||b==='dev')view=b}
+let data={},repos=[],all=[],policy={green:[],yellow:[],red:[]},bar=null,view=Branches.initial();   // dev or main, shared with index.html (assets/branches.js)
 
 const vnum=v=>{const m=String(v||'').replace(/^[\^~=<>v\s]+/,'').match(/^\d+(?:\.\d+)*/);return m?m[0].split('.').map(Number):null};
 function newer(a,b){const x=vnum(a),y=vnum(b);if(!x||!y)return null;for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0}return false}
@@ -110,7 +108,7 @@ function render(list,state){
     +(unchecked&&!down?`${unchecked} not checked (unresolved or private images, local actions, unpinned versions). `:'')
     +(risk?`<br>License risk: ${risk}`:'');
   const meta=single&&repos.find(x=>x.repository===single);
-  $('dep-note').innerHTML=!meta?(view==='main'?'Each repository\'s default branch.':'Each repository\'s development branch.'):`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`;
+  $('dep-note').innerHTML=!meta?`On the ${view==='main'?'default':'development'} branch, as chosen above.`:`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`;
   $('rows').innerHTML=list.length?(shown=list).map((d,i)=>row(d,single,i)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
 }
 function renderPolicy(){
@@ -120,14 +118,14 @@ function renderPolicy(){
     :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code> (Preferred), <code>yellow</code> (Not recommended) and <code>red</code> (Not to use) in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
 }
 function load(){   // the records of the branch being shown
-  repos=((view==='main'?data.main:null)||data.repositories||[]).slice().sort((a,b)=>a.repository.localeCompare(b.repository));
+  // Development lists only repos whose development branch was found; the note under the switch names the others
+  repos=(view==='main'?data.main||data.repositories||[]:Branches.devOnly(data.repositories)).slice().sort((a,b)=>a.repository.localeCompare(b.repository));
   all=repos.flatMap(r=>(r.dependencies||[]).map(d=>({...d,repository:r.repository}))).sort((a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name));
 }
 function setView(v,store=true){
   view=v;load();
-  $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
-  if(store){try{localStorage.setItem('branchView',v)}catch(e){}}
-  const q=new URLSearchParams(location.search);q.set('branch',v);try{history.replaceState(null,'',location.pathname+'?'+q)}catch(e){}
+  if(store)Branches.remember(v);
+  Branches.paint(v,data.repositories||[],data.main||data.repositories||[]);
   bar.setItems(all);   // re-renders through the filter bar, which keeps the filters
 }
 async function init(){

@@ -19,6 +19,14 @@
     <span class="updated" id="updated">Loading data…</span>
   </header>
   <p class="summary" id="summary">Reading the dependency list.</p>
+  <div class="branchbar">
+    <span class="branchbar-label" id="branch-label">Branch</span>
+    <div class="switch" role="group" aria-labelledby="branch-label">
+      <button type="button" id="view-dev" aria-pressed="true">Development <span class="count" id="count-dev"></span></button>
+      <button type="button" id="view-main" aria-pressed="false">Main <span class="count" id="count-main"></span></button>
+    </div>
+    <p class="sub branch-note" id="branch-note" aria-live="polite"></p>
+  </div>
   <div id="filters"></div>
 
   <div class="tabs" role="tablist" aria-label="Sections">
@@ -28,9 +36,7 @@
   </div>
 
   <section id="sec-packages" role="tabpanel" aria-labelledby="tab-packages">
-    <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div>
-      <div class="switch" role="group" aria-label="Branch to show"><button type="button" id="view-dev" aria-pressed="true">Development</button><button type="button" id="view-main" aria-pressed="false">Main</button></div>
-    </div>
+    <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div></div>
     <div class="table-wrap"><table class="deps">
       <thead><tr><th scope="col">Package</th><th scope="col">Ecosystem</th><th scope="col">Version</th><th scope="col">Latest</th><th scope="col">License</th><th scope="col">Vulnerabilities</th><th scope="col">Fixed in</th></tr></thead>
       <tbody id="rows"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
@@ -64,6 +70,7 @@
 </main>
 <script src="assets/filters.js"></script>
 <script src="assets/tabs.js"></script>
+<script src="assets/branches.js"></script>
 <script src="assets/deps.js"></script>
 </body>
 </html>

@@ -1,5 +1,4 @@
-let data={repositories:[],main:[],releases:[]},view='dev';
-try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
+let data={repositories:[],main:[],releases:[]},view=Branches.initial();   // dev or main, shared with deps.html (assets/branches.js)
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isNum=v=>v!=null&&v!==''&&Number.isFinite(Number(v));
@@ -89,17 +88,14 @@ function fill(id,list,empty,render1=row){
   const a=list.filter(shown).sort((x,y)=>cv(y)-cv(x)||x.repository.localeCompare(y.repository));
   $(id).innerHTML=a.length?a.map(x=>render1(x)).join(''):`<tr><td colspan="3" class="empty">${visibleSet&&list.length?'No repositories match these filters.':empty}</td></tr>`;
 }
-const viewList=()=>(view==='main'?data.main:data.repositories)||[];
+const viewList=()=>(view==='main'?data.main:Branches.devOnly(data.repositories))||[];   // Development: only repos whose development branch was found
 function summary(){
   const all=viewList().filter(shown),has=all.filter(r=>isNum(r.coverage)).length,st=k=>all.filter(r=>(r.security||{}).state===k).length,pass=st('passing'),fail=st('failing');
   $('summary').innerHTML=all.length?`On their ${view==='main'?'main':'development'} branches, <strong>${has} of ${all.length}</strong> ${visibleSet?'matching ':''}repositories report coverage. Security: <strong>${pass}</strong> passing, <strong class="${fail?'bad':''}">${fail}</strong> failing.`:'No repositories are configured yet.';
 }
 function setView(v){
-  view=v;try{localStorage.setItem('branchView',v)}catch(e){}
-  $('view-dev').setAttribute('aria-pressed',v==='dev');$('view-main').setAttribute('aria-pressed',v==='main');
-  $('dev-title').textContent=v==='main'?'Main':'Development';
-  $('stack-note').innerHTML=(v==='main'?'Each repository\'s default branch.':'Each repository\'s development branch.')+' <a href="deps.html">All dependencies →</a>';
-  $('dev-note').innerHTML=v==='main'?'Each repository\'s default branch.':'Each repository\'s development branch: its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>, else the default branch.';
+  view=v;Branches.remember(v);Branches.paint(v,data.repositories,data.main);
+  $('stack-note').innerHTML=`On the ${v==='main'?'default':'development'} branch, as chosen above. <a href="deps.html?branch=${v}">All dependencies →</a>`;
   if(bar)bar.setItems(repoItems());else{summary();render()}
 }
 let stack=null;
@@ -132,7 +128,7 @@ function render(){
 const SECL={passing:'Passing',failing:'Failing','no runs':'No runs','no workflow':'No security workflow','branch not found':'Branch not found',unknown:'Unknown'};
 const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Preferred',yellow:'Not recommended',red:'Not to use',unclassified:'Unclassified',none:'No LICENSE file'};
 const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
-const stackList=()=>!stack?[]:(view==='main'?stack.main||stack.repositories:stack.repositories)||[];
+const stackList=()=>!stack?[]:(view==='main'?stack.main||stack.repositories:Branches.devOnly(stack.repositories))||[];
 function repoItems(){
   const st=Object.fromEntries(stackList().map(r=>[r.repository,r]));
   return viewList().map(r=>{

@@ -50,7 +50,7 @@ All keys except `name` are optional. An entry is merged with whatever the source
 
 **Branches.** There is no `branch` on a repo: the Development / Main switch on the dashboard decides.
 - **Main** is the repo's default branch.
-- **Development** is the repo's `dev_branch` if given, else the first branch (alphabetically) matching `branches.development`, else the default branch. In that last case the dashboard says *default branch* next to the name, so a repo without a development branch is not shown as if it had one.
+- **Development** is the repo's `dev_branch` if given, else the first branch (alphabetically) matching `branches.development`. A repo with neither has no development branch: it is left out of the Development view (the note under the switch names it) and appears under Main, so its default branch is never shown as if it were a development branch.
 - A branch that does not exist (a wrong `dev_branch`) shows **Branch not found**.
 
 **Release sets.** `release_sets` names a release across repos that version themselves differently:
@@ -133,7 +133,7 @@ Both pages share one filter component (`assets/filters.js`).
 - Filters live in the address bar (`?sec=failing&tag=DPG`), so a link shares the view. A link from the main page to `deps.html?repo=network-adapter&vuln=any` opens with that repository ticked and the vulnerability filter on.
 - **Main page**: one bar filters every table at once (Repository, Tag, Security, Coverage, License risk, License, Vulnerabilities, Language). Security and Coverage follow the Development/Main switch. The release table has its own *Found as* and *Stability* filters and a *Show version* selector.
 - **Dependency page**: Repository, Ecosystem, License, License risk, Vulnerabilities, Group, Update status, and a text search.
-- Tests: `node --test tests/filters.test.mjs` (also run in CI before the dashboard is built).
+- Tests: `node --test tests/*.test.mjs` (also run in CI before the dashboard is built).
 
 ## Stack, dependencies and vulnerabilities
 
@@ -153,7 +153,7 @@ Both pages share one filter component (`assets/filters.js`).
 - **Fixed in** is the one version that fixes every fixable advisory. For an image it is the count of fixable findings, since the fixes belong to packages inside the image; the card behind it lists every advisory with its package and fixed version.
 - **`${VAR}` tags** are resolved from the repo's own compose defaults (`${VAR:-17}`) and `.env` example files.
 - **Main stack only.** The Stack column lists the repo's real languages and frameworks. `stack` in `config/repos.json` controls it: `ignore_languages`, `ignore_techs`, `max_languages`, `max_techs`, `min_share`.
-- **Development / Main.** Both the stack table and `deps.html` follow the same switch as the coverage tables, remembered across the two pages and kept in the address bar (`?branch=main`).
+- **Development / Main.** One switch at the top of each page, above the filters, sets the branch for every table on it (coverage and security, stack, dependencies). Its buttons show how many repositories each lists. **Development lists only repositories whose development branch was found** (their `dev_branch`, or a branch matching `branches.development`); a repository without one is not shown there, and the note under the switch names it. Main lists every repository's default branch. The choice is remembered across the two pages and kept in the address bar (`?branch=main`).
 - **Licenses with OR, AND and commas.** `A OR B` takes the better class, `A AND B` the worse; several licenses reported together (`MIT, Apache-2.0`) all apply, so the strictest counts.
 
 **Safety.** Clones, manifests, workflow files, image names and registry answers all come from outside, so: the clone uses no token; child processes (git, npx, docker, osv-scanner) get an allowlisted environment without `GH_TOKEN`; files are read only if they are regular files under 1 MB; names are validated before they reach an API path or a command; registry calls go only to public hosts over HTTPS, with the connected address, every redirect, the response size (5 MB) and the time to receive it (60 s) checked; and log lines have control characters replaced.
@@ -218,7 +218,7 @@ scripts/
     lookups/               what other services say: deps.dev, OSV, Actions, registries, image scans, releases, Terraform, stars
     rules/                 what the dashboard concludes: license class, why a value is missing, the shown name
     settings.py            the dependencies block, applied for the run
-tests/                     pytest for scripts/, node --test for assets/filters.js
+tests/                     pytest for scripts/, node --test for assets/filters.js and assets/branches.js
 ```
 
 ## Refreshing

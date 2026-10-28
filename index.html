@@ -20,10 +20,18 @@
     </div>
   </header>
   <p class="summary" id="summary">Reading the latest coverage reports.</p>
+  <div class="branchbar">
+    <span class="branchbar-label" id="branch-label">Branch</span>
+    <div class="switch" role="group" aria-labelledby="branch-label">
+      <button type="button" id="view-dev" aria-pressed="true">Development <span class="count" id="count-dev"></span></button>
+      <button type="button" id="view-main" aria-pressed="false">Main <span class="count" id="count-main"></span></button>
+    </div>
+    <p class="sub branch-note" id="branch-note" aria-live="polite"></p>
+  </div>
   <div id="filters"></div>
 
   <div class="tabs" role="tablist" aria-label="Sections">
-    <button type="button" role="tab" id="tab-dev" data-tab="dev" aria-controls="sec-dev" aria-selected="true">Development</button>
+    <button type="button" role="tab" id="tab-dev" data-tab="dev" aria-controls="sec-dev" aria-selected="true">Coverage and security</button>
     <button type="button" role="tab" id="tab-release" data-tab="release" aria-controls="sec-release" aria-selected="false" tabindex="-1">Latest release</button>
     <button type="button" role="tab" id="tab-stack" data-tab="stack" aria-controls="sec-stack" aria-selected="false" tabindex="-1">Stack and licenses</button>
     <button type="button" role="tab" id="tab-about" data-tab="about" aria-controls="sec-about" aria-selected="false" tabindex="-1">How this is measured</button>
@@ -31,14 +39,9 @@
 
   <section id="sec-dev" role="tabpanel" aria-labelledby="tab-dev">
     <div class="sec-head"><div>
-      <h2 id="dev-title">Development</h2>
-      <p class="sub" id="dev-note">Each repository's development branch: its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>, else the default branch.</p>
-    </div>
-      <div class="switch" role="group" aria-label="Branch to show">
-        <button type="button" id="view-dev" aria-pressed="true">Development</button>
-        <button type="button" id="view-main" aria-pressed="false">Main</button>
-      </div>
-    </div>
+      <h2 id="dev-title">Coverage and security</h2>
+      <p class="sub" id="dev-note">On the branch chosen above. A repository's development branch is its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>.</p>
+    </div></div>
     <div class="table-wrap"><table>
       <thead><tr><th scope="col">Repository</th><th scope="col">Code coverage</th><th scope="col">Security</th></tr></thead>
       <tbody id="dev-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
@@ -90,6 +93,7 @@
 </main>
 <script src="assets/filters.js"></script>
 <script src="assets/tabs.js"></script>
+<script src="assets/branches.js"></script>
 <script src="assets/index.js"></script>
 </body>
 </html>
