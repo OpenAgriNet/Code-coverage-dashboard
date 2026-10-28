@@ -6,6 +6,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 RETRY=Retry(total=3,backoff_factor=1,status_forcelist=(429,500,502,503,504),allowed_methods=None)  # public APIs rate-limit and blip; one retry round hides that
 from .versions import clean_version
+from .reasons import short_error
 OSV='https://api.osv.dev/v1'
 ECOSYSTEMS={'npm':'npm','python':'PyPI','golang':'Go'}  # stack-analyser ecosystem -> OSV ecosystem; docker and actions are not covered
 BATCH=500
@@ -78,5 +79,7 @@ def annotate(deps,post=post,fetch=get,log=lambda m:print(m,file=sys.stderr)):
       if vuln.get('withdrawn') or ids&seen:continue  # withdrawn, or the same advisory under another id (GHSA/PYSEC/CVE)
       seen|=ids;items.append(item(vuln,eco,d['name'],v))
      d['vulns']={'checked_version':v,'exact':bool(d.get('installed')) or is_exact(d['version']),**summarize(items)}
-    except Exception as e:log(f'WARN OSV advisory lookup failed for {d["name"]}: {e}')
-  except Exception as e:log(f'WARN OSV lookup failed for {len(chunk)} dependencies: {e}')
+    except Exception as e:d.setdefault('errors',{})['vulns']=f'OSV: {short_error(e)}';log(f'WARN OSV advisory lookup failed for {d["name"]}: {e}')
+  except Exception as e:
+   for d,_,_ in chunk:d.setdefault('errors',{})['vulns']=f'OSV: {short_error(e)}'
+   log(f'WARN OSV lookup failed for {len(chunk)} dependencies: {e}')

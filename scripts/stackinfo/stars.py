@@ -33,6 +33,17 @@ def hub_stars(name,get=None):
  if host!='registry-1.docker.io':return None
  r=(get or images._get)(f'https://hub.docker.com/v2/repositories/{path}/')
  return r.json().get('star_count') if r.status_code==200 else None
+def fill_licenses(deps,license_of=None):
+ """A package whose registry states no license takes its source repository's license (license_of 'source'),
+ e.g. a Go submodule deps.dev has no license for. A failed lookup leaves it empty."""
+ license_of=license_of or images.project_license
+ for d in deps:
+  if d.get('license') or d.get('license_of')=='error' or d.get('ecosystem') not in ('npm','python','golang'):continue
+  repo=source_repo(d)
+  if not repo:continue
+  try:lic=license_of(repo)
+  except Exception:continue
+  if lic:d.update(license=lic,license_of='source')
 def annotate(deps,api=project_stars,hub=hub_stars,cache=CACHE,log=lambda m:print(m,file=sys.stderr)):
  """Add stars and stars_of (where they were counted) to every dependency that has a known home. A failed lookup adds nothing."""
  for d in deps:

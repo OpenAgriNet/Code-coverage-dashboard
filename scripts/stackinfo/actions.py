@@ -4,6 +4,7 @@ GitHub's advisory database is used instead."""
 import re, sys
 import aggregate_coverage as ac
 from .vulns import summarize, vkey
+from .reasons import short_error
 SEV={'low':'LOW','medium':'MODERATE','moderate':'MODERATE','high':'HIGH','critical':'CRITICAL'}
 SHA=re.compile(r'[0-9a-f]{40}')
 FULL=re.compile(r'v?\d+\.\d+\.\d+.*')
@@ -63,5 +64,7 @@ def annotate(deps,api=ac.api,cache=CACHE,log=lambda m:print(m,file=sys.stderr)):
   if not NAME.fullmatch(key[0]) or '..' in key[0] or not REF.fullmatch(key[1]):log(f'WARN action reference not checked: {d["name"]}@{key[1]}');continue
   if key not in cache:
    try:cache[key]=lookup(*key,api)
-   except Exception as e:cache[key]={'license_of':'error','vulns':None};log(f'WARN GitHub lookup failed for action {d["name"]}@{key[1]}: {e}')
+   except Exception as e:
+    m=f'GitHub: {short_error(e)}';cache[key]={'license_of':'error','vulns':None,'errors':{'latest':m,'license':m,'vulns':m}}
+    log(f'WARN GitHub lookup failed for action {d["name"]}@{key[1]}: {e}')
   d.update({k:(dict(v) if isinstance(v,dict) else v) for k,v in cache[key].items()})

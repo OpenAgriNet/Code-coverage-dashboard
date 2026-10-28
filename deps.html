@@ -116,6 +116,8 @@ const FACETS=[
 // nil: the value exists but the dashboard could not get it; N/A: there is no such value for this dependency
 const local=d=>d.ecosystem==='githubAction'&&d.name.startsWith('./');
 const NIL=why=>`<span class="muted" title="${esc(why)}">nil</span>`,NA=why=>`<span class="muted" title="${esc(why)}">N/A</span>`;
+// the collector's reason for an empty value (scripts/stackinfo/reasons.py); null for data written before reasons existed
+const missingCell=(d,col)=>{const m=d.missing&&d.missing[col];return m?(m.state==='na'?NA(m.why):NIL(m.why)):null};
 // The findings card behind Fixed in: every advisory with its package, severity and fix
 let shown=[];
 function sevBadge(s){return `<span class="sev ${SEVCLASS[s]||'warn'}">${esc(s==='UNKNOWN'?'not rated':String(s).toLowerCase())}</span>`}
@@ -136,6 +138,7 @@ function openCard(d){
 function vulnCells(d){
   const q=d.vulns;
   if(local(d))return[NA('An action in this repository, not a published package'),NA('No vulnerabilities to fix')];
+  if(!q&&missingCell(d,'vulns'))return[missingCell(d,'vulns'),NA('Nothing was checked, so there is nothing to fix')];
   if(!q)return[NIL(d.ecosystem==='docker'?'Not scanned: the tag is an unresolved ${VAR}, the image could not be pulled anonymously (private, or built locally), or the scan failed':d.ecosystem==='githubAction'?'Not checked: pinned to a branch or a commit no release tag points at, or the GitHub lookup failed':LOOKED.includes(d.ecosystem)?'Not checked: the version is not exact or the lookup failed':'Not checked: vulnerability lookup does not cover this ecosystem yet'),NA('No known vulnerabilities to fix')];
   if(!q.count)return['<span class="good">None known</span>',NA('No known vulnerabilities to fix')];
   const cls=SEVCLASS[q.severity]||'warn',worst=q.severity==='UNKNOWN'?'severity not rated':q.severity.toLowerCase();
@@ -147,18 +150,19 @@ function vulnCells(d){
 }
 function licCell(d){
   if(d.license_of==='error')return '<span class="warn" title="deps.dev did not answer; this is not a missing license">Lookup failed</span>';
+  if(!d.license&&missingCell(d,'license'))return missingCell(d,'license');
   if(local(d))return NA('An action in this repository, not a published package');
   if(!d.license&&d.ecosystem==='docker')return NA('The image declares no license label and names no GitHub source repository');
   if(!d.license)return LOOKED.includes(d.ecosystem)?'<span class="muted">Unknown</span>':NIL('Not looked up: license lookup does not cover this ecosystem yet');
   const r=riskOf(d);
   const several=d.license.includes(', ')?' All of these licenses apply, so the strictest one counts.':'';
-  return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}${d.license_of==='label'?' <span class="sub" title="From the image\'s own license label (org.opencontainers.image.licenses)">(image label)</span>':d.license_of==='source'?' <span class="sub" title="The image has no license label; this is the license of the GitHub repository its source label names">(source repo)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
+  return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}${d.license_of==='source'&&d.ecosystem!=='docker'?' <span class="sub" title="The registry states no license; this is the license of the package\'s source repository">(source repo)</span>':''}${d.license_of==='label'?' <span class="sub" title="From the image\'s own license label (org.opencontainers.image.licenses)">(image label)</span>':d.license_of==='source'&&d.ecosystem==='docker'?' <span class="sub" title="The image has no license label; this is the license of the GitHub repository its source label names">(source repo)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
 }
 function row(d,single,i){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
   const shown=displayName(d),full=shown===d.name?'':` title="${esc(d.name)}"`;
   const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
-  const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):d.latest_of==='floating'?NA('A floating tag such as latest always points at the newest image'):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
+  const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):missingCell(d,'latest')?missingCell(d,'latest'):d.latest_of==='floating'?NA('A floating tag such as latest always points at the newest image'):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
   const [vc,fx]=vulnCells(d);
   const rs=(repos.find(r=>r.repository===d.repository)||{}).stars;
   const rk=riskOf(d),hl=rk==='red'||rk==='yellow'?` class="row-risk-${rk}"`:'';   // licenses to avoid or use with care stand out

@@ -10,6 +10,7 @@ from urllib3.connection import HTTPSConnection
 from urllib3.connectionpool import HTTPSConnectionPool
 from .analyser import child_env
 from .depsdev import D
+from .reasons import short_error
 from .vulns import SEVERITIES, normal, severity as osv_severity
 WORKERS=4
 MAX_ITEMS=50   # postgres alone has hundreds; the counts stay exact, the list keeps the worst
@@ -202,20 +203,21 @@ def project_license(repo):
 CACHE={}
 def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  license_of=license_of or project_license
- out={'latest':None,'latest_of':None,'vulns':None}
+ out={'latest':None,'latest_of':None,'vulns':None};errors={}
  try:
   if SHAPE.fullmatch(tag):out['latest']=latest_like(tag,tags_of(name));out['latest_of']='registry'
   else:
    # a floating tag (latest): find the version it points at today, then compare that version with the newest
    out['latest_of']='floating';ts=tags_of(name);v=resolve(name,tag,ts)
    if v:out.update(resolved=v,latest=latest_like(v,ts),latest_of='registry')
- except Exception as e:log(f'WARN registry tags failed for {name}: {e}')
+ except Exception as e:errors['latest']=short_error(e);log(f'WARN registry tags failed for {name}: {e}')
  try:
   res=scan(f'{name}:{tag}');labels=res.pop('labels',{})
   out['vulns']={'checked_version':tag,'exact':True,**res}
   lic,where=image_license(labels,license_of)
   if lic:out.update(license=lic,license_of=where)
- except Exception as e:log(f'WARN image scan failed for {name}:{tag}: {e}')
+ except Exception as e:errors['vulns']=errors['license']=short_error(e);log(f'WARN image scan failed for {name}:{tag}: {e}')
+ if errors:out['errors']=errors
  return out
 def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,file=sys.stderr),workers=WORKERS,is_public=public_host,resolve=version_of,license_of=None):
  """Fill latest, latest_of and vulns of every Docker image in deps. An unresolved ${VAR} tag, a malformed name, a refused pull or a

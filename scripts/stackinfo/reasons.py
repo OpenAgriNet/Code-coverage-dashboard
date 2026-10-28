@@ -1,0 +1,65 @@
+"""Why a dependency's latest version, license or vulnerability check is empty. Every empty value gets a reason, so the page never
+shows a bare blank: state 'na' when the value does not exist for this dependency, 'nil' when it exists but could not be found."""
+import re
+from .versions import clean_version
+
+LOOKED=('npm','python','golang')
+REGISTRY={'npm':'npm','python':'PyPI','golang':'the Go module proxy'}
+
+def _local(d):
+ return d.get('ecosystem')=='githubAction' and d.get('name','').startswith('./')
+def _var(d):
+ return '$' in str(d.get('version') or '')
+def latest_reason(d,err):
+ eco=d.get('ecosystem')
+ if _local(d):return 'na','An action inside this repository: it has no releases'
+ if eco=='docker':
+  if _var(d):return 'nil','The tag is an unresolved ${VAR}: no compose default or .env example sets it'
+  if err:return 'nil',f'Registry lookup failed: {err}'
+  if d.get('latest_of')=='floating':return 'nil','The floating tag matches none of the newest 30 version tags in the registry, so its version is unknown'
+  return 'nil','The registry lists no tag of the same shape as this one'
+ if eco=='githubAction':
+  if err:return 'nil',f'GitHub lookup failed: {err}'
+  return 'nil','The action repository publishes no releases or version tags'
+ if eco in LOOKED:
+  if d.get('license_of')=='error' or err:return 'nil',f'deps.dev lookup failed{": "+err if err else ""}'
+  if d.get('license_of')=='not found':return 'nil',f'Not published on {REGISTRY[eco]} (deps.dev has no record): installed from a URL, Git or a private index'
+  return 'nil','deps.dev lists no stable release'
+ return 'nil','Latest version is not looked up for this ecosystem'
+def license_reason(d,err):
+ eco=d.get('ecosystem')
+ if _local(d):return 'na','An action inside this repository, not a published package'
+ if eco=='docker':
+  if err:return 'nil',f'The image could not be read, so its labels are unknown: {err}'
+  return 'na','The image declares no license label and names no GitHub source repository'
+ if d.get('license_of')=='error':return 'nil',f'Lookup failed{": "+err if err else ""}; this is not a missing license'
+ if d.get('license_of')=='not found':return 'nil',f'Not published on {REGISTRY.get(eco,"its registry")}, and no source repository is known'
+ return 'nil','Neither the registry nor the source repository states a license'
+def vulns_reason(d,err):
+ eco=d.get('ecosystem')
+ if _local(d):return 'na','An action inside this repository, not a published package'
+ if _var(d):return 'nil','The version is an unresolved ${VAR}, so there is nothing to check'
+ if err:return 'nil',('Scan failed: ' if eco=='docker' else 'Lookup failed: ')+err
+ if eco=='githubAction':return 'nil','Pinned to a branch or to a commit no release tag points at, so no version to check'
+ if eco in LOOKED:
+  if not clean_version(d.get('installed') or d.get('version')):return 'nil','No version to check: the manifest gives no version and no lockfile pins one'
+  return 'nil','Not checked'
+ return 'nil','Vulnerabilities are not checked for this ecosystem'
+def explain(deps):
+ """Set d['missing'] = {column: {'state': 'na'|'nil', 'why': text}} for every empty latest, license and vulns, from the
+ errors the lookups left in d['errors'] (which is then removed)."""
+ for d in deps:
+  errs=d.pop('errors',None) or {};missing={}
+  if not d.get('latest') and not (d.get('ecosystem')=='docker' and d.get('latest_of')=='floating' and d.get('resolved')):
+   s,w=latest_reason(d,errs.get('latest'));missing['latest']={'state':s,'why':w}
+  if not d.get('license'):
+   s,w=license_reason(d,errs.get('license'));missing['license']={'state':s,'why':w}
+  if d.get('vulns') is None:
+   s,w=vulns_reason(d,errs.get('vulns'));missing['vulns']={'state':s,'why':w}
+  if missing:d['missing']=missing
+  else:d.pop('missing',None)
+def short_error(e,limit=150):
+ """The last line of an exception's text, without tokens or long URLs."""
+ s=str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
+ s=re.sub(r'(?i)(bearer|token)[=: ]+\S+',r'\1 [hidden]',s)
+ return s[:limit]

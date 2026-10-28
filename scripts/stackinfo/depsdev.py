@@ -5,6 +5,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from .versions import clean_version, latest_stable
+from .reasons import short_error
 DEPSDEV='https://api.deps.dev/v3/systems'
 SYSTEMS={'npm':'NPM','python':'PYPI','golang':'GO'}  # stack-analyser ecosystem -> deps.dev system; docker/githubAction have no license data there
 D=requests.Session()
@@ -33,5 +34,7 @@ def dep_info(eco,name,version,fetch=fetch):
     src=next((p['projectKey']['id'] for p in info.get('relatedProjects') or [] if p.get('relationType')=='SOURCE_REPO' and p.get('projectKey',{}).get('id')),None)
     if src:out['project']=src   # where the package is developed, for its star count
     break
- except Exception as e:out['license_of']='error';print(f'WARN deps.dev {eco}/{name}: {e}',file=sys.stderr)  # 'error' so a lookup failure is not shown as 'no license'
+ except Exception as e:  # 'error' so a lookup failure is not shown as 'no license'
+  m=f'deps.dev: {short_error(e)}';out.update(license_of='error',errors={'license':m,'latest':m})
+  print(f'WARN deps.dev {eco}/{name}: {e}',file=sys.stderr)
  return out
