@@ -90,3 +90,17 @@ def test_image_tag_nobody_defines_is_left_alone(tmp_path):
     src = _tree(tmp_path, {'node_modules/x/.env': 'TAG=9\n', 'compose.yaml': 'image: app:${TAG}\n'})
     raw = {'dependencies': [['docker', 'app', '${TAG}'], ['npm', 'left', '${TAG}']]}
     assert a.resolve_image_versions(raw, src)['dependencies'] == [['docker', 'app', '${TAG}'], ['npm', 'left', '${TAG}']]
+
+def test_symlinked_env_file_is_not_read(tmp_path):
+    secret = tmp_path / 'outside.env'
+    secret.write_text('TAG=leaked-secret\n')
+    src = _tree(tmp_path / 'repo', {'compose.yaml': 'image: app:${TAG}\n'})
+    os.symlink(secret, os.path.join(src, '.env'))
+    raw = {'dependencies': [['docker', 'app', '${TAG}']]}
+    assert a.resolve_image_versions(raw, src)['dependencies'][0][2] == '${TAG}'
+
+def test_oversized_env_file_is_not_read(tmp_path, monkeypatch):
+    monkeypatch.setattr(a, 'MAX_TEXT_BYTES', 10)
+    src = _tree(tmp_path, {'compose.yaml': 'image: app:${TAG}\n', '.env': 'TAG=1.2.3\n# padding padding\n'})
+    raw = {'dependencies': [['docker', 'app', '${TAG}']]}
+    assert a.resolve_image_versions(raw, src)['dependencies'][0][2] == '${TAG}'

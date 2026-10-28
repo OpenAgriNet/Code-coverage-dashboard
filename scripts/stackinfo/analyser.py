@@ -1,5 +1,5 @@
 """Run specfy/stack-analyser on a shallow clone and reduce its output."""
-import json, os, re, subprocess, tempfile
+import json, os, re, stat, subprocess, tempfile
 import aggregate_coverage as ac
 ANALYSER='@specfy/stack-analyser@1.27.6'
 SAFE_ENV=('PATH','HOME','TMPDIR','TEMP','TMP','LANG','LC_ALL','XDG_CACHE_HOME','RUNNER_TEMP')
@@ -27,14 +27,21 @@ def analyse(repo,branch):
   with open(os.path.join(tmp,'out.json'),encoding='utf-8') as f:raw=json.load(f)
   return resolve_image_versions(raw,src)
 SKIP_DIRS={'.git','node_modules','vendor','.venv'}
+MAX_TEXT_BYTES=1_000_000
 def _texts(src,want):
- """(path, text) of the files under src whose name passes want(name); unreadable files are skipped."""
+ """(path, text) of the files under src whose name passes want(name). Only regular files up to MAX_TEXT_BYTES are read:
+ the clone is untrusted, and a symlink such as .env -> /proc/self/environ would otherwise put the runner's secrets into
+ published versions (a FIFO or a huge file would hang the run). Unreadable files are skipped."""
  for root,dirs,files in os.walk(src):
   dirs[:]=[d for d in dirs if d not in SKIP_DIRS]
   for n in files:
    if not want(n):continue
+   p=os.path.join(root,n)
    try:
-    with open(os.path.join(root,n),encoding='utf-8',errors='replace') as f:yield os.path.join(root,n),f.read()
+    st=os.lstat(p)
+    if not stat.S_ISREG(st.st_mode) or st.st_size>MAX_TEXT_BYTES:continue
+    fd=os.open(p,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
+    with os.fdopen(fd,encoding='utf-8',errors='replace') as f:yield p,f.read(MAX_TEXT_BYTES)
    except OSError:continue
 def resolve_image_versions(raw,src):
  """stack-analyser keeps an image tag like ${POSTGRES_VERSION:-17} only up to the first colon. Replace such a tag with the value the
