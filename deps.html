@@ -84,10 +84,14 @@ const FACETS=[
   {key:'update',label:'Update status',get:updateOf,valueLabel:v=>UPDATE[v]||v,order:['behind','current','unknown']},
 ];
 
+// nil: the value exists but the dashboard could not get it; N/A: there is no such value for this dependency
+const local=d=>d.ecosystem==='githubAction'&&d.name.startsWith('./');
+const NIL=why=>`<span class="muted" title="${esc(why)}">nil</span>`,NA=why=>`<span class="muted" title="${esc(why)}">N/A</span>`;
 function vulnCells(d){
   const q=d.vulns;
-  if(!q)return['<span class="muted">Not checked</span>','<span class="muted">—</span>'];
-  if(!q.count)return['<span class="good">None known</span>','<span class="muted">—</span>'];
+  if(local(d))return[NA('An action in this repository, not a published package'),NA('No vulnerabilities to fix')];
+  if(!q)return[NIL(LOOKED.includes(d.ecosystem)?'Not checked: the version is not exact or the lookup failed':'Not checked: vulnerability lookup does not cover this ecosystem yet'),NA('No known vulnerabilities to fix')];
+  if(!q.count)return['<span class="good">None known</span>',NA('No known vulnerabilities to fix')];
   const cls=SEVCLASS[q.severity]||'warn',worst=q.severity==='UNKNOWN'?'severity not rated':q.severity.toLowerCase();
   const list=q.items.map(i=>`<li><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.cve||i.id)}</a> <span class="sev ${SEVCLASS[i.severity]||'warn'}">${esc(i.severity==='UNKNOWN'?'not rated':i.severity.toLowerCase())}</span> ${esc(i.summary)} — ${i.fixed?`fixed in <code>${esc(i.fixed)}</code>`:'no fix released'}</li>`).join('');
   const note=q.exact?'':`<div class="sub">Checked at ${esc(q.checked_version)}, the lowest version the range allows</div>`;
@@ -96,7 +100,8 @@ function vulnCells(d){
 }
 function licCell(d){
   if(d.license_of==='error')return '<span class="warn" title="deps.dev did not answer; this is not a missing license">Lookup failed</span>';
-  if(!d.license)return `<span class="muted">${LOOKED.includes(d.ecosystem)?'Unknown':'Not looked up'}</span>`;
+  if(local(d))return NA('An action in this repository, not a published package');
+  if(!d.license)return LOOKED.includes(d.ecosystem)?'<span class="muted">Unknown</span>':NIL('Not looked up: license lookup does not cover this ecosystem yet');
   const r=riskOf(d);
   const several=d.license.includes(', ')?' All of these licenses apply, so the strictest one counts.':'';
   return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
@@ -105,7 +110,7 @@ function row(d,single){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
   const shown=d.ecosystem==='docker'?image(d.name).short:d.name,full=shown===d.name?'':` title="${esc(d.name)}"`;
   const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
-  const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:esc(d.latest||'—');
+  const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
   const [vc,fx]=vulnCells(d);
   return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code></td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
 }

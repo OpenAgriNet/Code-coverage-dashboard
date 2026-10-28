@@ -67,3 +67,26 @@ def test_analyse_reports_a_failed_clone_readably(monkeypatch):
     import pytest
     with pytest.raises(RuntimeError, match='^private repository: not analysed'):
         a.analyse('infra-automation', 'main')
+
+def _tree(tmp_path, files):
+    for name, text in files.items():
+        p = tmp_path / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+    return str(tmp_path)
+
+def test_image_tag_from_compose_default(tmp_path):
+    src = _tree(tmp_path, {'docker-compose.yml': 'services:\n  db:\n    image: docker.io/postgres:${POSTGRES_VERSION:-17}\n'})
+    raw = {'dependencies': [['docker', 'docker.io/postgres', '${POSTGRES_VERSION'], ['docker', 'redis', 'latest']]}
+    assert a.resolve_image_versions(raw, src)['dependencies'] == [['docker', 'docker.io/postgres', '17'], ['docker', 'redis', 'latest']]
+
+def test_image_tag_from_env_example_when_compose_has_no_default(tmp_path):
+    src = _tree(tmp_path, {'quick-start/docker-compose.yml': 'image: ghcr.io/x/core:${REGISTRY_IMAGE_TAG}\n',
+                           'quick-start/.env.example': '# tags\nREGISTRY_IMAGE_TAG=v2.0.0\n'})
+    raw = {'dependencies': [['docker', 'ghcr.io/x/core', '${REGISTRY_IMAGE_TAG}']]}
+    assert a.resolve_image_versions(raw, src)['dependencies'][0][2] == 'v2.0.0'
+
+def test_image_tag_nobody_defines_is_left_alone(tmp_path):
+    src = _tree(tmp_path, {'node_modules/x/.env': 'TAG=9\n', 'compose.yaml': 'image: app:${TAG}\n'})
+    raw = {'dependencies': [['docker', 'app', '${TAG}'], ['npm', 'left', '${TAG}']]}
+    assert a.resolve_image_versions(raw, src)['dependencies'] == [['docker', 'app', '${TAG}'], ['npm', 'left', '${TAG}']]
