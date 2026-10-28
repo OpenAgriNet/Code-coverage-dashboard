@@ -43,7 +43,7 @@ def license_policy(raw):
  """{'green': [...], 'yellow': [...], 'red': [...], 'labels': {...}}: SPDX ids or patterns such as GPL-*, and the name the
  dashboard shows for each list. The same entry in two lists is an error."""
  if raw is None:raw={}
- if not isinstance(raw,dict) or set(raw)-{*LICENSE_CLASSES,'labels'}:raise ConfigError(f'licenses: use only the keys {", ".join(LICENSE_CLASSES)}, labels')
+ if not isinstance(raw,dict) or set(raw)-{*LICENSE_CLASSES,'labels','no_license'}:raise ConfigError(f'licenses: use only the keys {", ".join(LICENSE_CLASSES)}, labels, no_license')
  out={};seen={}
  for c in LICENSE_CLASSES:
   out[c]=name_list(raw,c,'licenses')
@@ -53,6 +53,9 @@ def license_policy(raw):
  if not isinstance(labels,dict) or set(labels)-set(LICENSE_CLASSES) or not all(isinstance(v,str) and v.strip() for v in labels.values()):
   raise ConfigError(f'licenses.labels: map {", ".join(LICENSE_CLASSES)} to the names to show, for example {{"green": "Preferred"}}')
  out['labels']={**LICENSE_LABELS,**{k:v.strip() for k,v in labels.items()}}
+ # the class of a dependency or repository that nothing states a license for; None leaves it unclassified
+ out['no_license']=raw.get('no_license')
+ if out['no_license'] not in (None,*LICENSE_CLASSES):raise ConfigError(f'licenses.no_license must be one of {", ".join(LICENSE_CLASSES)} (or left out)')
  return out
 # The dependency scan. Every key is optional; a list or map given here replaces the default rather than extending it.
 DEPENDENCY_DEFAULTS={
@@ -66,6 +69,8 @@ DEPENDENCY_DEFAULTS={
  'license_aliases':{'apache license 2.0':'Apache-2.0','apache license, version 2.0':'Apache-2.0','apache 2.0':'Apache-2.0','apache-2':'Apache-2.0',
   'apache2':'Apache-2.0','mit license':'MIT','the mit license':'MIT','bsd':'BSD-3-Clause','gplv3':'GPL-3.0-only','gplv2':'GPL-2.0-only',
   'agplv3':'AGPL-3.0-only','mpl 2.0':'MPL-2.0'},
+ # an image's license when nothing machine-readable gives one: its GitHub repo (license looked up), or the license itself
+ 'image_sources':{},'image_licenses':{},
  'ecosystem_names':{'npm':'npm','python':'PyPI','golang':'Go','docker':'Docker','githubAction':'GitHub Action','terraform':'Terraform provider',
   'githubRelease':'GitHub release'},
 }
@@ -80,6 +85,12 @@ def _text_map(raw,where,lower_keys=False):
  if not isinstance(raw,dict) or not all(isinstance(k,str) and k.strip() and isinstance(v,str) and v.strip() for k,v in raw.items()):
   raise ConfigError(f'{where} must map names to names, for example {{"tests": "test"}}')
  return {(k.strip().lower() if lower_keys else k.strip()):v.strip() for k,v in raw.items()}
+GITHUB_REPO=re.compile(r'(?!\.)[A-Za-z0-9_.-]+/(?!\.)[A-Za-z0-9_.-]+')
+def _image_sources(raw):
+ out=_text_map(raw,'dependencies.image_sources')
+ bad=[f'{k}: {v}' for k,v in out.items() if not GITHUB_REPO.fullmatch(v)]
+ if bad:raise ConfigError(f'dependencies.image_sources must map an image to a GitHub repository written owner/repo; not: {", ".join(bad)}')
+ return out
 def dependency_settings(raw):
  """The dependency scan's switches, limits and names: config/repos.json's "dependencies" block over DEPENDENCY_DEFAULTS."""
  D=DEPENDENCY_DEFAULTS;raw=_keys(raw,D,'dependencies')
@@ -99,7 +110,9 @@ def dependency_settings(raw):
  tf['trusted_registries']=name_list(tf,'trusted_registries','dependencies.terraform')
  return {'checks':checks,'images':images,'groups':groups,'terraform':tf,
   'license_aliases':_text_map(raw.get('license_aliases',D['license_aliases']),'dependencies.license_aliases',lower_keys=True),
-  'ecosystem_names':{**D['ecosystem_names'],**_text_map(raw.get('ecosystem_names',{}),'dependencies.ecosystem_names')}}
+  'ecosystem_names':{**D['ecosystem_names'],**_text_map(raw.get('ecosystem_names',{}),'dependencies.ecosystem_names')},
+  'image_sources':_image_sources(raw.get('image_sources',{})),
+  'image_licenses':_text_map(raw.get('image_licenses',{}),'dependencies.image_licenses')}
 def releases(raw,base,where):
  """Effective release-finding settings: `base` (or the defaults) overridden by `raw`. None when `raw` is false (releases off)."""
  if raw is False:return None

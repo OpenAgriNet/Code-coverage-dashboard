@@ -32,14 +32,17 @@ def latest_reason(d,err):
   return 'nil','deps.dev lists no stable release'
  return 'nil','Latest version is not looked up for this ecosystem'
 def license_reason(d,err):
+ """(state, why, kind). kind 'none' means every place that could state a license was read and none does: the policy's
+ no_license class applies to it. 'error', 'off' and 'na' are not a missing license."""
  eco=d.get('ecosystem')
- if _local(d):return 'na','An action inside this repository, not a published package'
+ if _local(d):return 'na','An action inside this repository, not a published package','na'
  if eco=='docker':
-  if err:return 'nil',f'The image could not be read, so its labels are unknown: {err}'
-  return 'na','The image declares no license label and names no GitHub source repository'
- if d.get('license_of')=='error':return 'nil',f'Lookup failed{": "+err if err else ""}; this is not a missing license'
- if d.get('license_of')=='not found':return 'nil',f'Not published on {REGISTRY.get(eco,"its registry")}, and no source repository is known'
- return 'nil','Neither the registry nor the source repository states a license'
+  if err:return 'nil',f'The image could not be read, so its labels are unknown: {err}','error'
+  return 'nil',('No license found: the image has no license label, its source label names no GitHub repository, config/repos.json '
+   'gives none (dependencies.image_licenses or image_sources), and no package inside it is named like the image'),'none'
+ if d.get('license_of')=='error':return 'nil',f'Lookup failed{": "+err if err else ""}; this is not a missing license','error'
+ if d.get('license_of')=='not found':return 'nil',f'No license found: not published on {REGISTRY.get(eco,"its registry")}, and no source repository is known','none'
+ return 'nil','No license found: neither the registry nor the source repository states a license','none'
 def vulns_reason(d,err):
  eco=d.get('ecosystem')
  if _local(d):return 'na','An action inside this repository, not a published package'
@@ -61,19 +64,20 @@ def turned_off(d,col):
  return name if name and not settings.check(name) else None
 def reason(col,d,err):
  off=turned_off(d,col)
- if off:return 'nil',f'Not looked up: dependencies.checks.{off} is turned off in config/repos.json'
- return {'latest':latest_reason,'license':license_reason,'vulns':vulns_reason}[col](d,err)
+ if off:return 'nil',f'Not looked up: dependencies.checks.{off} is turned off in config/repos.json','off'
+ got={'latest':latest_reason,'license':license_reason,'vulns':vulns_reason}[col](d,err)
+ return got if len(got)==3 else (*got,None)
 def explain(deps):
  """Set d['missing'] = {column: {'state': 'na'|'nil', 'why': text}} for every empty latest, license and vulns, from the
  errors the lookups left in d['errors'] (which is then removed)."""
  for d in deps:
   errs=d.pop('errors',None) or {};missing={}
   if not d.get('latest') and not (d.get('ecosystem')=='docker' and d.get('latest_of')=='floating' and d.get('resolved')):
-   s,w=reason('latest',d,errs.get('latest'));missing['latest']={'state':s,'why':w}
+   s,w,_=reason('latest',d,errs.get('latest'));missing['latest']={'state':s,'why':w}
   if not d.get('license'):
-   s,w=reason('license',d,errs.get('license'));missing['license']={'state':s,'why':w}
+   s,w,k=reason('license',d,errs.get('license'));missing['license']={'state':s,'why':w,'kind':k}
   if d.get('vulns') is None:
-   s,w=reason('vulns',d,errs.get('vulns'));missing['vulns']={'state':s,'why':w}
+   s,w,_=reason('vulns',d,errs.get('vulns'));missing['vulns']={'state':s,'why':w}
   if missing:d['missing']=missing
   else:d.pop('missing',None)
 def short_error(e,limit=150):

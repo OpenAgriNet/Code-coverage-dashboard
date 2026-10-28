@@ -110,3 +110,25 @@ def test_unlisted_adds_what_the_analyser_missed():
              ('python', 'en-core-web-sm'): {'name': 'en-core-web-sm', 'declared': None, 'installed': None, 'groups': ['main'], 'sources': ['pyproject.toml']}}
     rows = [['python', 'fastapi', '0.1'], ['python', 'en_core_web_sm', 'latest']]
     assert m.unlisted(found, rows) == [['python', 'pytest', '>=9.1.1'], ['python', 'ruff', '0.16.4']]
+
+def test_go_mod_blocks_for_requires_and_tools(tmp_path):
+    src = tree(tmp_path, {'go.mod': (
+        'module x\n\ngo 1.24\n\n'
+        'require (\n\tgithub.com/a/b v1.2.0 // pinned for a fix\n\tgithub.com/c/d v0.1.0 // indirect\n)\n\n'
+        'tool (\n\tgithub.com/sqlc-dev/sqlc/cmd/sqlc\n\tgolang.org/x/tools/cmd/stringer // codegen\n)\n'
+        'require github.com/e/f v2.0.0\ntool golang.org/x/vuln/cmd/govulncheck\n')})
+    got = m.read(src)
+    assert got[('golang', 'github.com/a/b')] == {'name': 'github.com/a/b', 'declared': 'v1.2.0', 'groups': ['main'], 'installed': None, 'sources': ['go.mod']}
+    assert got[('golang', 'github.com/e/f')]['groups'] == ['main'] and ('golang', 'github.com/c/d') not in got
+    # no require provides these tools, so their package paths stay as they are
+    assert [k[1] for k, e in got.items() if e['groups'] == ['tool']] == ['github.com/sqlc-dev/sqlc/cmd/sqlc', 'golang.org/x/tools/cmd/stringer', 'golang.org/x/vuln/cmd/govulncheck']
+    assert not any(k[1] in ('(', ')') for k in got)
+
+def test_a_tool_is_listed_as_the_module_that_provides_it(tmp_path):
+    src = tree(tmp_path, {'tools/go.mod': (
+        'module tools\n\ntool (\n\tgithub.com/golangci/golangci-lint/v2/cmd/golangci-lint\n\tgolang.org/x/vuln/cmd/govulncheck\n)\n\n'
+        'require (\n\tgithub.com/golangci/golangci-lint/v2 v2.5.0 // indirect\n\tgolang.org/x/vuln v1.1.4 // indirect\n\tgolang.org/x v0.0.1 // indirect\n)\n')})
+    got = m.read(src)
+    assert got[('golang', 'github.com/golangci/golangci-lint/v2')] == {'name': 'github.com/golangci/golangci-lint/v2', 'declared': 'v2.5.0', 'groups': ['tool'], 'installed': None, 'sources': ['tools/go.mod']}
+    assert got[('golang', 'golang.org/x/vuln')]['declared'] == 'v1.1.4'   # the longest matching module, not golang.org/x
+    assert len(got) == 2   # indirect requires that provide no tool are not listed

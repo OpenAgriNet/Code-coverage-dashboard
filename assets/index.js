@@ -103,7 +103,8 @@ let stack=null;
 const licensable=d=>!(d.ecosystem==='githubAction'&&d.name.startsWith('./'));
 function stackRow(r){
   const url=repoUrl(r),deps=r.dependencies||[],langs=(r.languages||[]).slice(0,3).map(l=>l[0]).join(' · '),techs=r.techs||[];
-  const lic=r.license?`<span class="lic risk risk-${esc(r.license_class||'unclassified')}" title="${esc(RISK[r.license_class||'unclassified'])}"><span class="dot" aria-hidden="true"></span>${esc(r.license)}</span><span class="sr"> (${esc(RISK[r.license_class||'unclassified'])})</span>`:'<span class="lic none">No LICENSE file</span>';
+  const lic=r.license?`<span class="lic risk risk-${esc(r.license_class||'unclassified')}" title="${esc(RISK[r.license_class||'unclassified'])}"><span class="dot" aria-hidden="true"></span>${esc(r.license)}</span><span class="sr"> (${esc(RISK[r.license_class||'unclassified'])})</span>`   // a class here is the policy's no_license class
+    :r.license_class?`<span class="lic risk risk-${esc(r.license_class)}" title="${esc('No LICENSE file. '+RISK[r.license_class]+' under the license policy (licenses.no_license).')}"><span class="dot" aria-hidden="true"></span>No LICENSE file</span><span class="sr"> (${esc(RISK[r.license_class])})</span>`:'<span class="lic none">No LICENSE file</span>';
   const vuln=deps.filter(d=>d.vulns&&d.vulns.count).length,known=deps.filter(d=>d.license).length,pkgs=deps.filter(licensable).length;
   const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
     :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} with a known license`:'Local actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
@@ -135,7 +136,7 @@ function repoItems(){
     const s=st[r.repository]||{},deps=s.dependencies||[],c=isNum(r.coverage)?+r.coverage:null;
     const vul=!deps.some(d=>d.vulns)?['unchecked']:!deps.some(d=>d.vulns&&d.vulns.count)?['none']:deps.some(d=>d.vulns&&(d.vulns.severity==='CRITICAL'||d.vulns.severity==='HIGH'))?['any','critical-high']:['any'];
     return {repository:r.repository,tags:r.tags||(r.dpg?['DPG']:[]),sec:(r.security||{}).state||'unknown',cov:c===null?'none':c>=80?'high':c>=50?'mid':'low',
-      license:stack?(s.license||'(no LICENSE file)'):null,risk:stack?(s.license?s.license_class||'unclassified':'none'):null,vuln:stack?vul:null,
+      license:stack?(s.license||'(no LICENSE file)'):null,risk:stack?(s.license?s.license_class||'unclassified':s.license_class||'none'):null,vuln:stack?vul:null,
       langs:(s.languages||[]).map(l=>l[0])};
   });
 }

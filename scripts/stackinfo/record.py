@@ -30,9 +30,11 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   'stars':None,'license':None,'license_class':None,'languages':[],'techs':[],'dependencies':[],'error':None}
  try:out['stars']=repo_stars(repo)
  except Exception as e:warn(f'WARN stars {repo}: {e}')
- try:out['license']=repo_license(repo)
+ looked=False
+ try:out['license']=repo_license(repo);looked=True
  except Exception as e:warn(f'WARN license {repo}: {e}')
- out['license_class']=classify(out['license'],policy)
+ # a repository GitHub finds no LICENSE file in has no license: the policy's no_license class (a failed lookup is not that)
+ out['license_class']=classify(out['license'],policy) if out['license'] or not looked else policy.get('no_license')
  try:
   branch=out['branch']=t.get('branch') or github.default_branch(repo)
   raw=analyse(repo,branch);s=summarize(raw,stack);found=raw.get('manifests') or {}
@@ -50,5 +52,7 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   (licenses or fill_licenses)(out['dependencies'])
   for d in out['dependencies']:d['license_class']=classify(d.get('license'),policy)
   explain(out['dependencies'])   # every empty latest, license and vulns gets a reason
+  for d in out['dependencies']:
+   if ((d.get('missing') or {}).get('license') or {}).get('kind')=='none':d['license_class']=policy.get('no_license')   # nothing states a license
  except Exception as e:out['error']=str(e)[:180];warn(f'ERROR stack {repo}@{out["branch"]}: {e}')
  return out

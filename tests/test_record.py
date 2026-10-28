@@ -95,3 +95,23 @@ def test_stack_record_adds_packages_the_analyser_missed(monkeypatch):
     by = {d['name']: d for d in rec['dependencies']}
     assert by['pytest']['groups'] == ['dev'] and by['pytest']['installed'] == '9.1.2'
     assert by['aquasecurity/trivy']['groups'] == ['security'] and by['aquasecurity/trivy']['version'] == 'latest'
+
+def test_a_repo_and_a_dependency_without_a_license_take_the_no_license_class(monkeypatch):
+    monkeypatch.setattr(r, 'repo_license', lambda repo: None)
+    monkeypatch.setattr(r, 'explain', __import__('stackinfo.rules.reasons', fromlist=['explain']).explain)
+    raw = {'dependencies': [['npm', 'nolicense', '1.0.0'], ['npm', 'broken', '1.0.0'], ['npm', 'mit', '1.0.0']]}
+    info = lambda e, n, v: {'ecosystem': e, 'name': n, 'version': v, 'latest': v, 'license': 'MIT' if n == 'mit' else None,
+                            'license_of': 'error' if n == 'broken' else None}
+    rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw, info=info, vulns=lambda d: None,
+                         actions=lambda d: None, images=lambda d: None, policy={'green': ['MIT'], 'no_license': 'red'})
+    by = {d['name']: d for d in rec['dependencies']}
+    assert rec['license_class'] == 'red'                                   # no LICENSE file
+    assert by['nolicense']['license_class'] == 'red' and by['mit']['license_class'] == 'green'
+    assert by['broken']['license_class'] is None                           # a failed lookup is not a missing license
+
+def test_a_failed_repo_license_lookup_is_not_no_license(monkeypatch):
+    def boom(repo):
+        raise RuntimeError('502')
+    monkeypatch.setattr(r, 'repo_license', boom)
+    rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: {}, policy={'no_license': 'red'})
+    assert rec['license_class'] is None

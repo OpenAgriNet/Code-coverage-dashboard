@@ -8,6 +8,25 @@ from stackinfo.lookups.imagescan import scan, image_license
 from stackinfo.lookups.projects import project_license
 from stackinfo import settings
 CACHE={}
+def configured(name,key):
+ """The value config/repos.json gives this image under dependencies.<key>, whichever way the image is spelled there."""
+ return {canonical(k):v for k,v in settings.get(key).items()}.get(canonical(name))
+def license_for(name,labels,main,license_of):
+ """(license, where, from) for an image, the first that gives one: the license config/repos.json states for it
+ (dependencies.image_licenses), its GitHub repository named there (dependencies.image_sources), its own license label, the
+ repository its source label names, or the license of its own program inside it (main package). None when none does.
+ labels and main are None when the image could not be scanned; the config still applies then."""
+ lic=configured(name,'image_licenses')
+ if lic:return lic,'config',None
+ repo=configured(name,'image_sources')
+ if repo:
+  lic=license_of(repo)
+  if lic:return lic,'repo',f'github.com/{repo}'
+ if labels:
+  lic,where=image_license(labels,license_of)
+  if lic:return lic,where,None
+ if main:return main[0],'package',main[1]
+ return None
 def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  license_of=license_of or project_license
  out={'latest':None,'latest_of':None,'vulns':None};errors={}
@@ -18,15 +37,16 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
    out['latest_of']='floating';ts=tags_of(name);v=resolve(name,tag,ts)
    if v:out.update(resolved=v,latest=latest_like(v,ts),latest_of='registry')
  except Exception as e:errors['latest']=short_error(e);log(f'WARN registry tags failed for {name}: {e}')
+ res=None
  try:res=scan(f'{name}:{tag}')
- except Exception as e:errors['vulns']=errors['license']=short_error(e);log(f'WARN image scan failed for {name}:{tag}: {e}')
+ except Exception as e:errors['vulns']=short_error(e);log(f'WARN image scan failed for {name}:{tag}: {e}')
  else:
-  labels=res.pop('labels',{})
+  labels,main=res.pop('labels',{}),res.pop('main',None)
   out['vulns']={'checked_version':tag,'exact':True,**res}
-  try:lic,where=image_license(labels,license_of)
-  except Exception as e:errors['license']=short_error(e);log(f'WARN license lookup failed for {name}:{tag}: {e}')   # the scan itself succeeded
-  else:
-   if lic:out.update(license=lic,license_of=where)
+ try:lic=license_for(name,res and labels,res and main,license_of)
+ except Exception as e:lic=None;errors['license']=short_error(e);log(f'WARN license lookup failed for {name}:{tag}: {e}')
+ if lic:out.update(license=lic[0],license_of=lic[1],**({'license_from':lic[2]} if lic[2] else {}))
+ elif res is None and 'license' not in errors:errors['license']=errors['vulns']
  if errors:out['errors']=errors
  return out
 def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=warn,workers=None,is_public=public_host,resolve=version_of,license_of=None):
