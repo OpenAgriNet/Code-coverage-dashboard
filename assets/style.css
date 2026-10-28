@@ -134,3 +134,9 @@ tr.row-risk-red>td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
 .tabs [role=tab]:hover{color:var(--ink)}
 .tabs [role=tab][aria-selected="true"]{color:var(--ink);border-bottom-color:var(--link)}
 [role=tabpanel][hidden]{display:none}
+/* the Development / Main switch: one per page, above the filters, for every table on it */
+.branchbar{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:0 0 18px}
+.branchbar-label{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.switch .count{display:inline-block;min-width:1.6em;margin-left:6px;padding:0 6px;border-radius:999px;font-size:12px;font-weight:700;background:var(--line);color:var(--ink)}
+.switch button[aria-pressed="true"] .count{background:var(--surface)}
+.branch-note{margin:0;flex:1 1 320px}
