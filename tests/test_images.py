@@ -1,4 +1,5 @@
 import json, os, sys
+import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 from common import safehttp as sh
@@ -81,7 +82,7 @@ def test_scan_runs_osv_scanner_without_secrets(monkeypatch):
         class P: returncode = 1; stdout = json.dumps(SCAN); stderr = ''
         return P()
     got = sc.scan('postgres:17', run=run, binary='/bin/osv', docker=None)
-    assert seen['cmd'] == ['/bin/osv', 'scan', 'image', '--format', 'json', 'postgres:17'] and 'secret' not in seen['env'].values()
+    assert seen['cmd'] == ['/bin/osv', 'scan', 'image', '--all-packages', '--licenses=MIT', '--format', 'json', 'postgres:17'] and 'secret' not in seen['env'].values()
     assert got['count'] == 2 and got['severity'] == 'CRITICAL' and got['fixed_in'] is None and got['fixable'] == 1 and got['unfixed'] == 1
 
 def test_scan_error_exit_raises():
@@ -324,3 +325,46 @@ def test_a_source_repo_cannot_be_a_dot_path():
     assert sc.image_license({'org.opencontainers.image.source': 'https://github.com/apache/.'}, repo) == (None, None)
     assert sc.image_license({'org.opencontainers.image.source': 'https://github.com/apache/..'}, repo) == (None, None)
     assert sc.image_license({'org.opencontainers.image.source': 'https://github.com/apache/airflow'}, repo) == ('MIT', 'source')
+
+LOKI = {'results': [
+    {'source': {'path': '/usr/bin/loki', 'type': 'artifact'}, 'packages': [
+        {'package': {'name': 'github.com/redis/go-redis/v9', 'version': '9.18.0', 'ecosystem': 'Go'}, 'licenses': ['BSD-2-Clause']},
+        {'package': {'name': 'github.com/grafana/loki/v3', 'version': '3.7.9', 'ecosystem': 'Go'}, 'licenses': ['AGPL-3.0', 'Apache-2.0', 'AGPL-3.0']}]},
+    {'source': {'path': '/lib/apk/db/installed', 'type': 'os'}, 'packages': [
+        {'package': {'name': 'musl', 'version': '1.2', 'ecosystem': 'Alpine'}, 'licenses': ['MIT']}]}]}
+
+def test_the_main_package_is_the_one_named_like_the_image():
+    assert sc.main_package(LOKI, 'docker.io/grafana/loki:3.7.9') == ('AGPL-3.0, Apache-2.0', 'github.com/grafana/loki/v3 3.7.9')
+    minio = {'results': [{'packages': [{'package': {'name': 'minio', 'version': '0.2026', 'ecosystem': 'Wolfi'}, 'licenses': ['AGPL-3.0']}]}]}
+    assert sc.main_package(minio, 'cgr.dev/chainguard/minio:latest') == ('AGPL-3.0', 'minio 0.2026')
+
+def test_no_main_package_when_nothing_matches_or_the_license_is_unknown():
+    debian = {'results': [{'packages': [{'package': {'name': 'postgresql-17', 'version': '17.11', 'ecosystem': 'Debian:13'}, 'licenses': ['UNKNOWN']},
+                                        {'package': {'name': 'postgres', 'version': '17', 'ecosystem': 'Debian:13'}, 'licenses': ['UNKNOWN']}]}]}
+    assert sc.main_package(debian, 'docker.io/library/postgres:17') is None
+    assert sc.main_package(LOKI, 'docker.io/library/redis:7') is None
+
+@pytest.fixture
+def image_config():
+    from repoconfig import config
+    def apply(**block):
+        settings.configure(config.dependency_settings(block))
+    yield apply
+    settings.configure(config.dependency_settings(None))
+
+def test_license_order_config_first_then_labels_then_the_main_package(image_config):
+    repo = lambda r: {'jaegertracing/jaeger': 'Apache-2.0', 'o/labelled': 'MIT'}.get(r)
+    image_config(image_licenses={'postgres': 'PostgreSQL'}, image_sources={'jaegertracing/all-in-one': 'jaegertracing/jaeger'})
+    assert im.license_for('docker.io/library/postgres', None, None, repo) == ('PostgreSQL', 'config', None)   # any spelling, even unscanned
+    assert im.license_for('docker.io/jaegertracing/all-in-one', {}, None, repo) == ('Apache-2.0', 'repo', 'github.com/jaegertracing/jaeger')
+    labels = {'org.opencontainers.image.licenses': 'MIT'}
+    assert im.license_for('docker.io/x/y', labels, ('AGPL-3.0', 'y 1'), repo) == ('MIT', 'label', None)
+    assert im.license_for('docker.io/x/y', {}, ('AGPL-3.0', 'y 1'), repo) == ('AGPL-3.0', 'package', 'y 1')
+    assert im.license_for('docker.io/x/y', {}, None, repo) is None
+
+def test_a_configured_license_survives_a_failed_scan(image_config):
+    image_config(image_licenses={'postgres': 'PostgreSQL'})
+    def boom(ref):
+        raise RuntimeError('docker pull failed: denied')
+    got = im.lookup('docker.io/library/postgres', '17', lambda n: ['17'], boom, lambda m: None, resolve=lambda *a: None, license_of=lambda r: None)
+    assert got['license'] == 'PostgreSQL' and got['license_of'] == 'config' and got['vulns'] is None and set(got['errors']) == {'vulns'}

@@ -62,18 +62,35 @@ def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
    if pull.returncode!=0:
     last=(pull.stderr or '').strip().splitlines()
     raise RuntimeError(f'docker pull failed: {last[-1][:150] if last else "no output"}')
-  p=run([binary,'scan','image','--format','json',ref],capture_output=True,text=True,timeout=settings.get('images','scan_timeout'),env=env)
+  # --all-packages lists the packages without findings too, and --licenses gives each its license, so the image's own program can
+  # be found and its license read (the allowlist value is required by the flag; its violations are not used)
+  p=run([binary,'scan','image','--all-packages','--licenses=MIT','--format','json',ref],capture_output=True,text=True,timeout=settings.get('images','scan_timeout'),env=env)
   if docker:labels=_labels(run([docker,'image','inspect','--format','{{json .Config.Labels}}',ref],capture_output=True,text=True,env=env,timeout=DOCKER_TIMEOUT))
  finally:
   if docker and not had:
    try:run([docker,'image','rm','-f',ref],capture_output=True,env=env,timeout=DOCKER_TIMEOUT)
    except Exception as e:warn(f'WARN could not remove image {ref}: {e}')   # cleanup must not hide the scan's own error
- if p.returncode==128:return {**summarize([]),'labels':labels}   # no packages found in the image
+ if p.returncode==128:return {**summarize([]),'labels':labels,'main':None}   # no packages found in the image
  if p.returncode not in (0,1):
   last=(p.stderr or '').strip().splitlines()
   raise RuntimeError(f'osv-scanner exit {p.returncode}: {last[-1][:150] if last else "no output"}')
  if not (p.stdout or '').strip():raise RuntimeError('osv-scanner printed no result')   # exit 1 means findings, so empty output is an error, not a clean image
- return {**summarize(items_of(json.loads(p.stdout))),'labels':labels}
+ result=json.loads(p.stdout)
+ return {**summarize(items_of(result)),'labels':labels,'main':main_package(result,ref)}
+MAJOR=re.compile(r'/v\d+$')
+def main_package(result,ref):
+ """(license, package) of the image's own program, found by name among the packages osv-scanner lists: an OS package named like
+ the image (minio in minio), or a Go module whose path ends in the image's name (github.com/grafana/loki/v3 in loki). None
+ when no package matches or its license is unknown, as for Debian packages, whose database records no license."""
+ name=ref.rsplit('/',1)[-1].split('@')[0].split(':')[0].lower()
+ for res in result.get('results') or []:
+  for p in res.get('packages') or []:
+   pkg=p.get('package') or {};pname=str(pkg.get('name',''))
+   key=MAJOR.sub('',pname).rsplit('/',1)[-1].lower() if pkg.get('ecosystem')=='Go' else pname.lower()
+   if key!=name:continue
+   lics=[l for l in p.get('licenses') or [] if l and l.upper() not in ('UNKNOWN','NOASSERTION','NONE')]
+   if lics:return ', '.join(dict.fromkeys(lics)),f'{pname} {pkg.get("version","")}'.strip()   # all of them apply, as for deps.dev
+ return None
 def _labels(p):
  """The image's config labels from docker image inspect (read from the pulled image: no extra registry request)."""
  try:got=json.loads(p.stdout) if p.returncode==0 else None

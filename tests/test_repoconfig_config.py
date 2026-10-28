@@ -218,3 +218,12 @@ def test_invalid_dependency_settings(bad, msg):
 
 def test_the_shipped_config_loads():
     assert config.load('config/repos.json')['dependencies']['checks']['images'] is True
+
+def test_image_sources_and_licenses():
+    d = n(dependencies={'image_sources': {'jaegertracing/all-in-one': 'jaegertracing/jaeger'}, 'image_licenses': {'postgres': 'PostgreSQL'}})['dependencies']
+    assert d['image_sources'] == {'jaegertracing/all-in-one': 'jaegertracing/jaeger'} and d['image_licenses'] == {'postgres': 'PostgreSQL'}
+    assert n()['dependencies']['image_sources'] == {} and n()['dependencies']['image_licenses'] == {}
+    with pytest.raises(ConfigError, match='owner/repo'):
+        n(dependencies={'image_sources': {'postgres': 'https://github.com/postgres/postgres'}})
+    with pytest.raises(ConfigError, match='owner/repo'):
+        n(dependencies={'image_sources': {'postgres': 'postgres/..'}})

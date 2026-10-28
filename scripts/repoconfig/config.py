@@ -66,6 +66,8 @@ DEPENDENCY_DEFAULTS={
  'license_aliases':{'apache license 2.0':'Apache-2.0','apache license, version 2.0':'Apache-2.0','apache 2.0':'Apache-2.0','apache-2':'Apache-2.0',
   'apache2':'Apache-2.0','mit license':'MIT','the mit license':'MIT','bsd':'BSD-3-Clause','gplv3':'GPL-3.0-only','gplv2':'GPL-2.0-only',
   'agplv3':'AGPL-3.0-only','mpl 2.0':'MPL-2.0'},
+ # an image's license when nothing machine-readable gives one: its GitHub repo (license looked up), or the license itself
+ 'image_sources':{},'image_licenses':{},
  'ecosystem_names':{'npm':'npm','python':'PyPI','golang':'Go','docker':'Docker','githubAction':'GitHub Action','terraform':'Terraform provider',
   'githubRelease':'GitHub release'},
 }
@@ -80,6 +82,12 @@ def _text_map(raw,where,lower_keys=False):
  if not isinstance(raw,dict) or not all(isinstance(k,str) and k.strip() and isinstance(v,str) and v.strip() for k,v in raw.items()):
   raise ConfigError(f'{where} must map names to names, for example {{"tests": "test"}}')
  return {(k.strip().lower() if lower_keys else k.strip()):v.strip() for k,v in raw.items()}
+GITHUB_REPO=re.compile(r'(?!\.)[A-Za-z0-9_.-]+/(?!\.)[A-Za-z0-9_.-]+')
+def _image_sources(raw):
+ out=_text_map(raw,'dependencies.image_sources')
+ bad=[f'{k}: {v}' for k,v in out.items() if not GITHUB_REPO.fullmatch(v)]
+ if bad:raise ConfigError(f'dependencies.image_sources must map an image to a GitHub repository written owner/repo; not: {", ".join(bad)}')
+ return out
 def dependency_settings(raw):
  """The dependency scan's switches, limits and names: config/repos.json's "dependencies" block over DEPENDENCY_DEFAULTS."""
  D=DEPENDENCY_DEFAULTS;raw=_keys(raw,D,'dependencies')
@@ -99,7 +107,9 @@ def dependency_settings(raw):
  tf['trusted_registries']=name_list(tf,'trusted_registries','dependencies.terraform')
  return {'checks':checks,'images':images,'groups':groups,'terraform':tf,
   'license_aliases':_text_map(raw.get('license_aliases',D['license_aliases']),'dependencies.license_aliases',lower_keys=True),
-  'ecosystem_names':{**D['ecosystem_names'],**_text_map(raw.get('ecosystem_names',{}),'dependencies.ecosystem_names')}}
+  'ecosystem_names':{**D['ecosystem_names'],**_text_map(raw.get('ecosystem_names',{}),'dependencies.ecosystem_names')},
+  'image_sources':_image_sources(raw.get('image_sources',{})),
+  'image_licenses':_text_map(raw.get('image_licenses',{}),'dependencies.image_licenses')}
 def releases(raw,base,where):
  """Effective release-finding settings: `base` (or the defaults) overridden by `raw`. None when `raw` is false (releases off)."""
  if raw is False:return None

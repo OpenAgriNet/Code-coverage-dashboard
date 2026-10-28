@@ -46,6 +46,26 @@
     "max_techs": 6
   },
 
+  "dependencies": {
+    "image_sources": {
+      "clickhouse/clickhouse-server": "ClickHouse/ClickHouse",
+      "jaegertracing/all-in-one": "jaegertracing/jaeger",
+      "openzipkin/zipkin": "openzipkin/zipkin",
+      "grafana/grafana": "grafana/grafana",
+      "grafana/loki": "grafana/loki",
+      "otel/opentelemetry-collector-contrib": "open-telemetry/opentelemetry-collector-contrib",
+      "minio/minio": "minio/minio",
+      "minio/mc": "minio/mc",
+      "cgr.dev/chainguard/minio": "minio/minio",
+      "temporalio/auto-setup": "temporalio/temporal",
+      "temporalio/ui": "temporalio/ui"
+    },
+    "image_licenses": {
+      "postgres": "PostgreSQL",
+      "pgvector/pgvector": "PostgreSQL"
+    }
+  },
+
   "licenses": {
     "green": ["MIT", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Apache-2.0", "Zlib", "BSL-1.0", "PSF-2.0", "Python-2.0", "Unlicense", "CC0-1.0", "0BSD"],
     "yellow": ["MPL-2.0", "LGPL-*", "EPL-2.0", "CDDL-1.*"],
