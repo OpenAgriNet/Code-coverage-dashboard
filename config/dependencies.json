@@ -128,7 +128,7 @@
     "pgvector/pgvector": "PostgreSQL"
   },
   "license_aliases": {
-    "_note": "License texts found in image labels and the SPDX id they mean.",
+    "_note": "License texts found in image labels and in PyPI metadata (license text or classifier), and the license id they mean. LGPL with no version stated stays LGPL.",
     "apache license 2.0": "Apache-2.0",
     "apache license, version 2.0": "Apache-2.0",
     "apache 2.0": "Apache-2.0",
@@ -140,6 +140,8 @@
     "gplv3": "GPL-3.0-only",
     "gplv2": "GPL-2.0-only",
     "agplv3": "AGPL-3.0-only",
-    "mpl 2.0": "MPL-2.0"
+    "mpl 2.0": "MPL-2.0",
+    "lgpl with exceptions": "LGPL",
+    "gnu library or lesser general public license (lgpl)": "LGPL"
   }
 }
