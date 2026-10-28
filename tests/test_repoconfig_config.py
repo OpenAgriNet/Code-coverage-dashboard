@@ -183,8 +183,8 @@ def test_invalid_release_sets(bad, msg):
 def test_shipped_config_follows_the_new_shape():
     c = config.load('config/repos.json')
     assert [s['type'] for s in c['sources']] == ['query'] and all('fallback' not in s for s in c['sources'])
-    assert [r['name'] for r in c['repositories']] == ['infra-automation']
-    assert 'engineering-tracker' in c['exclude'] and c['security']['workflow'] == 'security.yml'
+    assert c['repositories'] == []   # infra-automation is private and the workflow cannot read it, so it is excluded
+    assert {'engineering-tracker', 'infra-automation'} <= set(c['exclude']) and c['security']['workflow'] == 'security.yml'
 
 def test_license_labels_default_and_can_be_renamed_one_at_a_time():
     assert n()['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Not to use'}
