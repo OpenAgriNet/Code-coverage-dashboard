@@ -1,7 +1,7 @@
 """Why a dependency's latest version, license or vulnerability check is empty. Every empty value gets a reason, so the page never
 shows a bare blank: state 'na' when the value does not exist for this dependency, 'nil' when it exists but could not be found."""
 import re
-from .versions import clean_version
+from common.versions import clean_version
 
 LOOKED=('npm','python','golang')
 REGISTRY={'npm':'npm','python':'PyPI','golang':'the Go module proxy'}

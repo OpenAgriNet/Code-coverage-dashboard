@@ -1,7 +1,7 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo.collect import collect
+from stackinfo.pipeline import collect
 
 def run(targets, defaults, logs=None):
     calls = []

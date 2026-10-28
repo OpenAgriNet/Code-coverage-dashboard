@@ -1,13 +1,12 @@
 """Known vulnerabilities of dependencies, from OSV.dev (Google's open vulnerability database; public API, no key or login).
 Only package names and versions are sent. They are checked at the declared version: the lowest one a range such as ^5.0.0 allows."""
-import re, sys
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 RETRY=Retry(total=3,backoff_factor=1,status_forcelist=(429,500,502,503,504),allowed_methods=None)  # public APIs rate-limit and blip; one retry round hides that
-from .log import warn
-from .versions import clean_version
-from .reasons import short_error
+from common.log import warn
+from common.versions import clean_version, is_exact, normal, vkey
+from stackinfo.rules.reasons import short_error
 OSV='https://api.osv.dev/v1'
 ECOSYSTEMS={'npm':'npm','python':'PyPI','golang':'Go'}  # stack-analyser ecosystem -> OSV ecosystem; docker and actions are not covered
 BATCH=500
@@ -19,15 +18,6 @@ def post(path,body):
  r=S.post(f'{OSV}{path}',json=body,timeout=60);r.raise_for_status();return r.json()
 def get(path):
  r=S.get(f'{OSV}{path}',timeout=30);r.raise_for_status();return r.json()
-PRE=re.compile(r'[-.]?(?:a|b|c|rc|dev|alpha|beta|pre)\d*',re.I)
-def vkey(v):
- """Sort key: the release numbers (padded to three), then a final release above its own pre-releases (2.0.0-rc.1 < 2.0.0)."""
- m=re.match(r'v?(\d+(?:\.\d+)*)(.*)$',str(v).strip())
- if not m:return ((0,0,0),0)
- nums=tuple(int(x) for x in m.group(1).split('.'))
- return (nums+(0,)*(3-len(nums)),0 if PRE.search(m.group(2)) else 1)
-def normal(name):
- return re.sub(r'[-_.]+','-',name).lower()
 def fixed_version(vuln,eco,name,version):
  """Lowest fixed version above `version` in this vulnerability's entries for the package, or None when nothing fixes it.
  Commit-hash (GIT) ranges are ignored."""
@@ -51,10 +41,6 @@ def item(vuln,eco,name,version):
 def details(vid,fetch):
  if vid not in DETAILS:DETAILS[vid]=fetch(f'/vulns/{vid}')
  return DETAILS[vid]
-def is_exact(declared):
- """A pin (1.2.3, v1.2.3, ==1.2.3, =1.2.3) rather than a range (^1.2.3, >=1, 1.x)."""
- d=re.sub(r'^={1,2}','',str(declared).strip())
- return bool(re.match(r'v?\d',d)) and not any(c in d for c in '^~<>=*|, x')
 def summarize(items):
  fixes=[i['fixed'] for i in items if i['fixed']]
  rank=lambda i:SEVERITIES.index(i['severity']) if i['severity'] in SEVERITIES else -1

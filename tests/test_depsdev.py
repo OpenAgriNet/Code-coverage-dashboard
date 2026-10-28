@@ -1,7 +1,7 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo import depsdev as d
+from stackinfo.lookups import depsdev as d
 
 def fake_fetch(responses):
     return lambda path: responses.get(path)

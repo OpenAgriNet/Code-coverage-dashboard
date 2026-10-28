@@ -1,7 +1,7 @@
 """Tools a repository's GitHub workflows install in their run steps: a release installed with curl ... install.sh | sh
 (Trivy), pip / pipx / uv tool installs, npm -g and npx, and go install. Each is grouped by what its workflow is for."""
 import os, re
-from .manifests import _add, _pep508, _pep508_version
+from stackinfo.sources.manifests import add_entry, pep508_name, pep508_version
 
 # Every quantifier is bounded: workflow files come from the tracked repos, and unbounded lazy matches here took quadratic time
 # (112 KB of 'install' repeated cost 8 s, 1 MB about ten minutes), enough to stall the nightly run.
@@ -26,18 +26,18 @@ def _pip(out,args,group,rel):
   if skip:skip=False;continue
   if w in TAKES_VALUE:skip=True;continue
   if w.startswith('-') or w in ('.','..') or '/' in w or w.startswith('$'):continue
-  n=_pep508(w)
-  if n:_add(out,'python',n,group,rel,_pep508_version(w))
+  n=pep508_name(w)
+  if n:add_entry(out,'python',n,group,rel,pep508_version(w))
 def _npm(out,arg,group,rel,first_only):
  for w in _words(arg)[:1] if first_only else _words(arg):
   if w.startswith('-') or w.startswith('$'):continue
   name,_,ver=w.rpartition('@') if w.rfind('@')>0 else (w,'','')
-  if re.fullmatch(r'(@[a-z0-9._-]+/)?[a-z0-9._-]+',name):_add(out,'npm',name,group,rel,ver or None)
+  if re.fullmatch(r'(@[a-z0-9._-]+/)?[a-z0-9._-]+',name):add_entry(out,'npm',name,group,rel,ver or None)
 def read(src,texts=None):
  """Found entries ({(ecosystem, key): {...}}, as manifests.read gives) for tools installed in .github/workflows/*.yml."""
  if texts is None:
-  from .analyser import _texts
-  texts=_texts
+  from stackinfo.sources.files import texts as read_texts
+  texts=read_texts
  out={}
  for path,text in texts(src,lambda n:n.endswith(('.yml','.yaml'))):
   rel=os.path.relpath(path,src).replace(os.sep,'/')
@@ -45,10 +45,10 @@ def read(src,texts=None):
   g=purpose(rel.rsplit('/',1)[-1])
   for m in CURL.finditer(text):
    v=next((w for w in _words(m.group(3)) if VERSION.fullmatch(w)),None)
-   _add(out,'githubRelease',f'{m.group(1)}/{m.group(2)}',g,rel,v or 'latest')
+   add_entry(out,'githubRelease',f'{m.group(1)}/{m.group(2)}',g,rel,v or 'latest')
   for m in PIP.finditer(text):_pip(out,m.group(1),g,rel)
   for m in NPM.finditer(text):_npm(out,m.group(1) or m.group(2),g,rel,first_only=bool(m.group(2)))
-  for m in GO.finditer(text):_add(out,'golang',m.group(1),g,rel,m.group(2))
+  for m in GO.finditer(text):add_entry(out,'golang',m.group(1),g,rel,m.group(2))
  return {k:{'name':e['name'],'declared':e['declared'],'groups':sorted(e['groups']),'installed':None,'sources':sorted(e['sources'])} for k,e in out.items()}
 def merge(found,tools):
  """Add workflow tools to the manifests' entries; a package both declares and installs in CI keeps both groups."""

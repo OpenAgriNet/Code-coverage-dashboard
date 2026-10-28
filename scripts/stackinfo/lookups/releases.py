@@ -1,14 +1,13 @@
 """Tools installed from a GitHub release (curl ... install.sh | sh), such as Trivy: latest release, the release an unpinned
 install gets today, and, when the tool is also a Go module (most release-installed CLIs are), its known vulnerabilities
 from OSV at that release."""
-import sys
 from urllib.parse import quote
-import aggregate_coverage as ac
-from .log import warn
-from .actions import NAME, latest as latest_release
-from .depsdev import fetch as depsdev_fetch
-from .reasons import short_error
-from .vulns import annotate as osv_annotate
+from common import github
+from common.log import warn
+from stackinfo.lookups.actions import NAME, latest as latest_release
+from stackinfo.lookups.depsdev import fetch as depsdev_fetch
+from stackinfo.lookups.osv import annotate as osv_annotate
+from stackinfo.rules.reasons import short_error
 CACHE={}
 
 def lookup(repo,version,api,is_go,check):
@@ -23,7 +22,7 @@ def lookup(repo,version,api,is_go,check):
  return out
 def is_go_module(mod):
  return depsdev_fetch(f'GO/packages/{quote(mod,safe="")}') is not None
-def annotate(deps,api=ac.api,is_go=is_go_module,check=osv_annotate,cache=CACHE,log=warn):
+def annotate(deps,api=github.api,is_go=is_go_module,check=osv_annotate,cache=CACHE,log=warn):
  for d in deps:
   if d.get('ecosystem')!='githubRelease':continue
   repo,ver=d['name'],str(d.get('version') or 'latest')

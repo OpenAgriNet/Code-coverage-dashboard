@@ -1,11 +1,12 @@
 """GitHub Actions: the exact version behind a tag such as v4, the latest release, the action repo's license and its known
 vulnerabilities, all from the GitHub API (GH_TOKEN). OSV holds Actions advisories but cannot match them to a version, so
 GitHub's advisory database is used instead."""
-import re, sys
-import aggregate_coverage as ac
-from .log import warn
-from .vulns import summarize, vkey
-from .reasons import short_error
+import re
+from common import github
+from common.log import warn
+from common.versions import vkey
+from stackinfo.lookups.osv import summarize
+from stackinfo.rules.reasons import short_error
 SEV={'low':'LOW','medium':'MODERATE','moderate':'MODERATE','high':'HIGH','critical':'CRITICAL'}
 SHA=re.compile(r'[0-9a-f]{40}')
 FULL=re.compile(r'v?\d+\.\d+\.\d+.*')
@@ -56,7 +57,7 @@ def lookup(repo,ref,api):
  if exact:out['vulns']={'checked_version':exact,'exact':True,**summarize(advisories(repo,exact,api))}
  return out
 CACHE={}
-def annotate(deps,api=ac.api,cache=CACHE,log=warn):
+def annotate(deps,api=github.api,cache=CACHE,log=warn):
  """Fill latest, license and vulns of every published action in deps (local ./ actions and other ecosystems are left alone).
  One lookup per action and ref per run; a failed lookup leaves vulns None (not checked) and marks license_of 'error'."""
  for d in deps:

@@ -1,8 +1,8 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo.reasons import explain, short_error
-from stackinfo import stars
+from stackinfo.rules.reasons import explain, short_error
+from stackinfo.lookups import stars
 
 def why(d):
     explain([d])

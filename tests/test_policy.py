@@ -2,7 +2,7 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 import pytest
-from stackinfo.policy import classify
+from stackinfo.rules.policy import classify
 
 P = {'green': ['MIT', 'Apache-2.0', 'BSD-*'], 'yellow': ['MPL-2.0', 'LGPL-*'], 'red': ['AGPL-*', 'GPL-*', 'SSPL-1.0']}
 

@@ -1,12 +1,11 @@
 """License and latest version of a dependency from deps.dev."""
-import sys
 from urllib.parse import quote
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from .log import warn
-from .versions import clean_version, latest_stable
-from .reasons import short_error
+from common.log import warn
+from common.versions import clean_version, latest_stable
+from stackinfo.rules.reasons import short_error
 DEPSDEV='https://api.deps.dev/v3/systems'
 SYSTEMS={'npm':'NPM','python':'PYPI','golang':'GO'}  # stack-analyser ecosystem -> deps.dev system; docker/githubAction have no license data there
 D=requests.Session()

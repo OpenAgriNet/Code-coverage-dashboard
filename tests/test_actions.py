@@ -1,7 +1,7 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo import actions as a
+from stackinfo.lookups import actions as a
 
 SHA = '55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
 ADVISORY = {'ghsa_id': 'GHSA-mrrh-fwg8-r2c3', 'cve_id': 'CVE-2025-30066', 'severity': 'high', 'withdrawn_at': None,

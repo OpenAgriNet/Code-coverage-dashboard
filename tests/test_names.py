@@ -1,7 +1,7 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo.names import short_name, add_short
+from stackinfo.rules.names import short_name, add_short
 
 def test_short_names_keep_the_last_segment_and_major_versions():
     cases = [('golang', 'github.com/google/uuid', 'uuid'), ('golang', 'github.com/jackc/pgerrcode', 'pgerrcode'),

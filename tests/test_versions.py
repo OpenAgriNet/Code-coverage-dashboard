@@ -1,7 +1,7 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo import versions as v
+from common import versions as v
 
 def ver(version, published, default=False):
     return {'versionKey': {'version': version}, 'publishedAt': published, 'isDefault': default}

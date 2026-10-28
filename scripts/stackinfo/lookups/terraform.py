@@ -1,11 +1,10 @@
 """Terraform / OpenTofu providers: the latest release from the provider registry, and the GitHub repository the provider is
 built from (registries require it to be named terraform-provider-<type>), which gives its license and stars."""
-import re, sys
-from .log import warn
-from .images import _get
-from .reasons import short_error
-from .versions import PRERELEASE
-from .vulns import vkey
+import re
+from common.log import warn
+from common.safehttp import get as _get
+from common.versions import PRERELEASE, vkey
+from stackinfo.rules.reasons import short_error
 NAME=re.compile(r'(?:(?P<host>[a-z0-9.-]+\.[a-z]{2,})/)?(?P<ns>[A-Za-z0-9_-]+)/(?P<type>[a-z0-9_-]+)')
 CACHE={}
 # Only these registries require a provider to be built from <namespace>/terraform-provider-<type>. On any other registry that name

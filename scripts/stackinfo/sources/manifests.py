@@ -1,7 +1,7 @@
 """Which group each dependency a project names is declared in (main, dev, test, security, optional...), and the exact version its
 lockfile installs. Only packages the project names itself; indirect packages in lockfiles are never listed."""
 import json, os, re, tomllib
-from .vulns import is_exact, normal
+from common.versions import is_exact, normal
 SPELLING={'tests':'test','testing':'test','develop':'dev','development':'dev'}
 NPM={'dependencies':'main','devDependencies':'dev','optionalDependencies':'optional','peerDependencies':'peer'}
 BY_ECOSYSTEM={'docker':'runtime','githubAction':'ci'}
@@ -12,21 +12,21 @@ def group_name(g):
  g=str(g).strip().lower();return SPELLING.get(g,g)
 def key(eco,name):
  return (eco,normal(name) if eco=='python' else name)
-def _add(out,eco,name,group,source,declared=None):
+def add_entry(out,eco,name,group,source,declared=None):
  e=out.setdefault(key(eco,name),{'name':name,'groups':set(),'installed':None,'sources':set(),'declared':None})
  e['groups'].add(group_name(group));e['sources'].add(source)
  if declared and not e['declared']:e['declared']=str(declared).strip()
-def _pep508(spec):
+def pep508_name(spec):
  m=PEP508.match(spec) if isinstance(spec,str) else None
  return m.group(1) if m else None
-def _pep508_version(spec):
+def pep508_version(spec):
  """The version part of 'pytest[extra]>=9.1.1 ; python_version>"3"' -> '>=9.1.1'."""
  rest=PEP508.sub('',spec.split(';',1)[0],count=1).strip()
  return re.sub(r'^\[[^\]]*\]','',rest).strip() or None
 def _npm(out,rel,text):
  d=json.loads(text)
  for field,group in NPM.items():
-  for name,spec in (d.get(field) or {}).items():_add(out,'npm',name,group,rel,spec if isinstance(spec,str) else None)
+  for name,spec in (d.get(field) or {}).items():add_entry(out,'npm',name,group,rel,spec if isinstance(spec,str) else None)
 def _pyproject(out,rel,text):
  d=tomllib.loads(text);proj=d.get('project') or {};poetry=(d.get('tool') or {}).get('poetry') or {}
  sets=[('main',proj.get('dependencies') or [])]
@@ -35,11 +35,11 @@ def _pyproject(out,rel,text):
  sets+=[('build',(d.get('build-system') or {}).get('requires') or [])]
  for g,specs in sets:
   for s in specs:
-   n=_pep508(s)
-   if n:_add(out,'python',n,g,rel,_pep508_version(s))
+   n=pep508_name(s)
+   if n:add_entry(out,'python',n,g,rel,pep508_version(s))
  for g,deps in [('main',poetry.get('dependencies') or {}),('dev',poetry.get('dev-dependencies') or {})]+[(g,(v or {}).get('dependencies') or {}) for g,v in (poetry.get('group') or {}).items()]:
   for n,spec in deps.items():
-   if n.lower()!='python':_add(out,'python',n,g,rel,spec if isinstance(spec,str) else (spec or {}).get('version') if isinstance(spec,dict) else None)
+   if n.lower()!='python':add_entry(out,'python',n,g,rel,spec if isinstance(spec,str) else (spec or {}).get('version') if isinstance(spec,dict) else None)
 def _requirements(out,rel,text):
  parts=rel.split('/');m=REQ.fullmatch(parts[-1])
  g=m.group('a') if m.group('a') else m.group('b') if len(parts)>1 and parts[-2]=='requirements' else None
@@ -47,8 +47,8 @@ def _requirements(out,rel,text):
  for line in text.splitlines():
   line=line.split('#',1)[0].strip()
   if not line or line.startswith('-'):continue
-  n=_pep508(line)
-  if n:_add(out,'python',n,g,rel,_pep508_version(line))
+  n=pep508_name(line)
+  if n:add_entry(out,'python',n,g,rel,pep508_version(line))
 def _gomod(out,rel,text):
  block=False
  for line in text.splitlines():
@@ -56,9 +56,9 @@ def _gomod(out,rel,text):
   if s.startswith('require ('):block=True;continue
   if block and s==')':block=False;continue
   if '// indirect' in s:continue
-  if s.startswith('tool ') and len(s.split())==2:_add(out,'golang',s.split()[1],'tool',rel);continue
+  if s.startswith('tool ') and len(s.split())==2:add_entry(out,'golang',s.split()[1],'tool',rel);continue
   body=s[len('require '):] if s.startswith('require ') and not s.endswith('(') else s if block else None
-  if body and len(body.split())>=2:_add(out,'golang',body.split()[0],'main',rel,body.split()[1])
+  if body and len(body.split())>=2:add_entry(out,'golang',body.split()[0],'main',rel,body.split()[1])
 def _locks(rel,text,name):
  """{(ecosystem, name): version} of the packages a lockfile installs at top level."""
  if name=='package-lock.json':
@@ -73,8 +73,8 @@ def read(src,texts=None):
  """{(ecosystem, name): {'groups': [...], 'installed': version or None, 'sources': [manifest paths]}} for every dependency a manifest
  under src names. Unparseable files are skipped. installed comes from a lockfile in the manifest's own directory."""
  if texts is None:
-  from .analyser import _texts   # regular, size-capped files only
-  texts=_texts
+  from stackinfo.sources.files import texts as read_texts   # regular, size-capped files only
+  texts=read_texts
  out={};locks={}
  for path,text in texts(src,wanted):
   rel=os.path.relpath(path,src).replace(os.sep,'/');base=rel.rsplit('/',1)[-1];d=os.path.dirname(rel)

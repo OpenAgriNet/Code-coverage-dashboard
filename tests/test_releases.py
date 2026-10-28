@@ -1,7 +1,8 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo import releases as rl, stars, reasons
+from stackinfo.lookups import releases as rl, stars
+from stackinfo.rules import reasons
 
 def test_unpinned_release_tool_is_checked_at_the_latest_release():
     api = lambda path: {'/repos/aquasecurity/trivy/releases/latest': {'tag_name': 'v0.70.0'}}.get(path)

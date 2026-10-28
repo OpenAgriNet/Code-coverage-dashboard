@@ -13,3 +13,16 @@ def latest_stable(versions):
  if d and stable(d):return d['versionKey']['version']
  s=max((v for v in versions if stable(v)),key=lambda v:v.get('publishedAt') or '',default=None)
  return (s or d or {}).get('versionKey',{}).get('version')
+PRE=re.compile(r'[-.]?(?:a|b|c|rc|dev|alpha|beta|pre)\d*',re.I)
+def vkey(v):
+ """Sort key: the release numbers (padded to three), then a final release above its own pre-releases (2.0.0-rc.1 < 2.0.0)."""
+ m=re.match(r'v?(\d+(?:\.\d+)*)(.*)$',str(v).strip())
+ if not m:return ((0,0,0),0)
+ nums=tuple(int(x) for x in m.group(1).split('.'))
+ return (nums+(0,)*(3-len(nums)),0 if PRE.search(m.group(2)) else 1)
+def normal(name):
+ return re.sub(r'[-_.]+','-',name).lower()
+def is_exact(declared):
+ """A pin (1.2.3, v1.2.3, ==1.2.3, =1.2.3) rather than a range (^1.2.3, >=1, 1.x)."""
+ d=re.sub(r'^={1,2}','',str(declared).strip())
+ return bool(re.match(r'v?\d',d)) and not any(c in d for c in '^~<>=*|, x')

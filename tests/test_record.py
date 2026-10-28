@@ -38,11 +38,11 @@ def test_stack_record_runs_vulnerability_check_on_the_dependencies(monkeypatch):
     assert rec['dependencies'] == [{'name': 'jinja2', 'groups': [], 'short': 'jinja2', 'vulns': {'count': 2}, 'license_class': None}]
 
 def test_repo_license(monkeypatch):
-    monkeypatch.setattr(r.ac, 'api', lambda p: {'license': {'spdx_id': 'MIT'}})
+    monkeypatch.setattr(r.github, 'api', lambda p: {'license': {'spdx_id': 'MIT'}})
     assert r.repo_license('na') == 'MIT'
-    monkeypatch.setattr(r.ac, 'api', lambda p: {'license': {'spdx_id': 'NOASSERTION'}})
+    monkeypatch.setattr(r.github, 'api', lambda p: {'license': {'spdx_id': 'NOASSERTION'}})
     assert r.repo_license('na') == 'Other'
-    monkeypatch.setattr(r.ac, 'api', lambda p: None)
+    monkeypatch.setattr(r.github, 'api', lambda p: None)
     assert r.repo_license('na') is None
 
 def test_stack_record_classifies_repo_and_dependency_licenses(monkeypatch):
@@ -57,7 +57,7 @@ def test_stack_record_survives_default_branch_failure(monkeypatch):
     monkeypatch.setattr(r, 'repo_license', lambda repo: 'MIT')
     def boom(repo):
         raise RuntimeError('502')
-    monkeypatch.setattr(r.ac, 'default_branch', boom)
+    monkeypatch.setattr(r.github, 'default_branch', boom)
     rec = r.stack_record({'name': 'na', 'branch': None}, analyse=lambda *a: {})
     assert rec['license'] == 'MIT' and rec['error'] == '502' and rec['dependencies'] == []
 

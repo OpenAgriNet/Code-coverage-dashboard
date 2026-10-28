@@ -2,7 +2,7 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 import pytest
-from stackinfo import vulns as v
+from stackinfo.lookups import osv as v
 
 def vuln(vid, name='jinja2', eco='PyPI', fixed=(), severity='HIGH', aliases=(), summary='s', rtype='ECOSYSTEM', **kw):
     events = [{'introduced': '0'}] + [{'fixed': f} for f in fixed]

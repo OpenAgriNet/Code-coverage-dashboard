@@ -1,7 +1,7 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo import stars as s
+from stackinfo.lookups import stars as s
 
 def test_source_repo_per_ecosystem():
     assert s.source_repo({'ecosystem': 'githubAction', 'name': 'github/codeql-action/init'}) == 'github/codeql-action'

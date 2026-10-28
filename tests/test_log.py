@@ -1,7 +1,7 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo import log
+from common import log
 
 def test_control_characters_never_reach_the_log(capsys):
     log.warn('WARN image x\n::add-mask::secret\r::stop-commands::t\x1b[31m')

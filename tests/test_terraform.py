@@ -1,7 +1,7 @@
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo import terraform as tf, stars
+from stackinfo.lookups import terraform as tf, stars
 
 class Resp:
     def __init__(self, body, status=200):

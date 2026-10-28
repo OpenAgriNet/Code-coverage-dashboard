@@ -1,7 +1,7 @@
 import json, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-from stackinfo import manifests as m
+from stackinfo.sources import manifests as m
 
 def tree(tmp_path, files):
     for name, text in files.items():
