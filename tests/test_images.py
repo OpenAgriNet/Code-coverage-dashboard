@@ -42,14 +42,14 @@ def test_tags_gets_an_anonymous_token_then_follows_pages():
         if url.endswith('n=1000'):
             return Resp(200, {'tags': ['1']}, {'Link': '</v2/a/b/tags/list?n=1000&last=1>; rel="next"'})
         return Resp(200, {'tags': ['2']})
-    assert im.tags('reg.example', 'a/b', get=get) == ['1', '2']
+    assert im.tags('reg.example', 'a/b', get=get, is_public=lambda h: True) == ['1', '2']
     assert calls[-1][0] == 'https://reg.example/v2/a/b/tags/list?n=1000&last=1' and calls[-1][1] == {'Authorization': 'Bearer anon'}
 
 def test_tags_refuses_a_non_https_token_realm():
     def get(url, headers=None, params=None):
         return Resp(401, headers={'WWW-Authenticate': 'Bearer realm="http://evil/token",service="x"'})
     try:
-        im.tags('reg.example', 'a/b', get=get)
+        im.tags('reg.example', 'a/b', get=get, is_public=lambda h: True)
         assert False
     except RuntimeError as e:
         assert 'realm' in str(e)
@@ -99,7 +99,7 @@ def test_annotate_fills_images_and_skips_unresolved_tags():
     def scan(ref):
         scanned.append(ref)
         return {'count': 0, 'severity': None, 'fixed_in': None, 'unfixed': 0, 'fixable': 0, 'items': []}
-    im.annotate(deps, tags_of=lambda name: ['16', '17', '18', 'latest'], scan=scan, cache={})
+    im.annotate(deps, tags_of=lambda name: ['16', '17', '18', 'latest'], scan=scan, cache={}, is_public=lambda h: True)
     assert deps[0]['latest'] == '18' and deps[0]['vulns']['count'] == 0 and deps[0]['vulns']['checked_version'] == '17'
     assert deps[1]['vulns'] is None and deps[1]['latest'] is None
     assert deps[2]['latest'] is None and deps[2]['latest_of'] == 'floating' and deps[2]['vulns'] is not None
@@ -110,12 +110,12 @@ def test_annotate_failures_stay_unchecked():
     def boom(*a):
         raise RuntimeError('denied')
     logs = []
-    im.annotate(deps, tags_of=boom, scan=boom, cache={}, log=logs.append)
+    im.annotate(deps, tags_of=boom, scan=boom, cache={}, log=logs.append, is_public=lambda h: True)
     assert deps[0]['vulns'] is None and deps[0]['latest'] is None and len(logs) == 2
 
 def test_malformed_image_names_are_not_fetched():
     deps = [{'ecosystem': 'docker', 'name': n, 'version': '1', 'latest': None, 'vulns': None} for n in ('evil.com/../x', 'a b', 'x;rm')]
-    im.annotate(deps, tags_of=lambda n: 1 / 0, scan=lambda r: 1 / 0, cache={}, log=lambda m: None)
+    im.annotate(deps, tags_of=lambda n: 1 / 0, scan=lambda r: 1 / 0, cache={}, log=lambda m: None, is_public=lambda h: True)
     assert all(d['vulns'] is None and d['latest'] is None for d in deps)
 
 def test_scan_removes_only_images_it_pulled():
@@ -133,3 +133,31 @@ def test_long_lists_keep_the_worst_items_and_exact_counts(monkeypatch):
     items = [{'id': str(n), 'severity': s, 'fixed': f, 'summary': str(n)} for n, (s, f) in enumerate([('LOW', None), ('CRITICAL', None), ('HIGH', '2'), ('CRITICAL', '1')])]
     got = im.summarize(items)
     assert [i['id'] for i in got['items']] == ['3', '1'] and got['count'] == 4 and got['fixable'] == 2 and got['unfixed'] == 2 and got['severity'] == 'CRITICAL'
+
+def resolver(table):
+    def resolve(name, port):
+        if name not in table:
+            raise OSError('no such host')
+        return [(None, None, None, '', (a, port)) for a in table[name]]
+    return resolve
+
+def test_public_host_rejects_internal_targets():
+    r = resolver({'registry-1.docker.io': ['44.208.254.194'], 'evil.example': ['169.254.169.254'], 'mixed.example': ['8.8.8.8', '10.0.0.5'], 'v6.example': ['2606:4700::1111']})
+    assert im.public_host('registry-1.docker.io', r) and im.public_host('v6.example:5000', r)
+    for host in ('169.254.169.254', 'localhost:5000', '[::1]:5000', 'evil.example', 'mixed.example', 'metadata.google.internal', 'nosuch.example', 'intranet'):
+        assert not im.public_host(host, r), host
+
+def test_images_on_internal_registries_are_never_fetched():
+    deps = [{'ecosystem': 'docker', 'name': n, 'version': '1', 'latest': None, 'vulns': None} for n in ('169.254.169.254/x', 'localhost:5000/app')]
+    logs = []
+    im.annotate(deps, tags_of=lambda n: 1 / 0, scan=lambda r: 1 / 0, cache={}, log=logs.append, is_public=im.public_host)
+    assert all(d['vulns'] is None and d['latest'] is None for d in deps) and len(logs) == 2
+
+def test_token_realm_on_an_internal_host_is_refused():
+    def get(url, headers=None, params=None):
+        return Resp(401, headers={'WWW-Authenticate': 'Bearer realm="https://169.254.169.254/token",service="x"'})
+    try:
+        im.tags('reg.example', 'a/b', get=get, is_public=lambda h: not h.startswith('169.'))
+        assert False
+    except RuntimeError as e:
+        assert 'realm' in str(e)

@@ -1,7 +1,8 @@
 """Docker images: the newest tag of the same shape (17 -> 18, 25.7-alpine -> 25.12-alpine) from the registry's tag list, and the
 known vulnerabilities of the packages inside the image from osv-scanner (it pulls and reads the image; nothing in it is run).
 Registries are asked anonymously, so private images stay unchecked."""
-import json, os, re, shutil, subprocess, sys
+import ipaddress, json, os, re, shutil, socket, subprocess, sys
+from urllib.parse import urlsplit
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from .analyser import child_env
@@ -21,6 +22,16 @@ def split(name):
  reg,path=(p[0],p[1:]) if host else ('docker.io',p)
  if reg=='docker.io':return 'registry-1.docker.io','/'.join(['library',*path] if len(path)==1 else path)
  return reg,'/'.join(path)
+def public_host(host,resolve=socket.getaddrinfo):
+ """True when host (optionally host:port) is a DNS name whose every address is public. Image names come from tracked repos, so a
+ name such as 169.254.169.254/x or localhost:5000/x must not make the runner call its metadata service or local ports."""
+ name=host.rsplit(':',1)[0] if re.fullmatch(r'[^:]+:\d+',host) else host
+ try:ipaddress.ip_address(name.strip('[]'));return False   # IP literals are never registries we track
+ except ValueError:pass
+ if name=='localhost' or name.endswith(('.localhost','.local','.internal')) or '.' not in name:return False
+ try:addrs={a[4][0] for a in resolve(name,443)}
+ except OSError:return False
+ return bool(addrs) and all(ipaddress.ip_address(a.split('%')[0]).is_global for a in addrs)
 def latest_like(tag,tags):
  """Highest tag with the same prefix, number of version parts and suffix as tag; None for a floating tag such as latest or alpine."""
  m=SHAPE.fullmatch(tag)
@@ -32,14 +43,15 @@ def _get(url,headers=None,params=None):
  return R.get(url,headers=headers,params=params,timeout=30)
 def _challenge(header):
  return dict(re.findall(r'(\w+)="([^"]*)"',header or ''))
-def tags(host,path,get=_get,pages=50):
+def tags(host,path,get=_get,pages=50,is_public=public_host):
  """Every tag of host/path from the registry HTTP API v2, with an anonymous bearer token when the registry asks for one."""
  base=f'https://{host}';url=f'{base}/v2/{path}/tags/list?n=1000';auth=None;out=[]
  for _ in range(pages):
   r=get(url,headers=auth)
   if r.status_code==401 and auth is None:
    c=_challenge(r.headers.get('WWW-Authenticate'))
-   if not c.get('realm','').startswith('https://'):raise RuntimeError(f'registry {host} asked for a token from a non-https realm')
+   realm=urlsplit(c.get('realm',''))
+   if realm.scheme!='https' or not realm.hostname or not is_public(realm.netloc):raise RuntimeError(f'registry {host} asked for a token from a non-https or non-public realm')
    t=get(c['realm'],params={k:c[k] for k in ('service','scope') if k in c});t.raise_for_status()
    tok=t.json();auth={'Authorization':'Bearer '+(tok.get('token') or tok.get('access_token') or '')}
    r=get(url,headers=auth)
@@ -112,7 +124,7 @@ def lookup(name,tag,tags_of,scan,log):
  try:out['vulns']={'checked_version':tag,'exact':True,**scan(f'{name}:{tag}')}
  except Exception as e:log(f'WARN image scan failed for {name}:{tag}: {e}')
  return out
-def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,file=sys.stderr),workers=WORKERS):
+def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,file=sys.stderr),workers=WORKERS,is_public=public_host):
  """Fill latest, latest_of and vulns of every Docker image in deps. An unresolved ${VAR} tag, a malformed name, a refused pull or a
  failed scan leaves vulns None (not checked), never 'none known'. Each image:tag is looked up once per run, several at a time."""
  rows=[]
@@ -122,6 +134,7 @@ def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,fil
   if not NAME.fullmatch(name) or '..' in name or not TAG.fullmatch(tag):
    if '$' not in tag:log(f'WARN image reference not checked: {name}:{tag}')
    continue
+  if not is_public(split(name)[0]):log(f'WARN image not checked, registry is not a public host: {name}');continue
   rows.append((d,(name,tag)))
  todo=sorted({k for _,k in rows if k not in cache})
  with ThreadPoolExecutor(max_workers=workers) as ex:
