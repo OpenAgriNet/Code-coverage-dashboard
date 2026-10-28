@@ -17,7 +17,7 @@ const STAR='<svg class="star-icon" viewBox="0 0 16 16" width="12" height="12" ar
 const starChip=(n,of)=>!Number.isFinite(n)?'':` <span class="stars" title="${esc(n.toLocaleString()+' stars on '+of)}">${STAR}${starCount(n)}<span class="sr"> stars</span></span>`;
 const ecoOf=d=>d.ecosystem==='docker'?image(d.name).registry:d.ecosystem;
 const LOOKED=['npm','python','golang','githubAction'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
-const RISK={green:'Preferred',yellow:'Not recommended',red:'Not to use',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
+const RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Not to use (red)',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const GROUP={main:'main (installed with the app)',dev:'dev',test:'test',security:'security',optional:'optional',peer:'peer',runtime:'runtime (Docker image)',ci:'ci (GitHub Action)',tool:'tool','(not found)':'not found in a manifest'};
 const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
@@ -105,6 +105,8 @@ const SORTS={
   name:(a,b)=>displayName(a).localeCompare(displayName(b),undefined,{sensitivity:'base'})||a.repository.localeCompare(b.repository),
   vulns:(a,b)=>((b.vulns||{}).count??-1)-((a.vulns||{}).count??-1)||SORTS.repo(a,b),
 };
+// each license list's name with its colour, e.g. Not to use (red); the names come from licenses.labels
+const withColour=l=>Object.fromEntries(Object.entries(l||{}).filter(([k])=>['green','yellow','red'].includes(k)).map(([k,v])=>[k,`${v} (${k})`]));
 let sortBy=(k=>SORTS[k]?k:'repo')(new URLSearchParams(location.search).get('sort'));
 function render(list,state){
   list=list.slice().sort(SORTS[sortBy]);
@@ -145,7 +147,7 @@ async function init(){
     const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
     data=await res.json();policy=data.license_policy||policy;load();
     // names set in config/repos.json (licenses.labels, dependencies.ecosystem_names); the built-in ones cover older data
-    Object.assign(RISK,policy.labels||{});Object.assign(ECO,(data.display||{}).ecosystems||{});
+    Object.assign(RISK,withColour(policy.labels));Object.assign(ECO,(data.display||{}).ecosystems||{});
     $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
     renderPolicy();
     bar=Filters.createFilterBar($('filters'),{facets:FACETS,items:all,noun:'dependencies',text:{param:'q',placeholder:'Find a package or license',of:d=>d.name+' '+(d.license||'')},onChange:render});
