@@ -49,16 +49,31 @@ def _requirements(out,rel,text):
   if not line or line.startswith('-'):continue
   n=pep508_name(line)
   if n:add_entry(out,'python',n,g,rel,pep508_version(line))
+GO_BLOCK=re.compile(r'(require|tool)\s*\($')
 def _gomod(out,rel,text):
- block=False
+ """Direct requires (main) and tools (tool) of a go.mod, one-line or in a ( ... ) block; // indirect requires are not listed.
+ A tool line names a package (golang.org/x/vuln/cmd/govulncheck); it is listed as the module that provides it, found among the
+ file's requires (indirect ones too), because registries know modules, not packages."""
+ block=None;reqs={};direct=[];tools=[]
  for line in text.splitlines():
-  s=line.strip()
-  if s.startswith('require ('):block=True;continue
-  if block and s==')':block=False;continue
-  if '// indirect' in s:continue
-  if s.startswith('tool ') and len(s.split())==2:add_entry(out,'golang',s.split()[1],'tool',rel);continue
-  body=s[len('require '):] if s.startswith('require ') and not s.endswith('(') else s if block else None
-  if body and len(body.split())>=2:add_entry(out,'golang',body.split()[0],'main',rel,body.split()[1])
+  indirect='// indirect' in line
+  s=line.split('//',1)[0].strip()
+  if not s:continue
+  if block:
+   if s==')':block=None;continue
+   w=s.split()
+   if block=='require' and len(w)>=2:reqs[w[0]]=w[1];(None if indirect else direct.append(w[0]))
+   elif block=='tool' and len(w)==1:tools.append(w[0])
+   continue
+  m=GO_BLOCK.fullmatch(s)
+  if m:block=m.group(1);continue
+  w=s.split()
+  if w[0]=='require' and len(w)>=3:reqs[w[1]]=w[2];(None if indirect else direct.append(w[1]))
+  elif w[0]=='tool' and len(w)==2:tools.append(w[1])
+ for mod in direct:add_entry(out,'golang',mod,'main',rel,reqs[mod])
+ for t in tools:
+  mod=max((r for r in reqs if t==r or t.startswith(r+'/')),key=len,default=t)
+  add_entry(out,'golang',mod,'tool',rel,reqs.get(mod))
 def _locks(rel,text,name):
  """{(ecosystem, name): version} of the packages a lockfile installs at top level."""
  if name=='package-lock.json':

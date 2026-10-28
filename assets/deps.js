@@ -27,7 +27,8 @@ const vnum=v=>{const m=String(v||'').replace(/^[\^~=<>v\s]+/,'').match(/^\d+(?:\
 function newer(a,b){const x=vnum(a),y=vnum(b);if(!x||!y)return null;for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0}return false}
 const updateOf=d=>{const n=newer(d.latest,d.version);return n===null?'unknown':n?'behind':'current'};
 // a license the collector says does not exist for this dependency is 'not looked up' (N/A); one it could not find is 'no license' (nil)
-const riskOf=d=>d.license?d.license_class||'unclassified':d.missing&&d.missing.license?(d.missing.license.state==='na'?'na':'none'):LOOKED.includes(d.ecosystem)&&!local(d)?'none':'na';
+// no license with a class: the policy's licenses.no_license class (nothing states a license for it)
+const riskOf=d=>d.license?d.license_class||'unclassified':d.license_class?d.license_class:d.missing&&d.missing.license?(d.missing.license.state==='na'?'na':'none'):LOOKED.includes(d.ecosystem)&&!local(d)?'none':'na';
 function vulnOf(d){const q=d.vulns;if(!q)return['unchecked'];if(!q.count)return['none'];return q.severity==='CRITICAL'||q.severity==='HIGH'?['any','critical-high']:['any']}
 
 const FACETS=[
@@ -77,6 +78,8 @@ function vulnCells(d){
 }
 function licCell(d){
   if(d.license_of==='error')return '<span class="warn" title="deps.dev did not answer; this is not a missing license">Lookup failed</span>';
+  if(!d.license&&d.license_class){const r=d.license_class,why=((d.missing||{}).license||{}).why||'No license found';
+    return `<span class="lic risk risk-${esc(r)}" title="${esc(why+'. '+RISK[r]+' under the license policy (licenses.no_license).')}"><span class="dot" aria-hidden="true"></span>No license</span><span class="sr"> (${esc(RISK[r])})</span>`}
   if(!d.license&&missingCell(d,'license'))return missingCell(d,'license');
   if(local(d))return NA('An action in this repository, not a published package');
   if(!d.license&&d.ecosystem==='docker')return NA('The image declares no license label and names no GitHub source repository');
@@ -108,13 +111,13 @@ function render(list,state){
     +(unchecked&&!down?`${unchecked} not checked (unresolved or private images, local actions, unpinned versions). `:'')
     +(risk?`<br>License risk: ${risk}`:'');
   const meta=single&&repos.find(x=>x.repository===single);
-  $('dep-note').innerHTML=!meta?`On the ${view==='main'?'default':'development'} branch, as chosen above.`:`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`;
+  $('dep-note').innerHTML=!meta?`On the ${view==='main'?'default':'development'} branch, as chosen above.`:`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:meta.license_class?`<span class="lic risk risk-${esc(meta.license_class)}"><span class="dot" aria-hidden="true"></span>No LICENSE file</span>`:'<span class="lic none">No LICENSE file</span>'}`;
   $('rows').innerHTML=list.length?(shown=list).map((d,i)=>row(d,single,i)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
 }
 function renderPolicy(){
   $('policy-title').textContent=`License policy: ${RISK.green}, ${RISK.yellow}, ${RISK.red}`;
   const any=['green','yellow','red'].some(k=>(policy[k]||[]).length);
-  $('policy').innerHTML=any?`<ul class="policy">${['green','yellow','red'].map(k=>`<li><span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span><b>${RISK[k]}</b></span> ${(policy[k]||[]).length?(policy[k]).map(x=>`<code>${esc(x)}</code>`).join(' '):'<span class="muted">none listed</span>'}</li>`).join('')}</ul>`
+  $('policy').innerHTML=any?`<ul class="policy">${['green','yellow','red'].map(k=>`<li><span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span><b>${RISK[k]}</b></span> ${(policy[k]||[]).length?(policy[k]).map(x=>`<code>${esc(x)}</code>`).join(' '):'<span class="muted">none listed</span>'}</li>`).join('')}${policy.no_license?`<li><span class="risk risk-${esc(policy.no_license)}"><span class="dot" aria-hidden="true"></span><b>${esc(RISK[policy.no_license])}</b></span> also: <i>no license</i> (nothing states one; a failed lookup is not counted)</li>`:''}</ul>`
     :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code> (Preferred), <code>yellow</code> (Not recommended) and <code>red</code> (Not to use) in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
 }
 function load(){   // the records of the branch being shown

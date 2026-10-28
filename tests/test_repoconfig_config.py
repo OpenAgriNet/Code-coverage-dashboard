@@ -69,10 +69,10 @@ def test_global_releases_false_turns_off_everywhere_unless_a_repo_sets_its_own()
     assert c['repositories'][1]['releases']['sources'] == ['tag'] and c['repositories'][1]['releases']['max_versions'] == 10
 
 def test_license_policy_defaults_to_empty_lists():
-    assert n()['licenses'] == {'green': [], 'yellow': [], 'red': [], 'labels': config.LICENSE_LABELS}
+    assert n()['licenses'] == {'green': [], 'yellow': [], 'red': [], 'labels': config.LICENSE_LABELS, 'no_license': None}
 
 def test_license_policy_is_kept_and_trimmed():
-    assert n(licenses={'green': [' MIT ', 'Apache-2.0'], 'red': ['GPL-*']})['licenses'] == {'green': ['MIT', 'Apache-2.0'], 'yellow': [], 'red': ['GPL-*'], 'labels': config.LICENSE_LABELS}
+    assert n(licenses={'green': [' MIT ', 'Apache-2.0'], 'red': ['GPL-*']})['licenses'] == {'green': ['MIT', 'Apache-2.0'], 'yellow': [], 'red': ['GPL-*'], 'labels': config.LICENSE_LABELS, 'no_license': None}
 
 @pytest.mark.parametrize('bad,msg', [
     ({'green': ['MIT'], 'red': ['mit']}, 'in both green and red'),
@@ -81,6 +81,7 @@ def test_license_policy_is_kept_and_trimmed():
     ({'green': ['']}, 'must be a list'),
     ({'labels': {'blue': 'Fine'}}, 'licenses.labels'),
     ({'labels': {'red': ''}}, 'licenses.labels'),
+    ({'no_license': 'blocked'}, 'no_license must be one of'),
 ])
 def test_invalid_license_policy(bad, msg):
     with pytest.raises(ConfigError, match=msg):
@@ -227,3 +228,7 @@ def test_image_sources_and_licenses():
         n(dependencies={'image_sources': {'postgres': 'https://github.com/postgres/postgres'}})
     with pytest.raises(ConfigError, match='owner/repo'):
         n(dependencies={'image_sources': {'postgres': 'postgres/..'}})
+
+def test_no_license_can_be_classed():
+    assert n(licenses={'no_license': 'red'})['licenses']['no_license'] == 'red'
+    assert n()['licenses']['no_license'] is None

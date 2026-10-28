@@ -43,7 +43,7 @@ def license_policy(raw):
  """{'green': [...], 'yellow': [...], 'red': [...], 'labels': {...}}: SPDX ids or patterns such as GPL-*, and the name the
  dashboard shows for each list. The same entry in two lists is an error."""
  if raw is None:raw={}
- if not isinstance(raw,dict) or set(raw)-{*LICENSE_CLASSES,'labels'}:raise ConfigError(f'licenses: use only the keys {", ".join(LICENSE_CLASSES)}, labels')
+ if not isinstance(raw,dict) or set(raw)-{*LICENSE_CLASSES,'labels','no_license'}:raise ConfigError(f'licenses: use only the keys {", ".join(LICENSE_CLASSES)}, labels, no_license')
  out={};seen={}
  for c in LICENSE_CLASSES:
   out[c]=name_list(raw,c,'licenses')
@@ -53,6 +53,9 @@ def license_policy(raw):
  if not isinstance(labels,dict) or set(labels)-set(LICENSE_CLASSES) or not all(isinstance(v,str) and v.strip() for v in labels.values()):
   raise ConfigError(f'licenses.labels: map {", ".join(LICENSE_CLASSES)} to the names to show, for example {{"green": "Preferred"}}')
  out['labels']={**LICENSE_LABELS,**{k:v.strip() for k,v in labels.items()}}
+ # the class of a dependency or repository that nothing states a license for; None leaves it unclassified
+ out['no_license']=raw.get('no_license')
+ if out['no_license'] not in (None,*LICENSE_CLASSES):raise ConfigError(f'licenses.no_license must be one of {", ".join(LICENSE_CLASSES)} (or left out)')
  return out
 # The dependency scan. Every key is optional; a list or map given here replaces the default rather than extending it.
 DEPENDENCY_DEFAULTS={

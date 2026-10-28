@@ -67,6 +67,7 @@
   },
 
   "licenses": {
+    "no_license": "red",
     "green": ["MIT", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Apache-2.0", "Zlib", "BSL-1.0", "PSF-2.0", "Python-2.0", "Unlicense", "CC0-1.0", "0BSD"],
     "yellow": ["MPL-2.0", "LGPL-*", "EPL-2.0", "CDDL-1.*"],
     "red": ["GPL-*", "AGPL-*", "SSPL-1.0", "BUSL-1.1", "Elastic-2.0", "Commons-Clause", "CC-BY-NC-*", "JSON", "non-standard", "Other"]

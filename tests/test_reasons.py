@@ -30,7 +30,7 @@ def test_lookup_errors_are_named():
 
 def test_images_without_labels_and_unmatched_floating_tags():
     got = why({'ecosystem': 'docker', 'name': 'postgres', 'version': 'latest', 'latest': None, 'latest_of': 'floating', 'license': None, 'vulns': {'count': 3}})
-    assert got['license'][0] == 'na' and 'none of the newest 30' in got['latest'][1] and 'vulns' not in got
+    assert got['license'][0] == 'nil' and got['license'][1].startswith('No license found') and 'none of the newest 30' in got['latest'][1] and 'vulns' not in got
 
 def test_unresolved_variable_tags():
     got = why({'ecosystem': 'docker', 'name': 'app', 'version': '${TAG', 'latest': None, 'license': None, 'vulns': None})
@@ -50,3 +50,15 @@ def test_license_from_the_source_repo_when_the_registry_has_none():
     stars.fill_licenses(deps, license_of=lambda repo: {'pgvector/pgvector-go': 'MIT'}.get(repo))
     assert deps[0]['license'] == 'MIT' and deps[0]['license_of'] == 'source'
     assert deps[1]['license'] is None and deps[2]['license'] == 'MIT' and 'license_of' not in deps[2]
+
+def kinds(d):
+    explain([d])
+    return d['missing']['license']['kind']
+
+def test_only_a_license_nothing_states_counts_as_no_license():
+    assert kinds({'ecosystem': 'npm', 'name': 'x', 'version': '1', 'license': None, 'latest': '1', 'vulns': {'count': 0}}) == 'none'
+    assert kinds({'ecosystem': 'python', 'name': 'en-core-web-sm', 'version': 'latest', 'license': None, 'license_of': 'not found', 'vulns': None}) == 'none'
+    assert kinds({'ecosystem': 'docker', 'name': 'redis', 'version': '7', 'license': None, 'vulns': {'count': 0}}) == 'none'
+    assert kinds({'ecosystem': 'npm', 'name': 'x', 'version': '1', 'license': None, 'license_of': 'error', 'vulns': None}) == 'error'
+    assert kinds({'ecosystem': 'docker', 'name': 'a/b', 'version': '1', 'license': None, 'vulns': None, 'errors': {'license': 'denied'}}) == 'error'
+    assert kinds({'ecosystem': 'githubAction', 'name': './.github/actions/x', 'version': 'latest', 'license': None, 'vulns': None}) == 'na'

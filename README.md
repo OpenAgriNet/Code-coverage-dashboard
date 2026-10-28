@@ -122,6 +122,7 @@ List the licenses your team accepts under `licenses` in `config/repos.json`:
 - Expressions follow SPDX: `A OR B` takes the better class (you may choose), `A AND B` the worse, `AND` binds tighter than `OR`, parentheses are respected, and `A WITH exception` uses the exception if you listed it, else `A`. Several licenses reported together for one package (`MIT, Apache-2.0`) are treated as all applying, so the worst counts, because deps.dev does not say whether they are alternatives.
 - Nothing is blocked or failed by this. It only colours and filters. An empty policy leaves everything *unclassified*.
 - The names shown for the three lists can be changed with `licenses.labels` (see *Configuring the dependency scan*); the keys stay `green`, `yellow` and `red`.
+- **No license.** `licenses.no_license` gives the class of a dependency or repository that nothing states a license for (the shipped config: `red`, as *Avoid* in the team's table). It applies only when every place that could state one was read: a registry and source repository with no license, a repository without a LICENSE file, an image none of the sources below give one for. A failed lookup, a check turned off and local actions are not counted as *no license*.
 
 ## Filters
 
@@ -145,7 +146,7 @@ Both pages share one filter component (`assets/filters.js`).
 |---|---|---|---|---|
 | npm, PyPI, Go | [deps.dev](https://deps.dev) | deps.dev, else the source repository's | [OSV.dev](https://osv.dev) at the installed version | deps.dev (source repository) |
 | GitHub Actions | the action's latest release | the action repository's | GitHub Advisory Database, at the release a tag like `v4` points to today | deps.dev |
-| Docker images | newest tag of the same shape in the registry (`17` → `18`); the version behind `latest` by digest | the image's license label, else its source repository's | [osv-scanner](https://github.com/google/osv-scanner) on the pulled image (OS packages and binaries inside it) | Docker Hub |
+| Docker images | newest tag of the same shape in the registry (`17` → `18`); the version behind `latest` by digest | the first of: `dependencies.image_licenses`, the repository `dependencies.image_sources` names, the image's license label, the repository its source label names, its own program inside it (an OS or Go package named like the image) | [osv-scanner](https://github.com/google/osv-scanner) on the pulled image (OS packages and binaries inside it) | Docker Hub |
 | Terraform providers | the provider registry | the `terraform-provider-<type>` repository's | none (no public database covers them) | deps.dev |
 | Tools installed from a GitHub release | the latest release (what an unpinned install gets) | the repository's | OSV, when the tool is a Go module | deps.dev |
 
@@ -196,6 +197,8 @@ Everything is optional. A key you leave out keeps its default, and a list or map
 | `terraform.trusted_registries` | Registries whose providers take the license and stars of `<namespace>/terraform-provider-<type>`. |
 | `license_aliases` | License texts in image labels and the SPDX id they mean. The defaults cover the usual spellings of Apache, MIT, BSD, GPL, AGPL and MPL; giving this key replaces them. |
 | `ecosystem_names` | Names shown for each ecosystem, merged over the built-in ones (`npm`, `python`, `golang`, `docker`, `githubAction`, `terraform`, `githubRelease`). |
+| `image_sources` | An image's GitHub repository, written `owner/repo`, whose license is then looked up: `{"jaegertracing/all-in-one": "jaegertracing/jaeger"}`. Any spelling of the image matches (`postgres`, `docker.io/postgres`). |
+| `image_licenses` | The license the team states for an image when nothing machine-readable gives one: `{"postgres": "PostgreSQL"}`. It wins over every other source and applies even when the image cannot be pulled. |
 
 A mistake (an unknown key, a wrong type, a number out of range) stops the refresh with an error that names it.
 
