@@ -140,3 +140,15 @@ tr.row-risk-red>td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
 .switch .count{display:inline-block;min-width:1.6em;margin-left:6px;padding:0 6px;border-radius:999px;font-size:12px;font-weight:700;background:var(--line);color:var(--ink)}
 .switch button[aria-pressed="true"] .count{background:var(--surface)}
 .branch-note{margin:0;flex:1 1 320px}
+/* cards above each table: a label, one big number (with a muted unit or "/ total"), an optional bar, one muted line */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:12px;margin:0 0 18px}
+.kpis:empty{display:none}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}
+.kpi-label{font-size:13px;font-weight:500;color:var(--muted)}
+.kpi-value{font-size:34px;font-weight:700;line-height:1.15;margin-top:6px;color:var(--ink);font-variant-numeric:normal;letter-spacing:-.01em}
+.kpi-value.good{color:var(--good)}.kpi-value.warn{color:var(--warn)}.kpi-value.bad{color:var(--bad)}
+.kpi-unit,.kpi-of{font-size:16px;font-weight:600;color:var(--muted);letter-spacing:0}
+.kpi-unit{margin-left:2px}
+.kpi-bar{height:6px;border-radius:999px;background:var(--track);margin-top:10px;overflow:hidden}
+.kpi-bar span{display:block;height:100%;border-radius:999px;background:var(--good)}
+.kpi-sub{font-size:13px;color:var(--muted);margin-top:8px;overflow-wrap:anywhere}
