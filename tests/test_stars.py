@@ -51,3 +51,9 @@ def test_hub_stars_only_for_docker_hub_images():
     assert s.hub_stars('grafana/loki', get=get) == 7 and s.hub_stars('ghcr.io/o/app', get=get) is None
     assert s.hub_stars('postgres', get=get) == 7
     assert got == ['https://hub.docker.com/v2/repositories/grafana/loki/', 'https://hub.docker.com/v2/repositories/library/postgres/']
+
+def test_only_whole_numbers_become_stars():
+    deps = [{'ecosystem': 'githubAction', 'name': 'a/b'}, {'ecosystem': 'githubAction', 'name': 'c/d'}, {'ecosystem': 'githubAction', 'name': 'e/f'}]
+    answers = {'a/b': '<img src=x onerror=alert(1)>', 'c/d': -5, 'e/f': 7}
+    s.annotate(deps, api=lambda repo: answers[repo], cache={})
+    assert [d.get('stars') for d in deps] == [None, None, 7]

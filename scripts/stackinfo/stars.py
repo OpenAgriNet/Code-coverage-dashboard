@@ -5,6 +5,7 @@ tracked repos' own stars are asked of GitHub."""
 import re, sys
 from urllib.parse import quote
 import aggregate_coverage as ac
+from .log import warn
 from .actions import NAME, repo_of
 from . import images
 from .depsdev import D
@@ -20,6 +21,9 @@ def source_repo(d):
  elif eco=='golang':m=GH.match(name);repo=m.group(1) if m else None
  else:m=GH.fullmatch(d.get('project') or '');repo=m.group(1) if m else None
  return repo if _ok(repo) else None
+def _count(v):
+ """A star count is a whole number of 0 or more; anything else an API sends back is dropped, so the page never prints it."""
+ return v if isinstance(v,int) and not isinstance(v,bool) and v>=0 else None
 def github_stars(repo,api=ac.api):
  return (api(f'/repos/{repo}') or {}).get('stargazers_count')
 def project_stars(repo):
@@ -44,7 +48,7 @@ def fill_licenses(deps,license_of=None):
   try:lic=license_of(repo)
   except Exception:continue
   if lic:d.update(license=lic,license_of='source')
-def annotate(deps,api=project_stars,hub=hub_stars,cache=CACHE,log=lambda m:print(m,file=sys.stderr)):
+def annotate(deps,api=project_stars,hub=hub_stars,cache=CACHE,log=warn):
  """Add stars and stars_of (where they were counted) to every dependency that has a known home. A failed lookup adds nothing."""
  for d in deps:
   if d.get('ecosystem')=='docker':
@@ -55,6 +59,6 @@ def annotate(deps,api=project_stars,hub=hub_stars,cache=CACHE,log=lambda m:print
    if not repo:continue
    key=('github',repo);where='github.com/'+repo;fetch=lambda:api(repo)
   if key not in cache:
-   try:cache[key]=fetch()
+   try:cache[key]=_count(fetch())
    except Exception as e:cache[key]=None;log(f'WARN stars lookup failed for {where}: {e}')
   if cache[key] is not None:d.update(stars=cache[key],stars_of=where)

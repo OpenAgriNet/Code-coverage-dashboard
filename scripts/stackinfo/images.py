@@ -1,7 +1,7 @@
 """Docker images: the newest tag of the same shape (17 -> 18, 25.7-alpine -> 25.12-alpine) from the registry's tag list, and the
 known vulnerabilities of the packages inside the image from osv-scanner (it pulls and reads the image; nothing in it is run).
 Registries are asked anonymously, so private images stay unchecked."""
-import ipaddress, json, os, re, shutil, socket, subprocess, sys
+import ipaddress, json, os, re, shutil, socket, subprocess, time
 from urllib.parse import quote, urlsplit
 from concurrent.futures import ThreadPoolExecutor
 import requests
@@ -10,6 +10,7 @@ from urllib3.util.retry import Retry
 from urllib3.connection import HTTPSConnection
 from urllib3.connectionpool import HTTPSConnectionPool
 from .analyser import child_env
+from .log import warn
 from .depsdev import D
 from .reasons import short_error
 from .vulns import SEVERITIES, normal, severity as osv_severity
@@ -27,6 +28,11 @@ def split(name):
  reg,path=(p[0],p[1:]) if host else ('docker.io',p)
  if reg=='docker.io':return 'registry-1.docker.io','/'.join(['library',*path] if len(path)==1 else path)
  return reg,'/'.join(path)
+def canonical(name):
+ """One spelling per image: postgres, docker.io/postgres and docker.io/library/postgres are the same image, so they are looked up,
+ scanned and removed once (scanning both spellings at once also let one scan delete the image the other was reading)."""
+ host,path=split(name)
+ return f'docker.io/{path}' if host=='registry-1.docker.io' else f'{host}/{path}'
 def public_host(host,resolve=socket.getaddrinfo):
  """True when host (optionally host:port) is a DNS name whose every address is public. Image names come from tracked repos, so a
  name such as 169.254.169.254/x or localhost:5000/x must not make the runner call its metadata service or local ports."""
@@ -41,8 +47,9 @@ def latest_like(tag,tags):
  """Highest tag with the same prefix, number of version parts and suffix as tag; None for a floating tag such as latest or alpine."""
  m=SHAPE.fullmatch(tag)
  if not m:return None
- pre,nums,suf=m.group(1),m.group(2).count('.'),m.group(3)
- same=[t for t in tags for x in [SHAPE.fullmatch(t)] if x and x.group(1)==pre and x.group(2).count('.')==nums and x.group(3)==suf]
+ pre,nums,suf=m.group(1),m.group(2).count('.'),m.group(3);digits=len(m.group(2).split('.')[0])
+ # a build number or a date (20250101) is not the next major of 17: the first number may grow by one digit at most
+ same=[t for t in tags for x in [SHAPE.fullmatch(t)] if x and x.group(1)==pre and x.group(2).count('.')==nums and x.group(3)==suf and len(x.group(2).split('.')[0])<=digits+1]
  return max(same,key=lambda t:tuple(int(n) for n in SHAPE.fullmatch(t).group(2).split('.')),default=None)
 def check_peer(sock):
  """Refuse a connection whose peer is not a public address. Checked on the connected socket, so a DNS answer that changes
@@ -61,17 +68,31 @@ class PublicAdapter(HTTPAdapter):
 R=requests.Session()   # no GitHub headers or tokens: registries are third parties
 R.trust_env=False      # no proxy or netrc credentials from the environment
 # timeouts and 5xx are retried; redirects are returned so _get can check each hop
-RETRY=Retry(total=3,connect=3,read=3,status=3,redirect=0,raise_on_redirect=False,backoff_factor=1,status_forcelist=(429,500,502,503,504),allowed_methods=None)
+# respect_retry_after_header is off: a hostile registry could otherwise answer 429 with Retry-After: 86400 and park a worker for a day
+RETRY=Retry(total=3,connect=3,read=3,status=3,redirect=0,raise_on_redirect=False,backoff_factor=1,respect_retry_after_header=False,status_forcelist=(429,500,502,503,504),allowed_methods=None)
 R.mount('https://',PublicAdapter(max_retries=RETRY));R.mount('http://',HTTPAdapter(max_retries=0))
 MAX_REDIRECTS=5
+MAX_BODY=5_000_000   # a tag page or a manifest is far smaller
+DEADLINE=60          # seconds to receive one response, however slowly the server sends it
+def _read(r):
+ """Read the body in chunks under a byte cap and an overall deadline: requests' timeout is per socket read, so a server that
+ dribbles bytes would otherwise hold a worker for as long as it likes."""
+ end=time.monotonic()+DEADLINE;body=bytearray()
+ for chunk in r.iter_content(65536):
+  body+=chunk
+  if len(body)>MAX_BODY:r.close();raise RuntimeError(f'response over {MAX_BODY} bytes')
+  if time.monotonic()>end:r.close();raise RuntimeError(f'response not complete after {DEADLINE} s')
+ r._content=bytes(body);r._content_consumed=True
+ return r
 def _get(url,headers=None,params=None,is_public=None,method='GET'):
  """GET (or HEAD) over https only, following redirects by hand so every hop is checked like the first one."""
  is_public=is_public or public_host
  for _ in range(MAX_REDIRECTS+1):
   u=urlsplit(url)
   if u.scheme!='https' or not u.hostname or not is_public(u.netloc):raise RuntimeError(f'refused to fetch {u.scheme}://{u.netloc}: not a public https host')
-  r=R.request(method,url,headers=headers,params=params,timeout=30,allow_redirects=False)
-  if r.status_code not in (301,302,303,307,308):return r
+  r=R.request(method,url,headers=headers,params=params,timeout=30,allow_redirects=False,stream=True)
+  if r.status_code not in (301,302,303,307,308):return _read(r)
+  r.close()
   url=requests.compat.urljoin(url,r.headers.get('Location',''));params=None
   if urlsplit(url).netloc!=u.netloc:headers=None   # never carry a registry token to another host
  raise RuntimeError('too many redirects')
@@ -115,8 +136,8 @@ def tags(host,path,get=_get,pages=50,is_public=public_host):
   nxt=re.search(r'<([^>]+)>;\s*rel="next"',r.headers.get('Link') or '')
   if not nxt:return out
   url=base+nxt.group(1) if nxt.group(1).startswith('/') else nxt.group(1)
-  if not url.startswith(base+'/'):return out
- return out
+  if not url.startswith(base+'/'):raise RuntimeError(f'{host} sent its next page of tags from another host')
+ raise RuntimeError(f'{host}/{path} has more than {pages} pages of tags; the newest could be on a page not read')
 def tags_of(name):
  return tags(*split(name))
 def loose(v):
@@ -157,23 +178,34 @@ def summarize(items):
  fixable=sum(1 for i in items if i['fixed'])
  worst=sorted(items,key=lambda i:(-rank(i),i['fixed'] is None,i['summary']))
  return {'count':len(items),'severity':worst[0]['severity'] if items else None,'fixed_in':None,'fixable':fixable,'unfixed':len(items)-fixable,'items':worst[:MAX_ITEMS]}
+DOCKER_TIMEOUT=60
 def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
- """osv-scanner pulls the image through the docker CLI; an image that was not on the machine before is removed again, so a run
- over dozens of images does not fill the disk."""
+ """Pull the image, then let osv-scanner read it. Pulling first matters: osv-scanner uses a copy that is already on the machine,
+ and a runner can ship stale cached images, which would be reported as today's tag. An image that was not on the machine before
+ is removed again, so a run over dozens of images does not fill the disk. The pull goes through the docker daemon, which resolves
+ the registry's name itself: the public-host checks above cover the registry API calls, not this pull."""
  binary=binary or os.getenv('OSV_SCANNER') or shutil.which('osv-scanner')
  if not binary:raise RuntimeError('osv-scanner is not installed')
  env=child_env()
- had=docker and run([docker,'image','inspect',ref],capture_output=True,env=env).returncode==0
+ had=bool(docker) and run([docker,'image','inspect',ref],capture_output=True,env=env,timeout=DOCKER_TIMEOUT).returncode==0
  labels={}
  try:
+  if docker:
+   pull=run([docker,'pull','-q',ref],capture_output=True,text=True,env=env,timeout=SCAN_TIMEOUT)
+   if pull.returncode!=0:
+    last=(pull.stderr or '').strip().splitlines()
+    raise RuntimeError(f'docker pull failed: {last[-1][:150] if last else "no output"}')
   p=run([binary,'scan','image','--format','json',ref],capture_output=True,text=True,timeout=SCAN_TIMEOUT,env=env)
-  if docker:labels=_labels(run([docker,'image','inspect','--format','{{json .Config.Labels}}',ref],capture_output=True,text=True,env=env))
+  if docker:labels=_labels(run([docker,'image','inspect','--format','{{json .Config.Labels}}',ref],capture_output=True,text=True,env=env,timeout=DOCKER_TIMEOUT))
  finally:
-  if docker and not had:run([docker,'image','rm','-f',ref],capture_output=True,env=env)
+  if docker and not had:
+   try:run([docker,'image','rm','-f',ref],capture_output=True,env=env,timeout=DOCKER_TIMEOUT)
+   except Exception as e:warn(f'WARN could not remove image {ref}: {e}')   # cleanup must not hide the scan's own error
  if p.returncode==128:return {**summarize([]),'labels':labels}   # no packages found in the image
  if p.returncode not in (0,1):
   last=(p.stderr or '').strip().splitlines()
   raise RuntimeError(f'osv-scanner exit {p.returncode}: {last[-1][:150] if last else "no output"}')
+ if not (p.stdout or '').strip():raise RuntimeError('osv-scanner printed no result')   # exit 1 means findings, so empty output is an error, not a clean image
  return {**summarize(items_of(json.loads(p.stdout))),'labels':labels}
 def _labels(p):
  """The image's config labels from docker image inspect (read from the pulled image: no extra registry request)."""
@@ -185,6 +217,7 @@ SPDX={'apache license 2.0':'Apache-2.0','apache license, version 2.0':'Apache-2.
  'mit license':'MIT','the mit license':'MIT','bsd':'BSD-3-Clause','gplv3':'GPL-3.0-only','gplv2':'GPL-2.0-only','agplv3':'AGPL-3.0-only','mpl 2.0':'MPL-2.0'}
 LABEL_LICENSE=('org.opencontainers.image.licenses','org.label-schema.license','license')
 LABEL_SOURCE=('org.opencontainers.image.source','org.label-schema.vcs-url')
+REPO=re.compile(r'(?!\.)[A-Za-z0-9_.-]+/(?!\.)[A-Za-z0-9_.-]+')   # no x/. or x/..
 GITHUB_REPO=re.compile(r'(?:https?://|git@)?github\.com[/:]([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?(?:[#?].*)?')
 def image_license(labels,repo_license):
  """(license, where): the image's own license label, else the license of the GitHub repo its source label names, else (None, None).
@@ -193,7 +226,7 @@ def image_license(labels,repo_license):
  if lic:return SPDX.get(lic.lower(),lic),'label'
  src=next((labels[k].strip() for k in LABEL_SOURCE if labels.get(k,'').strip()),'')
  m=GITHUB_REPO.fullmatch(src)
- if m and '..' not in m.group(1):
+ if m and REPO.fullmatch(m.group(1)):
   lic=repo_license(m.group(1))
   if lic:return lic,'source'
  return None,None
@@ -222,15 +255,18 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
    out['latest_of']='floating';ts=tags_of(name);v=resolve(name,tag,ts)
    if v:out.update(resolved=v,latest=latest_like(v,ts),latest_of='registry')
  except Exception as e:errors['latest']=short_error(e);log(f'WARN registry tags failed for {name}: {e}')
- try:
-  res=scan(f'{name}:{tag}');labels=res.pop('labels',{})
-  out['vulns']={'checked_version':tag,'exact':True,**res}
-  lic,where=image_license(labels,license_of)
-  if lic:out.update(license=lic,license_of=where)
+ try:res=scan(f'{name}:{tag}')
  except Exception as e:errors['vulns']=errors['license']=short_error(e);log(f'WARN image scan failed for {name}:{tag}: {e}')
+ else:
+  labels=res.pop('labels',{})
+  out['vulns']={'checked_version':tag,'exact':True,**res}
+  try:lic,where=image_license(labels,license_of)
+  except Exception as e:errors['license']=short_error(e);log(f'WARN license lookup failed for {name}:{tag}: {e}')   # the scan itself succeeded
+  else:
+   if lic:out.update(license=lic,license_of=where)
  if errors:out['errors']=errors
  return out
-def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,file=sys.stderr),workers=WORKERS,is_public=public_host,resolve=version_of,license_of=None):
+def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=warn,workers=WORKERS,is_public=public_host,resolve=version_of,license_of=None):
  """Fill latest, latest_of and vulns of every Docker image in deps. An unresolved ${VAR} tag, a malformed name, a refused pull or a
  failed scan leaves vulns None (not checked), never 'none known'. Each image:tag is looked up once per run, several at a time."""
  rows=[]
@@ -241,7 +277,7 @@ def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,fil
    if '$' not in tag:log(f'WARN image reference not checked: {name}:{tag}')
    continue
   if not is_public(split(name)[0]):log(f'WARN image not checked, registry is not a public host: {name}');continue
-  rows.append((d,(name,tag)))
+  rows.append((d,(canonical(name),tag)))
  todo=sorted({k for _,k in rows if k not in cache})
  with ThreadPoolExecutor(max_workers=workers) as ex:
   for k,res in zip(todo,ex.map(lambda k:lookup(*k,tags_of,scan,log,resolve,license_of),todo)):cache[k]=res

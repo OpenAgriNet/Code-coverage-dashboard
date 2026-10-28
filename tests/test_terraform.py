@@ -35,3 +35,10 @@ def test_registry_failure_is_recorded():
     deps = [{'ecosystem': 'terraform', 'name': 'hashicorp/gone', 'version': '1.0.0'}]
     tf.annotate(deps, get=get, cache={}, log=lambda m: None)
     assert 'latest' not in deps[0] and 'HTTP 404' in deps[0]['errors']['latest']
+
+def test_only_trusted_registries_borrow_the_source_repository():
+    deps = [{'ecosystem': 'terraform', 'name': 'registry.example.com/hashicorp/aws', 'version': '1.0.0'},
+            {'ecosystem': 'terraform', 'name': 'registry.terraform.io/hashicorp/aws', 'version': '1.0.0'}]
+    tf.annotate(deps, get=lambda url: Resp({'versions': [{'version': '1.0.0'}]}), cache={})
+    assert 'project' not in deps[0] and deps[1]['project'] == 'github.com/hashicorp/terraform-provider-aws'
+    assert stars.source_repo(deps[0]) is None

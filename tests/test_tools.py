@@ -48,3 +48,11 @@ def test_merge_keeps_both_groups():
     got = t.merge(found, tools)
     assert got[('python', 'pytest')]['groups'] == ['dev', 'test'] and got[('python', 'pytest')]['declared'] == '>=9'
     assert ('githubRelease', 'aquasecurity/trivy') in got
+
+def test_crafted_workflow_text_cannot_stall_the_reader(tmp_path):
+    import time
+    evil = 'run: curl https://raw.githubusercontent.com/a/b/' + 'install' * 20000
+    src = tree(tmp_path, {'.github/workflows/evil.yml': evil})
+    start = time.time()
+    t.read(src)
+    assert time.time() - start < 2   # was about 16 s at 140 KB

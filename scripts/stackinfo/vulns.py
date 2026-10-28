@@ -5,6 +5,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 RETRY=Retry(total=3,backoff_factor=1,status_forcelist=(429,500,502,503,504),allowed_methods=None)  # public APIs rate-limit and blip; one retry round hides that
+from .log import warn
 from .versions import clean_version
 from .reasons import short_error
 OSV='https://api.osv.dev/v1'
@@ -59,7 +60,7 @@ def summarize(items):
  rank=lambda i:SEVERITIES.index(i['severity']) if i['severity'] in SEVERITIES else -1
  return {'count':len(items),'severity':max(items,key=rank)['severity'] if items else None,'fixed_in':max(fixes,key=vkey) if fixes else None,
   'unfixed':sum(1 for i in items if not i['fixed']),'items':items}
-def annotate(deps,post=post,fetch=get,log=lambda m:print(m,file=sys.stderr)):
+def annotate(deps,post=post,fetch=get,log=warn):
  """Add 'vulns' to every dependency dict. None means not checked (Docker image, Action, unknown version, or the lookup failed);
  otherwise {checked_version, exact, count, severity, fixed_in, unfixed, items}. fixed_in is the one version that fixes every fixable item."""
  todo=[]

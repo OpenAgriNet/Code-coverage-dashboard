@@ -3,6 +3,7 @@ vulnerabilities, all from the GitHub API (GH_TOKEN). OSV holds Actions advisorie
 GitHub's advisory database is used instead."""
 import re, sys
 import aggregate_coverage as ac
+from .log import warn
 from .vulns import summarize, vkey
 from .reasons import short_error
 SEV={'low':'LOW','medium':'MODERATE','moderate':'MODERATE','high':'HIGH','critical':'CRITICAL'}
@@ -55,7 +56,7 @@ def lookup(repo,ref,api):
  if exact:out['vulns']={'checked_version':exact,'exact':True,**summarize(advisories(repo,exact,api))}
  return out
 CACHE={}
-def annotate(deps,api=ac.api,cache=CACHE,log=lambda m:print(m,file=sys.stderr)):
+def annotate(deps,api=ac.api,cache=CACHE,log=warn):
  """Fill latest, license and vulns of every published action in deps (local ./ actions and other ecosystems are left alone).
  One lookup per action and ref per run; a failed lookup leaves vulns None (not checked) and marks license_of 'error'."""
  for d in deps:

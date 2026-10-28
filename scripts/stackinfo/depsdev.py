@@ -4,6 +4,7 @@ from urllib.parse import quote
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from .log import warn
 from .versions import clean_version, latest_stable
 from .reasons import short_error
 DEPSDEV='https://api.deps.dev/v3/systems'
@@ -36,5 +37,5 @@ def dep_info(eco,name,version,fetch=fetch):
     break
  except Exception as e:  # 'error' so a lookup failure is not shown as 'no license'
   m=f'deps.dev: {short_error(e)}';out.update(license_of='error',errors={'license':m,'latest':m})
-  print(f'WARN deps.dev {eco}/{name}: {e}',file=sys.stderr)
+  warn(f'WARN deps.dev {eco}/{name}: {e}')
  return out

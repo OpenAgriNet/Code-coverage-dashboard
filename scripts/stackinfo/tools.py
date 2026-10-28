@@ -3,7 +3,9 @@
 import os, re
 from .manifests import _add, _pep508, _pep508_version
 
-CURL=re.compile(r'raw\.githubusercontent\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/\S*?install\S*?\.sh\S*\s*\|\s*(?:ba)?sh\b([^\n]*)')
+# Every quantifier is bounded: workflow files come from the tracked repos, and unbounded lazy matches here took quadratic time
+# (112 KB of 'install' repeated cost 8 s, 1 MB about ten minutes), enough to stall the nightly run.
+CURL=re.compile(r'raw\.githubusercontent\.com/([A-Za-z0-9_.-]{1,100})/([A-Za-z0-9_.-]{1,100})/\S{0,300}?install\S{0,100}?\.sh\S{0,100}\s{0,4}\|\s{0,4}(?:ba)?sh\b([^\n]{0,200})')
 PIP=re.compile(r'(?:\bpip3?|python3? -m pip|\buv pip|\bpipx|\buv tool)\s+install\s+([^\n&|;#]+)')
 NPM=re.compile(r'\bnpm\s+(?:install|i|add)\s+(?:-g|--global)\s+([^\n&|;#]+)|\bnpx\s+(?:(?:--yes|-y)\s+)?([^\s&|;#]+)')
 GO=re.compile(r'\bgo\s+install\s+([A-Za-z0-9_./-]+)@(\S+)')

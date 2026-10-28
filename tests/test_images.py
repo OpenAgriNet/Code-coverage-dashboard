@@ -29,6 +29,8 @@ class Resp:
     def raise_for_status(self):
         if self.status_code >= 400:
             raise RuntimeError(f'HTTP {self.status_code}')
+    def close(self):
+        pass
 
 def test_tags_gets_an_anonymous_token_then_follows_pages():
     calls = []
@@ -103,7 +105,7 @@ def test_annotate_fills_images_and_skips_unresolved_tags():
     assert deps[0]['latest'] == '18' and deps[0]['vulns']['count'] == 0 and deps[0]['vulns']['checked_version'] == '17'
     assert deps[1]['vulns'] is None and deps[1]['latest'] is None
     assert deps[2]['latest'] is None and deps[2]['latest_of'] == 'floating' and deps[2]['vulns'] is not None
-    assert sorted(scanned) == ['postgres:17', 'redis:latest'] and deps[3]['vulns'] == {'count': 0}
+    assert sorted(scanned) == ['docker.io/library/postgres:17', 'docker.io/library/redis:latest'] and deps[3]['vulns'] == {'count': 0}
 
 def test_annotate_failures_stay_unchecked():
     deps = [{'ecosystem': 'docker', 'name': 'ghcr.io/o/private', 'version': '1.0', 'latest': None, 'vulns': None}]
@@ -186,7 +188,7 @@ def test_session_uses_the_peer_checking_pool():
 
 def test_redirects_are_followed_by_hand_and_checked(monkeypatch):
     hops = []
-    def fake_get(method, url, headers=None, params=None, timeout=None, allow_redirects=True):
+    def fake_get(method, url, headers=None, params=None, timeout=None, allow_redirects=True, stream=False):
         assert allow_redirects is False
         hops.append((url, headers))
         if url == 'https://reg.example/a':
@@ -279,3 +281,142 @@ def test_project_license_asks_github_when_deps_dev_cannot_name_it(monkeypatch):
         return {'license': {'spdx_id': 'MPL-2.0'}}
     assert im.project_license('hashicorp/terraform-provider-aws', github=github) == 'MPL-2.0'
     assert asked == ['/repos/hashicorp/terraform-provider-aws/license']
+
+def test_one_image_under_several_spellings_is_scanned_once():
+    assert im.canonical('postgres') == im.canonical('docker.io/postgres') == im.canonical('docker.io/library/postgres') == 'docker.io/library/postgres'
+    assert im.canonical('grafana/loki') == 'docker.io/grafana/loki' and im.canonical('ghcr.io/o/app') == 'ghcr.io/o/app'
+    deps = [{'ecosystem': 'docker', 'name': n, 'version': '17', 'latest': None, 'vulns': None} for n in ('postgres', 'docker.io/postgres', 'docker.io/library/postgres')]
+    scanned = []
+    def scan(ref):
+        scanned.append(ref)
+        return im.summarize([])
+    im.annotate(deps, tags_of=lambda n: ['17'], scan=scan, cache={}, is_public=lambda h: True, resolve=lambda n, tag, ts: None)
+    assert scanned == ['docker.io/library/postgres:17'] and all(d['vulns']['count'] == 0 for d in deps)
+
+class Streamed:
+    """A response whose body arrives in chunks, as requests gives it with stream=True."""
+    status_code = 200
+    headers = {}
+    def __init__(self, chunks):
+        self.chunks, self.closed = chunks, False
+    def iter_content(self, size):
+        yield from self.chunks
+    def close(self):
+        self.closed = True
+
+def test_body_over_the_cap_is_refused(monkeypatch):
+    monkeypatch.setattr(im, 'MAX_BODY', 10)
+    r = Streamed([b'123456', b'789012'])
+    try:
+        im._read(r)
+        assert False
+    except RuntimeError as e:
+        assert 'over' in str(e) and r.closed
+
+def test_slow_body_is_cut_off(monkeypatch):
+    clock = iter([0, 1, 2, 100])
+    monkeypatch.setattr(im.time, 'monotonic', lambda: next(clock))
+    r = Streamed([b'a', b'b', b'c'])
+    try:
+        im._read(r)
+        assert False
+    except RuntimeError as e:
+        assert 'not complete' in str(e)
+
+def test_a_complete_body_is_readable_as_json():
+    import io
+    r = im.requests.Response()
+    r.status_code, r.raw = 200, io.BytesIO(b'{"tags": ["1"]}')
+    assert im._read(r).json() == {'tags': ['1']}
+
+def test_retry_after_is_not_obeyed():
+    assert im.RETRY.respect_retry_after_header is False
+
+def test_userinfo_in_a_url_is_never_public():
+    for url in ('https://user:pw@localhost/x', 'https://10.0.0.1@evil.example/x', 'https://evil.example:pw@127.0.0.1/x'):
+        try:
+            im._get(url)
+            assert False, url
+        except RuntimeError as e:
+            assert 'refused' in str(e)
+
+def test_tags_that_do_not_fit_in_the_page_limit_raise():
+    def get(url, headers=None, params=None):
+        return Resp(200, {'tags': ['1']}, {'Link': '</v2/a/b/tags/list?n=1000&last=1>; rel="next"'})
+    try:
+        im.tags('reg.example', 'a/b', get=get, pages=3, is_public=lambda h: True)
+        assert False
+    except RuntimeError as e:
+        assert 'more than 3 pages' in str(e)
+    def other_host(url, headers=None, params=None):
+        return Resp(200, {'tags': ['1']}, {'Link': '<https://evil.example/next>; rel="next"'})
+    try:
+        im.tags('reg.example', 'a/b', get=other_host, is_public=lambda h: True)
+        assert False
+    except RuntimeError as e:
+        assert 'another host' in str(e)
+
+def test_build_numbers_and_dates_are_not_the_next_major():
+    assert im.latest_like('17', ['16', '17', '18', '20250101', '1234567']) == '18'
+    assert im.latest_like('9', ['9', '10', '100']) == '10'
+    assert im.latest_like('2024.05', ['2024.05', '2025.01']) == '2025.01'
+
+def scan_run(log, pull_rc=0, scan_rc=1, stdout='{}', have=False):
+    def run(cmd, **kw):
+        log.append(cmd)
+        class P: returncode = 0; stdout = '{}'; stderr = ''
+        P.stdout = stdout
+        if cmd[1:3] == ['image', 'inspect'] and '--format' not in cmd:
+            P.returncode = 0 if have else 1
+        elif cmd[1] == 'pull':
+            P.returncode, P.stderr = pull_rc, 'denied: requested access to the resource is denied' if pull_rc else ''
+        elif cmd[1:3] == ['scan', 'image']:
+            P.returncode = scan_rc
+        return P()
+    return run
+
+def test_the_image_is_pulled_before_it_is_scanned():
+    log = []
+    im.scan('a:1', run=scan_run(log, have=True), binary='/bin/osv', docker='/bin/docker')
+    kinds = [c[1] if c[0] == '/bin/docker' else 'osv' for c in log]
+    assert kinds.index('pull') < kinds.index('osv')   # a stale copy already on the machine is refreshed, not trusted
+    assert ['/bin/docker', 'image', 'rm', '-f', 'a:1'] not in log   # it was there before, so it stays
+
+def test_a_failed_pull_is_an_error_and_still_cleans_up():
+    log = []
+    try:
+        im.scan('a:1', run=scan_run(log, pull_rc=1), binary='/bin/osv', docker='/bin/docker')
+        assert False
+    except RuntimeError as e:
+        assert 'docker pull failed' in str(e) and 'denied' in str(e)
+    assert ['/bin/docker', 'image', 'rm', '-f', 'a:1'] in log and not any(c[0] == '/bin/osv' for c in log)
+
+def test_exit_128_is_a_clean_image_but_empty_output_with_findings_is_not():
+    assert im.scan('a:1', run=scan_run([], scan_rc=128), binary='/bin/osv', docker=None)['count'] == 0
+    try:
+        im.scan('a:1', run=scan_run([], scan_rc=1, stdout=''), binary='/bin/osv', docker=None)
+        assert False
+    except RuntimeError as e:
+        assert 'no result' in str(e)
+
+def test_docker_calls_have_timeouts():
+    seen = []
+    def run(cmd, **kw):
+        seen.append((cmd[1], kw.get('timeout')))
+        class P: returncode = 0; stdout = '{}'; stderr = ''
+        return P()
+    im.scan('a:1', run=run, binary='/bin/osv', docker='/bin/docker')
+    assert all(t for _, t in seen)
+
+def test_a_failing_license_lookup_does_not_blame_the_scan():
+    scan = lambda ref: {**im.summarize([]), 'labels': {'org.opencontainers.image.source': 'https://github.com/o/r'}}
+    def boom(repo):
+        raise RuntimeError('deps.dev down')
+    got = im.lookup('a/b', '1', lambda n: ['1'], scan, lambda m: None, resolve=lambda *a: None, license_of=boom)
+    assert got['vulns']['count'] == 0 and set(got['errors']) == {'license'}
+
+def test_a_source_repo_cannot_be_a_dot_path():
+    repo = lambda r: 'MIT'
+    assert im.image_license({'org.opencontainers.image.source': 'https://github.com/apache/.'}, repo) == (None, None)
+    assert im.image_license({'org.opencontainers.image.source': 'https://github.com/apache/..'}, repo) == (None, None)
+    assert im.image_license({'org.opencontainers.image.source': 'https://github.com/apache/airflow'}, repo) == ('MIT', 'source')

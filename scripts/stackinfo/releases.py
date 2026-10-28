@@ -4,6 +4,7 @@ from OSV at that release."""
 import sys
 from urllib.parse import quote
 import aggregate_coverage as ac
+from .log import warn
 from .actions import NAME, latest as latest_release
 from .depsdev import fetch as depsdev_fetch
 from .reasons import short_error
@@ -22,7 +23,7 @@ def lookup(repo,version,api,is_go,check):
  return out
 def is_go_module(mod):
  return depsdev_fetch(f'GO/packages/{quote(mod,safe="")}') is not None
-def annotate(deps,api=ac.api,is_go=is_go_module,check=osv_annotate,cache=CACHE,log=lambda m:print(m,file=sys.stderr)):
+def annotate(deps,api=ac.api,is_go=is_go_module,check=osv_annotate,cache=CACHE,log=warn):
  for d in deps:
   if d.get('ecosystem')!='githubRelease':continue
   repo,ver=d['name'],str(d.get('version') or 'latest')

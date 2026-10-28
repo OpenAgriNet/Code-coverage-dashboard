@@ -1,6 +1,7 @@
 """One repository's stack record: own license, analyser output, per-dependency license, vulnerabilities and license class."""
 import sys
 import aggregate_coverage as ac
+from .log import warn
 from .analyser import analyse as run_analyser, summarize
 from .depsdev import dep_info
 from .vulns import annotate
@@ -28,9 +29,9 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
  out={'repository':repo,'html_url':f'https://github.com/{ac.ORG}/{repo}','dpg':'DPG' in t.get('tags',[]),'tags':t.get('tags',[]),'branch':t.get('branch'),'branch_source':t.get('branch_source'),
   'stars':None,'license':None,'license_class':None,'languages':[],'techs':[],'dependencies':[],'error':None}
  try:out['stars']=repo_stars(repo)
- except Exception as e:print(f'WARN stars {repo}: {e}',file=sys.stderr)
+ except Exception as e:warn(f'WARN stars {repo}: {e}')
  try:out['license']=repo_license(repo)
- except Exception as e:print(f'WARN license {repo}: {e}',file=sys.stderr)
+ except Exception as e:warn(f'WARN license {repo}: {e}')
  out['license_class']=classify(out['license'],policy)
  try:
   branch=out['branch']=t.get('branch') or ac.default_branch(repo)
@@ -42,5 +43,5 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   (licenses or fill_licenses)(out['dependencies'])
   for d in out['dependencies']:d['license_class']=classify(d.get('license'),policy)
   explain(out['dependencies'])   # every empty latest, license and vulns gets a reason
- except Exception as e:out['error']=str(e)[:180];print(f'ERROR stack {repo}@{out["branch"]}: {e}',file=sys.stderr)
+ except Exception as e:out['error']=str(e)[:180];warn(f'ERROR stack {repo}@{out["branch"]}: {e}')
  return out

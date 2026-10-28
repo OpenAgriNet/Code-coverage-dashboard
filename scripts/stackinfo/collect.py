@@ -1,9 +1,10 @@
 """Stack records for the working branch and the default branch of every repo."""
 import sys
 import aggregate_coverage as ac
+from .log import warn
 from .record import stack_record
 
-def collect(targets,policy=None,stack=None,record=stack_record,default_branch=ac.default_branch,log=lambda m:print(m,file=sys.stderr)):
+def collect(targets,policy=None,stack=None,record=stack_record,default_branch=ac.default_branch,log=warn):
  """{'repositories': working-branch records, 'main': default-branch records}.
  A repo whose working branch is its default branch is analysed once and appears in both."""
  dev,main=[],[]
