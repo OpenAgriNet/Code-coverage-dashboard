@@ -47,6 +47,12 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   if settings.check('vulnerabilities'):vulns(deps)
   if settings.check('actions'):actions(deps)
   if settings.check('images'):images(deps)
+  # an image named like this repository is the repository itself, built from its Dockerfile (docker-compose build: .) and not
+  # published: it takes the repository's license and stars, and explain() says why it has no versions or scan
+  for d in deps:
+   if d.get('ecosystem')=='docker' and d.get('name','').lower() in (repo.lower(),f'{github.ORG}/{repo}'.lower()):
+    d['own']=True;d['project']=f'github.com/{github.ORG}/{repo}'
+    if not d.get('license') and out['license']:d.update(license=out['license'],license_of='repository')
   if settings.check('terraform'):(providers or annotate_terraform)(deps)
   (tools or annotate_releases)(deps)   # rows exist only when dependencies.checks.workflow_tools listed them
   if settings.check('stars'):(stars or annotate_stars)(deps)

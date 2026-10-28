@@ -11,12 +11,12 @@ CACHE={}
 def configured(name,key):
  """The value config/repos.json gives this image under dependencies.<key>, whichever way the image is spelled there."""
  return {canonical(k):v for k,v in settings.get(key).items()}.get(canonical(name))
-def license_for(name,labels,main,license_of):
+def license_for(name,labels,main,license_of,tag=None):
  """(license, where, from) for an image, the first that gives one: the license config/repos.json states for it
  (dependencies.image_licenses), its GitHub repository named there (dependencies.image_sources), its own license label, the
  repository its source label names, or the license of its own program inside it (main package). None when none does.
  labels and main are None when the image could not be scanned; the config still applies then."""
- lic=configured(name,'image_licenses')
+ lic=(tag and configured(f'{name}:{tag}','image_licenses')) or configured(name,'image_licenses')   # name:tag first: redis:7 and redis:alpine differ
  if lic:return lic,'config',None
  repo=configured(name,'image_sources')
  if repo:
@@ -51,7 +51,7 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  else:
   labels,main=res.pop('labels',{}),res.pop('main',None)
   out['vulns']={'checked_version':tag,'exact':True,**res}
- try:lic=license_for(name,res and labels,res and main,license_of)
+ try:lic=license_for(name,res and labels,res and main,license_of,tag)
  except Exception as e:lic=None;errors['license']=short_error(e);log(f'WARN license lookup failed for {name}:{tag}: {e}')
  if lic:out.update(license=lic[0],license_of=lic[1],**({'license_from':lic[2]} if lic[2] else {}))
  elif res is None and 'license' not in errors:errors['license']=errors['vulns']

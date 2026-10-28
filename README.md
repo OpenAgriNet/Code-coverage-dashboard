@@ -200,7 +200,9 @@ Everything is optional. A key you leave out keeps its default, and a list or map
 | `image_kinds` | What each Docker image is, shown as its ecosystem: the first keyword its full name contains decides (`postgres` → Database, `redis` → Cache, `grafana` → Observability, `langfuse` → AI / LLM). Giving this map replaces the built-in one. |
 | `default_image_kind` | The kind of an image no keyword matches (default *Application*: usually the project's own images). |
 | `image_sources` | An image's GitHub repository, written `owner/repo`, whose license is then looked up: `{"jaegertracing/all-in-one": "jaegertracing/jaeger"}`. Any spelling of the image matches (`postgres`, `docker.io/postgres`). |
-| `image_licenses` | The license the team states for an image when nothing machine-readable gives one: `{"postgres": "PostgreSQL"}`. It wins over every other source and applies even when the image cannot be pulled. |
+| `image_licenses` | The license the team states for an image when nothing machine-readable gives one: `{"postgres": "PostgreSQL"}`. A key may carry a tag when the license depends on the version (`"redis:7"`, `"redis:alpine"`); `name:tag` is tried before `name`. It wins over every other source and applies even when the image cannot be pulled. |
+
+An image named like its own repository (a `docker-compose.yml` with `build: .` and `image: <repo>`) is that repository built locally: it takes the repository's license and stars, and its latest version is N/A because it is never published.
 
 A mistake (an unknown key, a wrong type, a number out of range) stops the refresh with an error that names it.
 
