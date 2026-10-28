@@ -196,7 +196,9 @@ Everything is optional. A key you leave out keeps its default, and a list or map
 | `groups.default_workflow_group` | Group when no key matches. |
 | `terraform.trusted_registries` | Registries whose providers take the license and stars of `<namespace>/terraform-provider-<type>`. |
 | `license_aliases` | License texts in image labels and the SPDX id they mean. The defaults cover the usual spellings of Apache, MIT, BSD, GPL, AGPL and MPL; giving this key replaces them. |
-| `ecosystem_names` | Names shown for each ecosystem, merged over the built-in ones (`npm`, `python`, `golang`, `docker`, `githubAction`, `terraform`, `githubRelease`). |
+| `ecosystem_names` | Names shown for each ecosystem, merged over the built-in ones: Node.js, Python, Go, GitHub Actions, Terraform, CLI tool, Container for (`npm`, `python`, `golang`, `docker`, `githubAction`, `terraform`, `githubRelease`). |
+| `image_kinds` | What each Docker image is, shown as its ecosystem: the first keyword its full name contains decides (`postgres` → Database, `redis` → Cache, `grafana` → Observability, `langfuse` → AI / LLM). Giving this map replaces the built-in one. |
+| `default_image_kind` | The kind of an image no keyword matches (default *Application*: usually the project's own images). |
 | `image_sources` | An image's GitHub repository, written `owner/repo`, whose license is then looked up: `{"jaegertracing/all-in-one": "jaegertracing/jaeger"}`. Any spelling of the image matches (`postgres`, `docker.io/postgres`). |
 | `image_licenses` | The license the team states for an image when nothing machine-readable gives one: `{"postgres": "PostgreSQL"}`. It wins over every other source and applies even when the image cannot be pulled. |
 

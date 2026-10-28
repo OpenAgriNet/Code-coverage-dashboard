@@ -71,8 +71,17 @@ DEPENDENCY_DEFAULTS={
   'agplv3':'AGPL-3.0-only','mpl 2.0':'MPL-2.0'},
  # an image's license when nothing machine-readable gives one: its GitHub repo (license looked up), or the license itself
  'image_sources':{},'image_licenses':{},
- 'ecosystem_names':{'npm':'npm','python':'PyPI','golang':'Go','docker':'Docker','githubAction':'GitHub Action','terraform':'Terraform provider',
-  'githubRelease':'GitHub release'},
+ 'ecosystem_names':{'npm':'Node.js','python':'Python','golang':'Go','docker':'Container','githubAction':'GitHub Actions','terraform':'Terraform',
+  'githubRelease':'CLI tool'},
+ # what a Docker image is, shown as its ecosystem: the first keyword its full name contains (postgres -> Database); else the default
+ 'image_kinds':{'pgvector':'Database','postgres':'Database','mysql':'Database','mariadb':'Database','mongo':'Database','clickhouse-server':'Database',
+  'cassandra':'Database','redis':'Cache','valkey':'Cache','memcached':'Cache','qdrant':'Vector / search','weaviate':'Vector / search',
+  'milvus':'Vector / search','elasticsearch':'Vector / search','opensearch':'Vector / search','minio':'Object storage','minio/mc':'Object storage',
+  'grafana':'Observability','loki':'Observability','prometheus':'Observability','jaeger':'Observability','zipkin':'Observability',
+  'opentelemetry':'Observability','otel/':'Observability','clickstack':'Observability','hyperdx':'Observability','langfuse':'AI / LLM',
+  'ollama':'AI / LLM','temporal':'Workflow','nginx':'Proxy','traefik':'Proxy','envoy':'Proxy','keycloak':'Identity','kafka':'Messaging',
+  'rabbitmq':'Messaging','nats':'Messaging'},
+ 'default_image_kind':'Application',
 }
 IMAGE_LIMITS={'workers':(1,16),'scan_timeout':(60,3600),'max_findings':(1,500),'resolve_limit':(0,200),'max_tag_pages':(1,500)}
 def _keys(raw,allowed,where):
@@ -91,6 +100,9 @@ def _image_sources(raw):
  bad=[f'{k}: {v}' for k,v in out.items() if not GITHUB_REPO.fullmatch(v)]
  if bad:raise ConfigError(f'dependencies.image_sources must map an image to a GitHub repository written owner/repo; not: {", ".join(bad)}')
  return out
+def _name(v,where):
+ if not isinstance(v,str) or not v.strip():raise ConfigError(f'{where} must be a name')
+ return v.strip()
 def dependency_settings(raw):
  """The dependency scan's switches, limits and names: config/repos.json's "dependencies" block over DEPENDENCY_DEFAULTS."""
  D=DEPENDENCY_DEFAULTS;raw=_keys(raw,D,'dependencies')
@@ -111,6 +123,8 @@ def dependency_settings(raw):
  return {'checks':checks,'images':images,'groups':groups,'terraform':tf,
   'license_aliases':_text_map(raw.get('license_aliases',D['license_aliases']),'dependencies.license_aliases',lower_keys=True),
   'ecosystem_names':{**D['ecosystem_names'],**_text_map(raw.get('ecosystem_names',{}),'dependencies.ecosystem_names')},
+  'image_kinds':_text_map(raw.get('image_kinds',D['image_kinds']),'dependencies.image_kinds',lower_keys=True),
+  'default_image_kind':_name(raw.get('default_image_kind',D['default_image_kind']),'dependencies.default_image_kind'),
   'image_sources':_image_sources(raw.get('image_sources',{})),
   'image_licenses':_text_map(raw.get('image_licenses',{}),'dependencies.image_licenses')}
 def releases(raw,base,where):

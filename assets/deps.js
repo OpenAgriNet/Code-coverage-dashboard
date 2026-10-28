@@ -1,6 +1,7 @@
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ECO={npm:'npm',python:'PyPI',golang:'Go',docker:'Docker',githubAction:'GitHub Action',terraform:'Terraform provider',githubRelease:'GitHub release'};
+// built-in names for data written before dependencies.ecosystem_names and image kinds; the data's own names replace them
+const ECO={npm:'Node.js',python:'Python',golang:'Go',docker:'Container',githubAction:'GitHub Actions',terraform:'Terraform',githubRelease:'CLI tool'};
 // a Docker image reference split into its registry (Docker Hub when none is named) and its repository path
 function image(n){const p=n.split('/'),host=p.length>1&&/[.:]|^localhost$/.test(p[0]);return {registry:host?p[0]:'docker.io',path:(host?p.slice(1):p).join('/')}}
 const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
@@ -15,7 +16,8 @@ const starCount=n=>!Number.isFinite(n)||n<0?'':n>=1e6?(n/1e6).toFixed(1).replace
 // GitHub's star octicon (MIT, primer/octicons)
 const STAR='<svg class="star-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Zm0 2.445L6.615 5.5a.75.75 0 0 1-.564.41l-3.097.45 2.24 2.184a.75.75 0 0 1 .216.664l-.528 3.084 2.769-1.456a.75.75 0 0 1 .698 0l2.77 1.456-.53-3.084a.75.75 0 0 1 .216-.664l2.24-2.183-3.096-.45a.75.75 0 0 1-.564-.41L8 2.694Z"/></svg>';
 const starChip=(n,of)=>!Number.isFinite(n)?'':` <span class="stars" title="${esc(n.toLocaleString()+' stars on '+of)}">${STAR}${starCount(n)}<span class="sr"> stars</span></span>`;
-const ecoOf=d=>d.ecosystem==='docker'?image(d.name).registry:d.ecosystem;
+// an image's ecosystem is what it is (Database, Cache, Observability, ...) as the collector classed it
+const ecoOf=d=>d.ecosystem==='docker'?d.kind||'docker':d.ecosystem;
 const LOOKED=['npm','python','golang','githubAction'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
 const RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Restricted use (red)',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
@@ -96,7 +98,7 @@ function row(d,single,i){
   const [vc,fx]=vulnCells(d);
   const rs=(repos.find(r=>r.repository===d.repository)||{}).stars;
   const rk=riskOf(d),hl=rk==='red'||rk==='yellow'?` class="row-risk-${rk}"`:'';   // licenses to avoid or use with care stand out
-  return `<tr${hl}><td>${name}${starChip(d.stars,d.stars_of)}${single?'':`<div class="sub">${esc(d.repository)}${starChip(rs,'github.com/'+(data.organization||'')+'/'+d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The version this tag points to today">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${d.vulns&&d.vulns.count?`<button type="button" class="fix-open" data-i="${i}" aria-haspopup="dialog">${fx}<span class="open-hint">Details</span></button>`:fx}</td></tr>`;
+  return `<tr${hl}><td>${name}${starChip(d.stars,d.stars_of)}${single?'':`<div class="sub">${esc(d.repository)}${starChip(rs,'github.com/'+(data.organization||'')+'/'+d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}${d.ecosystem==='docker'?`<div class="sub" title="Container image from this registry">image · ${esc(image(d.name).registry)}</div>`:''}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The version this tag points to today">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${d.vulns&&d.vulns.count?`<button type="button" class="fix-open" data-i="${i}" aria-haspopup="dialog">${fx}<span class="open-hint">Details</span></button>`:fx}</td></tr>`;
 }
 // Row order: the Sort by menu, kept in ?sort=. Rows without stars, or not checked for vulnerabilities, go last.
 const SORTS={
