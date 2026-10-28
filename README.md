@@ -25,8 +25,8 @@ The config says only what the scripts cannot know. Repos are **found**, not list
 
 ```json
 "sources": [{"type": "query", "query": "props.project-name:\"OAN DPG\"", "tags": ["DPG"]}],
-"exclude": ["engineering-tracker", "Code-coverage-dashboard"],
-"repositories": [{"name": "infra-automation"}],
+"exclude": ["engineering-tracker", "Code-coverage-dashboard", "infra-automation"],
+"repositories": [],
 "branches": {"development": "^(dev|develop|development)$"}
 ```
 
@@ -34,11 +34,11 @@ The config says only what the scripts cannot know. Repos are **found**, not list
 - `query` is a [GitHub repository search](https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories). `org:<organization>` and `fork:true` are added for you, because search hides forks by default (`"include_forks": false` opts out). Custom properties are searched with `props.<name>:"<value>"`.
 - `project` finds repos with an issue or PR on an org project board (`"number"`, optional `"org"`). It needs the `DPG_PROJECT_TOKEN` secret. Not used by default.
 - Both accept `tags` and `enabled`.
-- Private repos found by a source are skipped, because the dashboard is public.
+- Private repos found by a source are skipped, because the dashboard is public. A private repo added under `repositories` gets no data either: the workflow's built-in token cannot read another repository's branches, runs or code, so it would show only as its default branch with nothing measured. That is why `infra-automation` is excluded.
 - **A `props.` query needs a token that can read the organization's custom properties.** The workflow's built-in token cannot. GitHub does not report an error in that case: it silently ignores the `props.` part and returns **every** repository (even a made-up value matches all of them). The refresh checks for this on every run, by asking the same question with a value no repo can have, and **stops with an error** instead of publishing the whole organization. Put a token that can read custom properties in the `DPG_QUERY_TOKEN` secret (used only for this search). A classic token with `read:org` worked in testing; for a fine-grained token use the organization permission for custom properties (read). If the refresh keeps failing after you add it, the check is telling you the token still cannot read them.
 - If a source fails (rate limit, bad token) the refresh **stops with an error naming it**, nothing is published, and the dashboard keeps its last data. A query that finds nothing only logs a warning. There is no fixed fallback list.
 
-**`exclude`**: repo names to drop, whatever finds them. This is where repos such as the engineering tracker or this dashboard go.
+**`exclude`**: repo names to drop, whatever finds them, even an entry under `repositories`. This is where repos such as the engineering tracker, this dashboard, or a private repo the workflow cannot read go.
 
 **`repositories`**: custom additions and overrides only. A repo the sources already find needs no entry. Use an entry to add a repo the query does not find (a private one, or one outside the query), or to set something for one repo:
 

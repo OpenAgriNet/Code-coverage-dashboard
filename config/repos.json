@@ -9,11 +9,9 @@
     }
   ],
 
-  "exclude": ["engineering-tracker", "Code-coverage-dashboard"],
+  "exclude": ["engineering-tracker", "Code-coverage-dashboard", "infra-automation"],
 
-  "repositories": [
-    { "name": "infra-automation" }
-  ],
+  "repositories": [],
 
   "branches": {
     "development": "^(dev|develop|development)$"
