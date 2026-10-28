@@ -31,7 +31,9 @@ def dep_info(eco,name,version,fetch=fetch):
    # deps.dev does not say whether several licenses mean any-of or all-of: show a neutral list; the policy treats it as all-of
    if info:
     out.update(license=', '.join(info.get('licenses') or []) or None,license_of=tag)
-    src=next((p['projectKey']['id'] for p in info.get('relatedProjects') or [] if p.get('relationType')=='SOURCE_REPO' and p.get('projectKey',{}).get('id')),None)
+    # a SOURCE_REPO can be a GitHub Sponsors page (uvicorn lists github.com/sponsors/encode before github.com/kludex/uvicorn)
+    src=next((p['projectKey']['id'] for p in info.get('relatedProjects') or [] if p.get('relationType')=='SOURCE_REPO'
+     and p.get('projectKey',{}).get('id') and not p['projectKey']['id'].startswith('github.com/sponsors/')),None)
     if src:out['project']=src   # where the package is developed, for its star count
     break
  except Exception as e:  # 'error' so a lookup failure is not shown as 'no license'

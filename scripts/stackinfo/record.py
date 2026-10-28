@@ -14,6 +14,7 @@ from stackinfo.lookups.stars import annotate as annotate_stars, github_stars, fi
 from stackinfo.rules.policy import classify
 from stackinfo.rules.reasons import explain
 from stackinfo.rules.names import add_short
+from stackinfo.rules.kinds import add_kinds
 
 def repo_license(repo):
  """SPDX id of the repo's own LICENSE file, 'Other' if GitHub can't classify it, None if there is none."""
@@ -40,12 +41,18 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   raw=analyse(repo,branch);s=summarize(raw,stack);found=raw.get('manifests') or {}
   rows=s['dependencies']+unlisted(found,s['dependencies'])   # what the analyser misses: dependency-groups, build requires, CI tools
   out.update(languages=s['languages'],techs=s['techs'],dependencies=[info(*d) for d in rows])
-  attach_groups(out['dependencies'],found);add_short(out['dependencies'])
+  attach_groups(out['dependencies'],found);add_short(out['dependencies']);add_kinds(out['dependencies'])
   deps=out['dependencies']
   # each lookup can be turned off under dependencies.checks; explain() then says so in the empty cells
   if settings.check('vulnerabilities'):vulns(deps)
   if settings.check('actions'):actions(deps)
   if settings.check('images'):images(deps)
+  # an image named like this repository is the repository itself, built from its Dockerfile (docker-compose build: .) and not
+  # published: it takes the repository's license and stars, and explain() says why it has no versions or scan
+  for d in deps:
+   if d.get('ecosystem')=='docker' and d.get('name','').lower() in (repo.lower(),f'{github.ORG}/{repo}'.lower()):
+    d['own']=True;d['project']=f'github.com/{github.ORG}/{repo}'
+    if not d.get('license') and out['license']:d.update(license=out['license'],license_of='repository')
   if settings.check('terraform'):(providers or annotate_terraform)(deps)
   (tools or annotate_releases)(deps)   # rows exist only when dependencies.checks.workflow_tools listed them
   if settings.check('stars'):(stars or annotate_stars)(deps)

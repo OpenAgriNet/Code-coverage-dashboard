@@ -14,7 +14,7 @@ def configured():
     def apply(**block):
         settings.configure(config.dependency_settings(block))
     yield apply
-    settings.configure(config.dependency_settings(None))
+    settings.reset()   # back to config/dependencies.json
 
 def test_defaults_apply_until_configured():
     assert settings.check('images') and settings.get('images', 'workers') == 4

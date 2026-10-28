@@ -1,6 +1,7 @@
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ECO={npm:'npm',python:'PyPI',golang:'Go',docker:'Docker',githubAction:'GitHub Action',terraform:'Terraform provider',githubRelease:'GitHub release'};
+// built-in names for data written before dependencies.ecosystem_names and image kinds; the data's own names replace them
+const ECO={npm:'Node.js',python:'Python',golang:'Go',docker:'Container',githubAction:'GitHub Actions',terraform:'Terraform',githubRelease:'CLI tool'};
 // a Docker image reference split into its registry (Docker Hub when none is named) and its repository path
 function image(n){const p=n.split('/'),host=p.length>1&&/[.:]|^localhost$/.test(p[0]);return {registry:host?p[0]:'docker.io',path:(host?p.slice(1):p).join('/')}}
 const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
@@ -15,9 +16,10 @@ const starCount=n=>!Number.isFinite(n)||n<0?'':n>=1e6?(n/1e6).toFixed(1).replace
 // GitHub's star octicon (MIT, primer/octicons)
 const STAR='<svg class="star-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Zm0 2.445L6.615 5.5a.75.75 0 0 1-.564.41l-3.097.45 2.24 2.184a.75.75 0 0 1 .216.664l-.528 3.084 2.769-1.456a.75.75 0 0 1 .698 0l2.77 1.456-.53-3.084a.75.75 0 0 1 .216-.664l2.24-2.183-3.096-.45a.75.75 0 0 1-.564-.41L8 2.694Z"/></svg>';
 const starChip=(n,of)=>!Number.isFinite(n)?'':` <span class="stars" title="${esc(n.toLocaleString()+' stars on '+of)}">${STAR}${starCount(n)}<span class="sr"> stars</span></span>`;
-const ecoOf=d=>d.ecosystem==='docker'?image(d.name).registry:d.ecosystem;
+// an image's ecosystem is what it is (Database, Cache, Observability, ...) as the collector classed it
+const ecoOf=d=>d.ecosystem==='docker'?d.kind||'docker':d.ecosystem;
 const LOOKED=['npm','python','golang','githubAction'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
-const RISK={green:'Preferred',yellow:'Not recommended',red:'Not to use',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
+const RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Restricted use (red)',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const GROUP={main:'main (installed with the app)',dev:'dev',test:'test',security:'security',optional:'optional',peer:'peer',runtime:'runtime (Docker image)',ci:'ci (GitHub Action)',tool:'tool','(not found)':'not found in a manifest'};
 const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
@@ -86,7 +88,7 @@ function licCell(d){
   if(!d.license)return LOOKED.includes(d.ecosystem)?'<span class="muted">Unknown</span>':NIL('Not looked up: license lookup does not cover this ecosystem yet');
   const r=riskOf(d);
   const several=d.license.includes(', ')?' All of these licenses apply, so the strictest one counts.':'';
-  return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}${d.license_of==='source'&&d.ecosystem!=='docker'?' <span class="sub" title="The registry states no license; this is the license of the package\'s source repository">(source repo)</span>':''}${d.license_of==='config'?' <span class="sub" title="Stated in config/repos.json (dependencies.image_licenses)">(set in config)</span>':''}${d.license_of==='repo'?` <span class="sub" title="${esc('License of '+(d.license_from||'the GitHub repository')+', which config/repos.json names as this image\'s source (dependencies.image_sources)')}">(source repo)</span>`:''}${d.license_of==='package'?` <span class="sub" title="${esc('License of the image\'s own program inside it: '+(d.license_from||'its main package'))}">(main package)</span>`:''}${d.license_of==='label'?' <span class="sub" title="From the image\'s own license label (org.opencontainers.image.licenses): declared by whoever published the image, not verified">(image label)</span>':d.license_of==='source'&&d.ecosystem==='docker'?' <span class="sub" title="The image has no license label; this is the license of the GitHub repository its source label names">(source repo)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
+  return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}${d.license_of==='source'&&d.ecosystem!=='docker'?' <span class="sub" title="The registry states no license; this is the license of the package\'s source repository">(source repo)</span>':''}${d.license_of==='repository'?' <span class="sub" title="This is the repository\'s own image, built from its Dockerfile: the repository\'s license">(this repository)</span>':''}${d.license_of==='config'?' <span class="sub" title="Stated in config/repos.json (dependencies.image_licenses)">(set in config)</span>':''}${d.license_of==='repo'?` <span class="sub" title="${esc('License of '+(d.license_from||'the GitHub repository')+', which config/repos.json names as this image\'s source (dependencies.image_sources)')}">(source repo)</span>`:''}${d.license_of==='package'?` <span class="sub" title="${esc('License of the image\'s own program inside it: '+(d.license_from||'its main package'))}">(main package)</span>`:''}${d.license_of==='label'?' <span class="sub" title="From the image\'s own license label (org.opencontainers.image.licenses): declared by whoever published the image, not verified">(image label)</span>':d.license_of==='source'&&d.ecosystem==='docker'?' <span class="sub" title="The image has no license label; this is the license of the GitHub repository its source label names">(source repo)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
 }
 function row(d,single,i){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
@@ -96,7 +98,7 @@ function row(d,single,i){
   const [vc,fx]=vulnCells(d);
   const rs=(repos.find(r=>r.repository===d.repository)||{}).stars;
   const rk=riskOf(d),hl=rk==='red'||rk==='yellow'?` class="row-risk-${rk}"`:'';   // licenses to avoid or use with care stand out
-  return `<tr${hl}><td>${name}${starChip(d.stars,d.stars_of)}${single?'':`<div class="sub">${esc(d.repository)}${starChip(rs,'github.com/'+(data.organization||'')+'/'+d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The version this tag points to today">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${d.vulns&&d.vulns.count?`<button type="button" class="fix-open" data-i="${i}" aria-haspopup="dialog">${fx}<span class="open-hint">Details</span></button>`:fx}</td></tr>`;
+  return `<tr${hl}><td>${name}${starChip(d.stars,d.stars_of)}${single?'':`<div class="sub">${esc(d.repository)}${starChip(rs,'github.com/'+(data.organization||'')+'/'+d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}${d.ecosystem==='docker'?`<div class="sub" title="Container image from this registry">image · ${esc(image(d.name).registry)}</div>`:''}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The version this tag points to today">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${d.vulns&&d.vulns.count?`<button type="button" class="fix-open" data-i="${i}" aria-haspopup="dialog">${fx}<span class="open-hint">Details</span></button>`:fx}</td></tr>`;
 }
 // Row order: the Sort by menu, kept in ?sort=. Rows without stars, or not checked for vulnerabilities, go last.
 const SORTS={
@@ -105,6 +107,8 @@ const SORTS={
   name:(a,b)=>displayName(a).localeCompare(displayName(b),undefined,{sensitivity:'base'})||a.repository.localeCompare(b.repository),
   vulns:(a,b)=>((b.vulns||{}).count??-1)-((a.vulns||{}).count??-1)||SORTS.repo(a,b),
 };
+// each license list's name with its colour, e.g. Restricted use (red); the names come from licenses.labels
+const withColour=l=>Object.fromEntries(Object.entries(l||{}).filter(([k])=>['green','yellow','red'].includes(k)).map(([k,v])=>[k,`${v} (${k})`]));
 let sortBy=(k=>SORTS[k]?k:'repo')(new URLSearchParams(location.search).get('sort'));
 function render(list,state){
   list=list.slice().sort(SORTS[sortBy]);
@@ -127,7 +131,7 @@ function renderPolicy(){
   $('policy-title').textContent=`License policy: ${RISK.green}, ${RISK.yellow}, ${RISK.red}`;
   const any=['green','yellow','red'].some(k=>(policy[k]||[]).length);
   $('policy').innerHTML=any?`<ul class="policy">${['green','yellow','red'].map(k=>`<li><span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span><b>${RISK[k]}</b></span> ${(policy[k]||[]).length?(policy[k]).map(x=>`<code>${esc(x)}</code>`).join(' '):'<span class="muted">none listed</span>'}</li>`).join('')}${policy.no_license?`<li><span class="risk risk-${esc(policy.no_license)}"><span class="dot" aria-hidden="true"></span><b>${esc(RISK[policy.no_license])}</b></span> also: <i>no license</i> (nothing states one; a failed lookup is not counted)</li>`:''}</ul>`
-    :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code> (Preferred), <code>yellow</code> (Not recommended) and <code>red</code> (Not to use) in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
+    :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code> (Preferred), <code>yellow</code> (Not recommended) and <code>red</code> (Restricted use) in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
 }
 function load(){   // the records of the branch being shown
   // Development lists only repos whose development branch was found; the note under the switch names the others
@@ -145,7 +149,7 @@ async function init(){
     const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
     data=await res.json();policy=data.license_policy||policy;load();
     // names set in config/repos.json (licenses.labels, dependencies.ecosystem_names); the built-in ones cover older data
-    Object.assign(RISK,policy.labels||{});Object.assign(ECO,(data.display||{}).ecosystems||{});
+    Object.assign(RISK,withColour(policy.labels));Object.assign(ECO,(data.display||{}).ecosystems||{});
     $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
     renderPolicy();
     bar=Filters.createFilterBar($('filters'),{facets:FACETS,items:all,noun:'dependencies',text:{param:'q',placeholder:'Find a package or license',of:d=>d.name+' '+(d.license||'')},onChange:render});

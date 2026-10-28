@@ -183,24 +183,43 @@ def test_invalid_release_sets(bad, msg):
 def test_shipped_config_follows_the_new_shape():
     c = config.load('config/repos.json')
     assert [s['type'] for s in c['sources']] == ['query'] and all('fallback' not in s for s in c['sources'])
-    assert [r['name'] for r in c['repositories']] == ['infra-automation']
-    assert 'engineering-tracker' in c['exclude'] and c['security']['workflow'] == 'security.yml'
+    assert c['repositories'] == []   # infra-automation is private and the workflow cannot read it, so it is excluded
+    assert {'engineering-tracker', 'infra-automation'} <= set(c['exclude']) and c['security']['workflow'] == 'security.yml'
 
 def test_license_labels_default_and_can_be_renamed_one_at_a_time():
-    assert n()['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Not to use'}
+    assert n()['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Restricted use'}
     assert n(licenses={'labels': {'red': ' Avoid '}})['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Avoid'}
 
-def test_dependency_settings_default_to_everything_on():
+def test_built_in_dependency_defaults_are_switches_and_limits_only():
     d = n()['dependencies']
-    assert all(d['checks'].values()) and d['images']['workers'] == 4 and d['groups']['aliases']['tests'] == 'test'
+    assert all(d['checks'].values()) and d['images']['workers'] == 4 and d['groups']['default_workflow_group'] == 'ci'
+    assert d['groups']['aliases'] == {} and d['image_kinds'] == {} and d['terraform']['trusted_registries'] == [] and d['ecosystem_names'] == {}
+
+def test_the_mappings_come_from_config_dependencies_json():
+    d = config.load('config/repos.json')['dependencies']
+    assert d['groups']['aliases']['tests'] == 'test' and d['groups']['by_ecosystem'] == {'docker': 'runtime', 'githubAction': 'ci'}
     assert d['terraform']['trusted_registries'] == ['registry.terraform.io', 'registry.opentofu.org'] and d['ecosystem_names']['golang'] == 'Go'
+    assert d['image_sources']['fidedocker/onix-adapter'] == 'beckn/beckn-onix' and d['image_licenses']['redis:7'] == 'LicenseRef-RSALv2 OR SSPL-1.0'
+    assert '_note' not in d['image_kinds'] and '_note' not in d['checks']   # notes document the file and are dropped
+
+def test_dependencies_in_repos_json_points_to_the_new_file(tmp_path):
+    (tmp_path / 'repos.json').write_text('{"organization": "o", "dependencies": {"image_sources": {}}}')
+    with pytest.raises(ConfigError, match='moved to dependencies.json'):
+        config.load(str(tmp_path / 'repos.json'))
+
+def test_a_missing_or_broken_dependencies_file(tmp_path):
+    (tmp_path / 'repos.json').write_text('{"organization": "o"}')
+    assert config.load(str(tmp_path / 'repos.json'))['dependencies'] == config.dependency_settings(None)
+    (tmp_path / 'dependencies.json').write_text('{"image_sources": {"postgres": "not a repo"}}')
+    with pytest.raises(ConfigError, match='dependencies.json: dependencies.image_sources'):
+        config.load(str(tmp_path / 'repos.json'))
 
 def test_dependency_settings_override_one_key_at_a_time():
     d = n(dependencies={'checks': {'images': False}, 'images': {'workers': 2}, 'groups': {'aliases': {'Specs': 'test'}},
                         'ecosystem_names': {'golang': 'Go Modules'}})['dependencies']
     assert d['checks']['images'] is False and d['checks']['actions'] is True and d['images']['workers'] == 2 and d['images']['scan_timeout'] == 900
     assert d['groups']['aliases'] == {'specs': 'test'}   # a map given replaces the default, keys compared in lower case
-    assert d['ecosystem_names']['golang'] == 'Go Modules' and d['ecosystem_names']['npm'] == 'npm'   # names are merged over the defaults
+    assert d['ecosystem_names'] == {'golang': 'Go Modules'}
 
 @pytest.mark.parametrize('bad,msg', [
     ({'scan': True}, 'unknown key'),

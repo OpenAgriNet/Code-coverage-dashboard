@@ -11,12 +11,12 @@ CACHE={}
 def configured(name,key):
  """The value config/repos.json gives this image under dependencies.<key>, whichever way the image is spelled there."""
  return {canonical(k):v for k,v in settings.get(key).items()}.get(canonical(name))
-def license_for(name,labels,main,license_of):
+def license_for(name,labels,main,license_of,tag=None):
  """(license, where, from) for an image, the first that gives one: the license config/repos.json states for it
  (dependencies.image_licenses), its GitHub repository named there (dependencies.image_sources), its own license label, the
  repository its source label names, or the license of its own program inside it (main package). None when none does.
  labels and main are None when the image could not be scanned; the config still applies then."""
- lic=configured(name,'image_licenses')
+ lic=(tag and configured(f'{name}:{tag}','image_licenses')) or configured(name,'image_licenses')   # name:tag first: redis:7 and redis:alpine differ
  if lic:return lic,'config',None
  repo=configured(name,'image_sources')
  if repo:
@@ -28,9 +28,12 @@ def license_for(name,labels,main,license_of):
  if main:return main[0],'package',main[1]
  return None
 def image_repo(name,labels,main):
- """owner/repo of the image's GitHub repository: the one config/repos.json names, its source label's, or its main Go module's."""
+ """owner/repo of the image's GitHub repository: the one config/repos.json names, its source label's, its main Go module's, or for
+ an image on ghcr.io the repository of the same name (ghcr.io/openagrinet/knowledge-provider -> OpenAgriNet/knowledge-provider)."""
  repo=configured(name,'image_sources') or (labels and source_repo(labels))
  if not repo and main and main[1].startswith('github.com/'):repo='/'.join(main[1].split()[0].split('/')[1:3])
+ host,path=split(name)
+ if not repo and host=='ghcr.io' and path.count('/')>=1:repo='/'.join(path.split('/')[:2])   # GHCR namespaces are GitHub accounts
  return repo or None
 def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  license_of=license_of or project_license
@@ -48,7 +51,7 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  else:
   labels,main=res.pop('labels',{}),res.pop('main',None)
   out['vulns']={'checked_version':tag,'exact':True,**res}
- try:lic=license_for(name,res and labels,res and main,license_of)
+ try:lic=license_for(name,res and labels,res and main,license_of,tag)
  except Exception as e:lic=None;errors['license']=short_error(e);log(f'WARN license lookup failed for {name}:{tag}: {e}')
  if lic:out.update(license=lic[0],license_of=lic[1],**({'license_from':lic[2]} if lic[2] else {}))
  elif res is None and 'license' not in errors:errors['license']=errors['vulns']

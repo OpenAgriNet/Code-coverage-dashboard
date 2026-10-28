@@ -1,0 +1,145 @@
+{
+  "_about": "Settings and mappings for the dependency scan (data/stack.json). Every key is optional; a list or map given here replaces the built-in default. Keys starting with _ are notes and are ignored. See README, 'Configuring the dependency scan'.",
+  "checks": {
+    "_note": "Turn a kind of lookup off; its cells then say it is turned off.",
+    "vulnerabilities": true,
+    "actions": true,
+    "images": true,
+    "terraform": true,
+    "workflow_tools": true,
+    "stars": true
+  },
+  "images": {
+    "_note": "Limits for Docker image lookups: images looked up at once, seconds to pull and scan one, findings kept per image, version tags compared to find the version behind latest, pages of 1000 tags read.",
+    "workers": 4,
+    "scan_timeout": 900,
+    "max_findings": 50,
+    "resolve_limit": 30,
+    "max_tag_pages": 50
+  },
+  "groups": {
+    "_note": "aliases: group names read as another. workflow_purposes: group of a tool a workflow installs, by a keyword in the workflow's file name (first match wins). by_ecosystem: the group of every Docker image and GitHub Action.",
+    "aliases": {
+      "tests": "test",
+      "testing": "test",
+      "develop": "dev",
+      "development": "dev"
+    },
+    "workflow_purposes": {
+      "security": "security",
+      "scan": "security",
+      "codeql": "security",
+      "trivy": "security",
+      "audit": "security",
+      "test": "test",
+      "lint": "lint",
+      "format": "lint",
+      "docs": "docs",
+      "release": "build",
+      "publish": "build",
+      "build": "build",
+      "docker": "build"
+    },
+    "default_workflow_group": "ci",
+    "by_ecosystem": {
+      "docker": "runtime",
+      "githubAction": "ci"
+    }
+  },
+  "terraform": {
+    "_note": "Registries whose providers are built from <namespace>/terraform-provider-<type>, so that repository's license and stars apply.",
+    "trusted_registries": [
+      "registry.terraform.io",
+      "registry.opentofu.org"
+    ]
+  },
+  "ecosystem_names": {
+    "_note": "Names shown in the Ecosystem column and filter.",
+    "npm": "Node.js",
+    "python": "Python",
+    "golang": "Go",
+    "docker": "Container",
+    "githubAction": "GitHub Actions",
+    "terraform": "Terraform",
+    "githubRelease": "CLI tool"
+  },
+  "image_kinds": {
+    "_note": "What a Docker image is, shown as its ecosystem: the first keyword its full name contains (in this order). Add a keyword to class a new image.",
+    "pgvector": "Database",
+    "postgres": "Database",
+    "mysql": "Database",
+    "mariadb": "Database",
+    "mongo": "Database",
+    "clickhouse-server": "Database",
+    "cassandra": "Database",
+    "redis": "Cache",
+    "valkey": "Cache",
+    "memcached": "Cache",
+    "qdrant": "Vector / search",
+    "weaviate": "Vector / search",
+    "milvus": "Vector / search",
+    "elasticsearch": "Vector / search",
+    "opensearch": "Vector / search",
+    "minio": "Object storage",
+    "minio/mc": "Object storage",
+    "grafana": "Observability",
+    "loki": "Observability",
+    "prometheus": "Observability",
+    "jaeger": "Observability",
+    "zipkin": "Observability",
+    "opentelemetry": "Observability",
+    "otel/": "Observability",
+    "clickstack": "Observability",
+    "hyperdx": "Observability",
+    "langfuse": "AI / LLM",
+    "ollama": "AI / LLM",
+    "temporal": "Workflow",
+    "nginx": "Proxy",
+    "traefik": "Proxy",
+    "envoy": "Proxy",
+    "keycloak": "Identity",
+    "kafka": "Messaging",
+    "rabbitmq": "Messaging",
+    "nats": "Messaging"
+  },
+  "default_image_kind": "Application",
+  "image_sources": {
+    "_note": "An image's GitHub repository (owner/repo): its license is looked up there and its stars counted. Any spelling of the image matches.",
+    "clickhouse/clickhouse-server": "ClickHouse/ClickHouse",
+    "jaegertracing/all-in-one": "jaegertracing/jaeger",
+    "openzipkin/zipkin": "openzipkin/zipkin",
+    "grafana/grafana": "grafana/grafana",
+    "grafana/loki": "grafana/loki",
+    "otel/opentelemetry-collector-contrib": "open-telemetry/opentelemetry-collector-contrib",
+    "minio/minio": "minio/minio",
+    "minio/mc": "minio/mc",
+    "cgr.dev/chainguard/minio": "minio/minio",
+    "temporalio/auto-setup": "temporalio/temporal",
+    "temporalio/ui": "temporalio/ui",
+    "docker.langfuse.com/langfuse/langfuse": "langfuse/langfuse",
+    "docker.langfuse.com/langfuse/langfuse-worker": "langfuse/langfuse",
+    "fidedocker/onix-adapter": "beckn/beckn-onix"
+  },
+  "image_licenses": {
+    "_note": "A license stated for an image when nothing machine-readable gives one. name:tag is tried before name (redis 7.4 and 8.x differ). Wins over every other source.",
+    "postgres": "PostgreSQL",
+    "redis:7": "LicenseRef-RSALv2 OR SSPL-1.0",
+    "redis:alpine": "LicenseRef-RSALv2 OR SSPL-1.0 OR AGPL-3.0-only",
+    "pgvector/pgvector": "PostgreSQL"
+  },
+  "license_aliases": {
+    "_note": "License texts found in image labels and the SPDX id they mean.",
+    "apache license 2.0": "Apache-2.0",
+    "apache license, version 2.0": "Apache-2.0",
+    "apache 2.0": "Apache-2.0",
+    "apache-2": "Apache-2.0",
+    "apache2": "Apache-2.0",
+    "mit license": "MIT",
+    "the mit license": "MIT",
+    "bsd": "BSD-3-Clause",
+    "gplv3": "GPL-3.0-only",
+    "gplv2": "GPL-2.0-only",
+    "agplv3": "AGPL-3.0-only",
+    "mpl 2.0": "MPL-2.0"
+  }
+}

@@ -99,6 +99,8 @@ function setView(v){
   if(bar)bar.setItems(repoItems());else{summary();render()}
 }
 let stack=null;
+// each license list's name with its colour, e.g. Restricted use (red); the names come from licenses.labels
+const withColour=l=>Object.fromEntries(Object.entries(l||{}).filter(([k])=>['green','yellow','red'].includes(k)).map(([k,v])=>[k,`${v} (${k})`]));
 // a local action (./.github/actions/x) is not a published package and has no license to find
 const licensable=d=>!(d.ecosystem==='githubAction'&&d.name.startsWith('./'));
 function stackRow(r){
@@ -115,19 +117,81 @@ function stackRow(r){
     +`<td data-label="Dependencies">${dep}</td></tr>`;
 }
 function fillStack(){
+  stackCards();
   if(!stack)return;
   const a=stackList().filter(shown).sort((x,y)=>x.repository.localeCompare(y.repository));
   $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${visibleSet&&stackList().length?'No repositories match these filters.':'No repositories analysed yet.'}</td></tr>`;
 }
+/* ---- cards above each table: computed from the rows that table shows (the branch switch and the filters apply) ---- */
+const TARGET=80;
+// value is text (escaped here); sub is trusted HTML built from numbers and esc()'d names
+function card({label,value,unit='',of=null,bar=null,sub='',tone=''}){
+  const pct=bar==null?null:Math.max(0,Math.min(100,bar*100));
+  return `<div class="kpi"><div class="kpi-label">${esc(label)}</div>`
+    +`<div class="kpi-value${tone?' '+tone:''}">${esc(value)}${unit?`<span class="kpi-unit">${esc(unit)}</span>`:''}${of!=null?`<span class="kpi-of"> / ${esc(of)}</span>`:''}</div>`
+    +(pct==null?'':`<div class="kpi-bar" role="img" aria-label="${Math.round(pct)}%"><span style="width:${pct.toFixed(1)}%"></span></div>`)
+    +(sub?`<div class="kpi-sub">${sub}</div>`:'')+'</div>';
+}
+const plural=(n,one,many)=>`${n} ${n===1?one:many}`;
+function devCards(){
+  const all=viewList().filter(shown),n=all.length,rep=all.filter(r=>isNum(r.coverage));
+  if(!n){$('kpi-dev').innerHTML='';return}
+  const det=rep.filter(r=>isNum((r.coverage_detail||{}).lines)&&+r.coverage_detail.lines>0);
+  const lines=det.reduce((s,r)=>s+ +r.coverage_detail.lines,0),hits=det.reduce((s,r)=>s+ +r.coverage_detail.hits,0);
+  const overall=lines?hits/lines*100:rep.length?rep.reduce((s,r)=>s+ +r.coverage,0)/rep.length:null;
+  const below=rep.filter(r=>+r.coverage<TARGET).length;
+  const stale=rep.filter(r=>r.measured_at&&(Date.now()-new Date(r.measured_at))/864e5>STALE_DAYS).length;
+  const st=k=>all.filter(r=>(r.security||{}).state===k).length,pass=st('passing'),fail=st('failing'),other=n-pass-fail;
+  $('kpi-dev').innerHTML=[
+    card({label:'Reporting coverage',value:rep.length,of:n,bar:rep.length/n,tone:rep.length<n?'warn':'good',sub:n-rep.length?plural(n-rep.length,'repo uploads nothing','repos upload nothing'):'Every repository reports'}),
+    card({label:'Overall line coverage',value:overall==null?'—':overall.toFixed(1),unit:overall==null?'':'%',tone:overall==null?'':overall<TARGET?'warn':'good',
+      sub:lines?`${num(hits)} / ${num(lines)} lines · ${num(lines-hits)} uncovered${det.length<rep.length?` · ${rep.length-det.length} without line counts`:''}`
+        :rep.length?`Mean of ${plural(rep.length,'reporting repository','reporting repositories')}`:'No repository reports coverage'}),
+    card({label:`Below ${TARGET}% target`,value:below,tone:below?'warn':'',sub:`of ${rep.length} reporting`}),
+    card({label:`Stale (> ${STALE_DAYS} days)`,value:stale,tone:stale?'warn':'',sub:'Not re-measured recently'}),
+    card({label:'Security workflow',value:pass,unit:' passing',tone:fail?'':pass?'good':'',
+      sub:`${pass} passing · ${fail?`<span class="bad">${fail} failing</span>`:'0 failing'} · ${other} not run`}),
+  ].join('');
+}
+function releaseCards(){
+  const n=viewList().filter(shown).length,groups=(data.releases||[]).filter(g=>shown(g)&&pool(g).length);
+  if(!n){$('kpi-release').innerHTML='';return}
+  const versions=groups.flatMap(g=>pool(g)),picks=groups.map(relPick).filter(Boolean);
+  const newest=versions.map(v=>v.version).sort(verCmp).pop(),pre=versions.filter(v=>v.prerelease).length;
+  const fail=picks.filter(v=>(v.security||{}).state==='failing').length,cov=picks.filter(v=>isNum(v.coverage)).length;
+  $('kpi-release').innerHTML=[
+    card({label:'Repos with a release',value:groups.length,of:n,bar:groups.length/n,sub:n-groups.length?`${n-groups.length} never released`:'Every repository has released'}),
+    card({label:'Newest version',value:newest||'—',sub:`${plural(versions.length,'version','versions')} tracked · ${pre} pre-release`}),
+    card({label:'Security failing at release',value:fail,tone:fail?'bad':'',sub:fail?'The version shown fails its security workflow':'No shown version fails its security workflow'}),
+    card({label:'Coverage measured at release',value:cov,of:picks.length,tone:cov<picks.length?'warn':'',sub:picks.length-cov?`${picks.length-cov} released with no report`:'Every shown version has a report'}),
+  ].join('');
+}
+function stackCards(){
+  if(!stack){$('kpi-stack').innerHTML='';return}
+  const rs=stackList().filter(shown),n=rs.length;
+  if(!n){$('kpi-stack').innerHTML='';return}
+  const nolic=rs.filter(r=>!r.license).length;
+  const deps=rs.flatMap(r=>(r.dependencies||[]).map(d=>({d,repo:r.repository})));
+  const vul=deps.filter(x=>x.d.vulns&&x.d.vulns.count),vrepos=new Set(vul.map(x=>x.repo)).size;
+  const lic=deps.filter(x=>licensable(x.d)),known=lic.filter(x=>x.d.license).length,pct=lic.length?known/lic.length*100:null;
+  const langs=[...new Set(rs.flatMap(r=>(r.languages||[]).map(l=>l[0])))];
+  $('kpi-stack').innerHTML=[
+    card({label:'Missing LICENSE file',value:nolic,of:n,tone:nolic?'bad':'good',sub:'Required for DPG certification'}),
+    card({label:'Known vulnerabilities',value:vul.length,tone:vul.length?'bad':'good',sub:vul.length?`${vul.length===1?'dependency':'dependencies'} in ${plural(vrepos,'repository','repositories')}`:'No dependency has a known vulnerability'}),
+    card({label:'Dependency licenses known',value:pct==null?'—':Math.floor(pct),unit:pct==null?'':'%',bar:pct==null?null:pct/100,tone:pct!=null&&pct<95?'warn':'',sub:`${num(known)} of ${num(lic.length)} dependencies`}),
+    card({label:'Dependencies',value:num(deps.length),sub:langs.length?`${plural(langs.length,'language','languages')}: ${esc(langs.join(', '))}`:'No languages detected'}),
+  ].join('');
+}
 function render(){
   if($('rel-all').options.length<2)fillRelAll();
+  devCards();releaseCards();
   fill('dev-rows',viewList(),'No repositories configured. Add them to config/repos.json.');
   fill('rel-rows',(data.releases||[]).filter(g=>pool(g).length),relAllowed?'No repository has a version that matches.':'No repository has a release version yet.',relRow);
   fillStack();
 }
 /* ---- filters: one bar for every table (a repository is shown when it passes all of them) ---- */
 const SECL={passing:'Passing',failing:'Failing','no runs':'No runs','no workflow':'No security workflow','branch not found':'Branch not found',unknown:'Unknown'};
-const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Preferred',yellow:'Not recommended',red:'Not to use',unclassified:'Unclassified',none:'No LICENSE file'};
+const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Restricted use (red)',unclassified:'Unclassified',none:'No LICENSE file'};
 const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const stackList=()=>!stack?[]:(view==='main'?stack.main||stack.repositories:Branches.devOnly(stack.repositories))||[];
 function repoItems(){
@@ -163,7 +227,7 @@ function initFilters(){
   const want=new URLSearchParams(location.search).get('ver');if(want)relAll=want;
 }
 async function initStack(){
-  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();Object.assign(RISK,(stack.license_policy||{}).labels||{});if(bar)bar.setItems(repoItems());fillStack();if(data.main.length)render()}   // repo stars come from stack.json
+  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();Object.assign(RISK,withColour((stack.license_policy||{}).labels));if(bar)bar.setItems(repoItems());fillStack();if(data.main.length)render()}   // repo stars come from stack.json
   catch(e){$('stack-rows').innerHTML='<tr><td colspan="4" class="empty">data/stack.json is missing or unreadable.</td></tr>'}
 }
 async function init(){

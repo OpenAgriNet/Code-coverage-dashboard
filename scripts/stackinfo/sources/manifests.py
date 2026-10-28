@@ -4,7 +4,6 @@ import json, os, re, tomllib
 from common.versions import is_exact, normal
 from stackinfo import settings
 NPM={'dependencies':'main','devDependencies':'dev','optionalDependencies':'optional','peerDependencies':'peer'}
-BY_ECOSYSTEM={'docker':'runtime','githubAction':'ci'}
 REQ=re.compile(r'requirements(?:[-_](?P<a>[\w.-]+))?\.txt|(?P<b>[\w.-]+)\.txt')
 PEP508=re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)')
 
@@ -112,7 +111,8 @@ def attach(deps,found):
  """Give every dependency row its groups (Docker images run, Actions are CI), its manifests, and the installed version when the
  manifest gives only a range."""
  for d in deps:
-  if d.get('ecosystem') in BY_ECOSYSTEM:d['groups']=[BY_ECOSYSTEM[d['ecosystem']]];continue
+  by=settings.get('groups','by_ecosystem')   # every Docker image is runtime, every Action ci (config/dependencies.json)
+  if d.get('ecosystem') in by:d['groups']=[by[d['ecosystem']]];continue
   e=found.get(key(d.get('ecosystem'),d.get('name','')))
   d['groups']=e['groups'] if e else []
   if not e:continue
