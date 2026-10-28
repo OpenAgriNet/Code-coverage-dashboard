@@ -89,7 +89,11 @@ const isNum=v=>v!=null&&v!==''&&Number.isFinite(Number(v));
 const num=v=>Number(v).toLocaleString();
 const day=v=>{if(!v)return '';const d=new Date(v);return isNaN(d)?'':d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})};
 const repoUrl=r=>r.html_url||`https://github.com/OpenAgriNet/${r.repository}`;
-const tagChips=r=>(r.tags||(r.dpg?['DPG']:[])).map(g=>`<span class="tag"${g==='DPG'?' title="Part of the OpenAgriNet DPG project"':''}>${esc(g)}</span>`).join(' ');
+// GitHub stars of a tracked repo, from data/stack.json once it has loaded
+const repoStars=name=>{const r=((stack&&stack.repositories)||[]).find(x=>x.repository===name);return r?r.stars:null};
+const starCount=n=>n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':n>=1e4?Math.round(n/1e3)+'k':n>=1e3?(n/1e3).toFixed(1).replace(/\.0$/,'')+'k':String(n);
+const starChip=name=>{const n=repoStars(name);return n==null?'':`<span class="stars" title="${esc(n.toLocaleString())} stars on GitHub">★ ${starCount(n)}</span> `};
+const tagChips=r=>starChip(r.repository)+(r.tags||(r.dpg?['DPG']:[])).map(g=>`<span class="tag"${g==='DPG'?' title="Part of the OpenAgriNet DPG project"':''}>${esc(g)}</span>`).join(' ');
 const STALE_DAYS=14;
 document.addEventListener('error',e=>{const i=e.target;if(i.tagName==='IMG'&&i.dataset.fallback){const t=document.createElement('span');t.className='fallback';t.textContent=i.dataset.fallback;i.replaceWith(t)}},true);
 const SEC={passing:'Passing',failing:'Failing','no runs':'No runs on this branch','no workflow':'No security workflow','branch not found':'Branch not found'};
@@ -242,7 +246,7 @@ function initFilters(){
   const want=new URLSearchParams(location.search).get('ver');if(want)relAll=want;
 }
 async function initStack(){
-  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();if(bar)bar.setItems(repoItems());fillStack()}
+  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();if(bar)bar.setItems(repoItems());fillStack();if(data.main.length)render()}   // repo stars come from stack.json
   catch(e){$('stack-rows').innerHTML='<tr><td colspan="4" class="empty">data/stack.json is missing or unreadable.</td></tr>'}
 }
 async function init(){

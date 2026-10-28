@@ -62,8 +62,13 @@ const ECO={npm:'npm',python:'PyPI',golang:'Go',docker:'Docker',githubAction:'Git
 function image(n){const p=n.split('/'),host=p.length>1&&/[.:]|^localhost$/.test(p[0]);return {registry:host?p[0]:'docker.io',path:(host?p.slice(1):p).join('/'),short:p[p.length-1]}}
 const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
   docker:n=>{const i=image(n);return i.registry!=='docker.io'?null:`https://hub.docker.com/r/${i.path.includes('/')?i.path:'_/'+i.path}`},githubAction:n=>`https://github.com/${n}`};
-// a Go module by its last path segment, keeping a major-version suffix with its parent (github.com/jackc/pgx/v5 -> pgx/v5)
-const goShort=n=>{const p=n.split('/');return p.length>1&&/^v\d+$/.test(p[p.length-1])?p.slice(-2).join('/'):p[p.length-1]};
+// every name by its last path segment, keeping a major-version suffix with its parent (github.com/jackc/pgx/v5 -> pgx/v5,
+// @tanstack/react-query -> react-query, actions/cache -> cache); the full name is in the tooltip, search and link
+const lastPart=n=>{const p=n.split('/');return p.length>1&&/^v\d+$/.test(p[p.length-1])?p.slice(-2).join('/'):p[p.length-1]};
+const shortName=d=>d.ecosystem==='docker'?image(d.name).short:local(d)?d.name:lastPart(d.name);
+// GitHub (or Docker Hub) stars, compact: 950, 4.8k, 230k
+const starCount=n=>n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':n>=1e4?Math.round(n/1e3)+'k':n>=1e3?(n/1e3).toFixed(1).replace(/\.0$/,'')+'k':String(n);
+const starChip=(n,of)=>n==null?'':` <span class="stars" title="${esc(n.toLocaleString()+' stars on '+of)}">★ ${starCount(n)}</span>`;
 const ecoOf=d=>d.ecosystem==='docker'?image(d.name).registry:d.ecosystem;
 const LOOKED=['npm','python','golang','githubAction'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
 const RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
@@ -116,11 +121,12 @@ function licCell(d){
 }
 function row(d,single){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
-  const shown=d.ecosystem==='docker'?image(d.name).short:d.ecosystem==='golang'?goShort(d.name):d.name,full=shown===d.name?'':` title="${esc(d.name)}"`;
+  const shown=shortName(d),full=shown===d.name?'':` title="${esc(d.name)}"`;
   const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
   const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):d.latest_of==='floating'?NA('A floating tag such as latest always points at the newest image'):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
   const [vc,fx]=vulnCells(d);
-  return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The release this tag points to today; vulnerabilities are checked at this version">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
+  const rs=(repos.find(r=>r.repository===d.repository)||{}).stars;
+  return `<tr><td>${name}${starChip(d.stars,d.stars_of)}${single?'':`<div class="sub">${esc(d.repository)}${starChip(rs,'github.com/'+(data.organization||'')+'/'+d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The release this tag points to today; vulnerabilities are checked at this version">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
 }
 function render(list,state){
   const sel=(state.selected.repository||[]),single=sel.length===1?sel[0]:null;

@@ -2,6 +2,12 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 from stackinfo import record as r
+import pytest
+
+@pytest.fixture(autouse=True)
+def no_star_lookups(monkeypatch):
+    monkeypatch.setattr(r, 'annotate_stars', lambda deps: None)
+    monkeypatch.setattr(r, 'repo_stars', lambda repo: None)
 
 def test_stack_record_keeps_license_when_analyser_fails(monkeypatch):
     monkeypatch.setattr(r, 'repo_license', lambda repo: 'MIT')

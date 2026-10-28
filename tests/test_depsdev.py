@@ -38,3 +38,11 @@ def test_lookup_failure_is_marked_error_not_unknown():
         raise RuntimeError('429')
     got = d.dep_info('python', 'fastapi', '0.1', boom)
     assert got['license'] is None and got['license_of'] == 'error'
+
+def test_dep_info_records_the_source_repository():
+    def fetch(path):
+        if path.endswith('/versions/18.3.1'):
+            return {'licenses': ['MIT'], 'relatedProjects': [{'projectKey': {'id': 'github.com/facebook/react'}, 'relationType': 'ISSUE_TRACKER'},
+                                                          {'projectKey': {'id': 'github.com/facebook/react'}, 'relationType': 'SOURCE_REPO'}]}
+        return {'versions': [{'versionKey': {'version': '18.3.1'}, 'isDefault': True}]}
+    assert d.dep_info('npm', 'react', '18.3.1', fetch=fetch)['project'] == 'github.com/facebook/react'
