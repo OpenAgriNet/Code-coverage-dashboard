@@ -13,3 +13,4 @@ dialog.card::backdrop{background:rgba(10,16,12,.55)}
 .card-body th,.card-body td{padding:7px 8px;white-space:normal}
 .card-body td{overflow-wrap:anywhere}.card-body th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:-12px;background:var(--surface)}
 .card-body td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.sortby{display:flex;align-items:center;gap:8px}.sortby .ver{margin-top:0}

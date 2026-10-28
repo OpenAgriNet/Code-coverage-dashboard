@@ -36,7 +36,15 @@
   </div>
 
   <section id="sec-packages" role="tabpanel" aria-labelledby="tab-packages">
-    <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div></div>
+    <div class="sec-head"><div><h2 id="dep-title">Packages</h2><p class="sub" id="dep-note"></p></div>
+      <div class="sortby"><label class="sub" for="sort">Sort by</label>
+        <select class="ver" id="sort">
+          <option value="repo">Repository</option>
+          <option value="stars">Stars (most first)</option>
+          <option value="name">Package name</option>
+          <option value="vulns">Vulnerabilities (most first)</option>
+        </select></div>
+    </div>
     <div class="table-wrap"><table class="deps">
       <thead><tr><th scope="col">Package</th><th scope="col">Ecosystem</th><th scope="col">Version</th><th scope="col">Latest</th><th scope="col">License</th><th scope="col">Vulnerabilities</th><th scope="col">Fixed in</th></tr></thead>
       <tbody id="rows"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>

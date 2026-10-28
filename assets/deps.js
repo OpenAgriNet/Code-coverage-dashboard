@@ -98,7 +98,16 @@ function row(d,single,i){
   const rk=riskOf(d),hl=rk==='red'||rk==='yellow'?` class="row-risk-${rk}"`:'';   // licenses to avoid or use with care stand out
   return `<tr${hl}><td>${name}${starChip(d.stars,d.stars_of)}${single?'':`<div class="sub">${esc(d.repository)}${starChip(rs,'github.com/'+(data.organization||'')+'/'+d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The version this tag points to today">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${d.vulns&&d.vulns.count?`<button type="button" class="fix-open" data-i="${i}" aria-haspopup="dialog">${fx}<span class="open-hint">Details</span></button>`:fx}</td></tr>`;
 }
+// Row order: the Sort by menu, kept in ?sort=. Rows without stars, or not checked for vulnerabilities, go last.
+const SORTS={
+  repo:(a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name),
+  stars:(a,b)=>(Number.isFinite(b.stars)?b.stars:-1)-(Number.isFinite(a.stars)?a.stars:-1)||displayName(a).localeCompare(displayName(b)),
+  name:(a,b)=>displayName(a).localeCompare(displayName(b),undefined,{sensitivity:'base'})||a.repository.localeCompare(b.repository),
+  vulns:(a,b)=>((b.vulns||{}).count??-1)-((a.vulns||{}).count??-1)||SORTS.repo(a,b),
+};
+let sortBy=(k=>SORTS[k]?k:'repo')(new URLSearchParams(location.search).get('sort'));
 function render(list,state){
+  list=list.slice().sort(SORTS[sortBy]);
   const sel=(state.selected.repository||[]),single=sel.length===1?sel[0]:null;
   $('title').textContent=single?`${single} dependencies`:'Dependencies';
   const count=f=>list.filter(f).length,looked=list.filter(d=>LOOKED.includes(d.ecosystem)&&!local(d));
@@ -147,6 +156,13 @@ async function init(){
     $('rows').innerHTML='<tr><td colspan="7" class="empty">data/stack.json is missing or unreadable.</td></tr>';
   }
 }
+$('sort').value=sortBy;
+$('sort').addEventListener('change',e=>{
+  sortBy=SORTS[e.target.value]?e.target.value:'repo';
+  const q=new URLSearchParams(location.search);sortBy==='repo'?q.delete('sort'):q.set('sort',sortBy);
+  try{history.replaceState(null,'',(q.toString()?'?'+q:location.pathname)+location.hash)}catch(_){}
+  if(bar)bar.setItems(all);   // re-renders through the filter bar, which keeps the filters
+});
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
 init();
 $('rows').addEventListener('click',e=>{const b=e.target.closest('.fix-open');if(b)openCard(shown[+b.dataset.i])});
