@@ -8,7 +8,8 @@ import pytest
 def no_star_lookups(monkeypatch):
     monkeypatch.setattr(r, 'annotate_stars', lambda deps: None)
     monkeypatch.setattr(r, 'fill_licenses', lambda deps: None)
-    monkeypatch.setattr(r, 'explain', lambda deps: None)   # reasons have their own tests
+    monkeypatch.setattr(r, 'explain', lambda deps: None)
+    monkeypatch.setattr(r, 'annotate_terraform', lambda deps: None)   # reasons have their own tests
     monkeypatch.setattr(r, 'repo_stars', lambda repo: None)
 
 def test_stack_record_keeps_license_when_analyser_fails(monkeypatch):

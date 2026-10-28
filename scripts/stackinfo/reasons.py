@@ -18,6 +18,8 @@ def latest_reason(d,err):
   if err:return 'nil',f'Registry lookup failed: {err}'
   if d.get('latest_of')=='floating':return 'nil','The floating tag matches none of the newest 30 version tags in the registry, so its version is unknown'
   return 'nil','The registry lists no tag of the same shape as this one'
+ if eco=='terraform':
+  return 'nil',f'Provider registry lookup failed: {err}' if err else 'The provider registry lists no stable release'
  if eco=='githubAction':
   if err:return 'nil',f'GitHub lookup failed: {err}'
   return 'nil','The action repository publishes no releases or version tags'
@@ -41,6 +43,7 @@ def vulns_reason(d,err):
  if _var(d):return 'nil','The version is an unresolved ${VAR}, so there is nothing to check'
  if err:return 'nil',('Scan failed: ' if eco=='docker' else 'Lookup failed: ')+err
  if eco=='githubAction':return 'nil','Pinned to a branch or to a commit no release tag points at, so no version to check'
+ if eco=='terraform':return 'nil','No public vulnerability database (OSV, GitHub advisories) covers Terraform providers'
  if eco in LOOKED:
   if not clean_version(d.get('installed') or d.get('version')):return 'nil','No version to check: the manifest gives no version and no lockfile pins one'
   return 'nil','Not checked'

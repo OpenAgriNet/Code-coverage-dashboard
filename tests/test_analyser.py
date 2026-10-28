@@ -104,3 +104,7 @@ def test_oversized_env_file_is_not_read(tmp_path, monkeypatch):
     src = _tree(tmp_path, {'compose.yaml': 'image: app:${TAG}\n', '.env': 'TAG=1.2.3\n# padding padding\n'})
     raw = {'dependencies': [['docker', 'app', '${TAG}']]}
     assert a.resolve_image_versions(raw, src)['dependencies'][0][2] == '${TAG}'
+
+def test_terraform_resource_types_are_not_dependencies():
+    raw = {'dependencies': [['terraform', 'registry.opentofu.org/hashicorp/aws', '6.62.0'], ['terraform.resource', 'aws_s3_bucket', 'unknown']]}
+    assert a.summarize(raw)['dependencies'] == [['terraform', 'registry.opentofu.org/hashicorp/aws', '6.62.0']]

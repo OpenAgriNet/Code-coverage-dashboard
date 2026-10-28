@@ -6,6 +6,7 @@ from urllib.parse import quote, urlsplit
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from urllib3.connection import HTTPSConnection
 from urllib3.connectionpool import HTTPSConnectionPool
 from .analyser import child_env
@@ -59,7 +60,9 @@ class PublicAdapter(HTTPAdapter):
   super().init_poolmanager(*a,**kw);self.poolmanager.pool_classes_by_scheme={**self.poolmanager.pool_classes_by_scheme,'https':PublicHTTPSPool}
 R=requests.Session()   # no GitHub headers or tokens: registries are third parties
 R.trust_env=False      # no proxy or netrc credentials from the environment
-R.mount('https://',PublicAdapter());R.mount('http://',HTTPAdapter(max_retries=0))
+# timeouts and 5xx are retried; redirects are returned so _get can check each hop
+RETRY=Retry(total=3,connect=3,read=3,status=3,redirect=0,raise_on_redirect=False,backoff_factor=1,status_forcelist=(429,500,502,503,504),allowed_methods=None)
+R.mount('https://',PublicAdapter(max_retries=RETRY));R.mount('http://',HTTPAdapter(max_retries=0))
 MAX_REDIRECTS=5
 def _get(url,headers=None,params=None,is_public=None,method='GET'):
  """GET (or HEAD) over https only, following redirects by hand so every hop is checked like the first one."""

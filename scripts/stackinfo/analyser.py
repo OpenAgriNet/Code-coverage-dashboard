@@ -73,6 +73,7 @@ def main_stack(langs,techs,stack):
  skip_l={x.lower() for x in stack['ignore_languages']};skip_t={x.lower() for x in stack['ignore_techs']}
  code=[l for l in langs if l[0].lower() not in skip_l];total=sum(n for _,n in code)
  return ([l for l in code if total and l[1]/total>=stack['min_share']][:stack['max_languages']],[t for t in techs if t.lower() not in skip_t][:stack['max_techs']])
+NOT_DEPENDENCIES={'terraform.resource'}   # resource types in .tf files (aws_s3_bucket), not packages
 def summarize(raw,stack=None):
  """Languages by file count, tech keys, and deduplicated [ecosystem, name, version] dependencies.
  With `stack` (the config's stack settings) languages and techs are cut down to the main stack."""
@@ -80,6 +81,7 @@ def summarize(raw,stack=None):
  seen=set();deps=[]
  for dep in raw.get('dependencies') or []:
   if not isinstance(dep,(list,tuple)) or len(dep)!=3:continue  # one odd manifest entry must not lose the whole repo
+  if dep[0] in NOT_DEPENDENCIES:continue
   key=tuple(dep)
   if key in seen:continue
   seen.add(key);deps.append(list(key))
