@@ -83,7 +83,7 @@ function licCell(d){
   if(!d.license&&d.license_class){const r=d.license_class,why=((d.missing||{}).license||{}).why||'No license found';
     return `<span class="lic risk risk-${esc(r)}" title="${esc(why+'. '+RISK[r]+' under the license policy (licenses.no_license).')}"><span class="dot" aria-hidden="true"></span>No license</span><span class="sr"> (${esc(RISK[r])})</span>`}
   if(!d.license&&missingCell(d,'license'))return missingCell(d,'license');
-  if(local(d))return NA('An action in this repository, not a published package');
+  if(local(d)&&!d.license)return NA('An action in this repository, not a published package');
   if(!d.license&&d.ecosystem==='docker')return NA('The image declares no license label and names no GitHub source repository');
   if(!d.license)return LOOKED.includes(d.ecosystem)?'<span class="muted">Unknown</span>':NIL('Not looked up: license lookup does not cover this ecosystem yet');
   const r=riskOf(d);

@@ -53,6 +53,9 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
    if d.get('ecosystem')=='docker' and d.get('name','').lower() in (repo.lower(),f'{github.ORG}/{repo}'.lower()):
     d['own']=True;d['project']=f'github.com/{github.ORG}/{repo}'
     if not d.get('license') and out['license']:d.update(license=out['license'],license_of='repository')
+   # an action stored in this repository (./.github/actions/x) is this repository's code, under its license
+   if d.get('ecosystem')=='githubAction' and d.get('name','').startswith('./') and out['license'] and not d.get('license'):
+    d.update(license=out['license'],license_of='repository')
   if settings.check('terraform'):(providers or annotate_terraform)(deps)
   (tools or annotate_releases)(deps)   # rows exist only when dependencies.checks.workflow_tools listed them
   if settings.check('stars'):(stars or annotate_stars)(deps)

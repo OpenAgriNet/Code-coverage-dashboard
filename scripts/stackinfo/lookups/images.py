@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from common.log import warn
 from common.safehttp import public_host
 from stackinfo.rules.reasons import short_error
-from stackinfo.lookups.registry import NAME, TAG, SHAPE, split, canonical, latest_like, tags_of, version_of
+from stackinfo.lookups.registry import NAME, TAG, SHAPE, split, canonical, latest_like, tags_of, version_of, gone_from_docker_hub, GONE
 from stackinfo.lookups.imagescan import scan, image_license, source_repo
 from stackinfo.lookups.projects import project_license
 from stackinfo import settings
@@ -44,10 +44,10 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
    # a floating tag (latest): find the version it points at today, then compare that version with the newest
    out['latest_of']='floating';ts=tags_of(name);v=resolve(name,tag,ts)
    if v:out.update(resolved=v,latest=latest_like(v,ts),latest_of='registry')
- except Exception as e:errors['latest']=short_error(e);log(f'WARN registry tags failed for {name}: {e}')
+ except Exception as e:errors['latest']=GONE if gone_from_docker_hub(name) else short_error(e);log(f'WARN registry tags failed for {name}: {e}')
  res=None
  try:res=scan(f'{name}:{tag}')
- except Exception as e:errors['vulns']=short_error(e);log(f'WARN image scan failed for {name}:{tag}: {e}')
+ except Exception as e:errors['vulns']=GONE if errors.get('latest')==GONE else short_error(e);log(f'WARN image scan failed for {name}:{tag}: {e}')
  else:
   labels,main=res.pop('labels',{}),res.pop('main',None)
   out['vulns']={'checked_version':tag,'exact':True,**res}

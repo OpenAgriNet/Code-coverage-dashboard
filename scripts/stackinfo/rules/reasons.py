@@ -17,7 +17,7 @@ def latest_reason(d,err):
  if d.get('own'):return 'na','This repository\'s own image, built from its Dockerfile and not published to a registry: it has no versions'
  if eco=='docker':
   if _var(d):return 'nil','The tag is an unresolved ${VAR}: no compose default or .env example sets it'
-  if err:return 'nil',f'Registry lookup failed: {err}'
+  if err:return 'nil',(err[0].upper()+err[1:]) if err.startswith('no longer') else f'Registry lookup failed: {err}'
   if d.get('latest_of')=='floating':return 'nil','The floating tag matches none of the newest 30 version tags in the registry, so its version is unknown'
   return 'nil','The registry lists no tag of the same shape as this one'
  if eco=='terraform':
@@ -49,7 +49,7 @@ def vulns_reason(d,err):
  if _local(d):return 'na','An action inside this repository, not a published package'
  if _var(d):return 'nil','The version is an unresolved ${VAR}, so there is nothing to check'
  if d.get('own'):return 'nil','Built locally from this repository and not published, so there is no image to download and scan; its packages are checked as this repository\'s own dependencies'
- if err:return 'nil',('Scan failed: ' if eco=='docker' else 'Lookup failed: ')+err
+ if err:return 'nil',(err[0].upper()+err[1:]) if err.startswith('no longer') else ('Scan failed: ' if eco=='docker' else 'Lookup failed: ')+err
  if eco=='githubAction':return 'nil','Pinned to a branch or to a commit no release tag points at, so no version to check'
  if eco=='terraform':return 'nil','No public vulnerability database (OSV, GitHub advisories) covers Terraform providers'
  if eco=='githubRelease':return 'nil','Installed from a GitHub release and not a Go module, so no vulnerability database can be asked about it'
