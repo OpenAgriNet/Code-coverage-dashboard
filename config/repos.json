@@ -9,7 +9,7 @@
     }
   ],
 
-  "exclude": ["engineering-tracker", "Code-coverage-dashboard", "infra-automation"],
+  "exclude": ["engineering-tracker", "Code-coverage-dashboard", "infra-automation", "network-specs", "protocol-specifications-v2"],
 
   "repositories": [],
 
