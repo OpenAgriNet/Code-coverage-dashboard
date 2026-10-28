@@ -99,7 +99,7 @@ def test_annotate_fills_images_and_skips_unresolved_tags():
     def scan(ref):
         scanned.append(ref)
         return {'count': 0, 'severity': None, 'fixed_in': None, 'unfixed': 0, 'fixable': 0, 'items': []}
-    im.annotate(deps, tags_of=lambda name: ['16', '17', '18', 'latest'], scan=scan, cache={}, is_public=lambda h: True)
+    im.annotate(deps, tags_of=lambda name: ['16', '17', '18', 'latest'], scan=scan, cache={}, is_public=lambda h: True, resolve=lambda n, tag, ts: None)
     assert deps[0]['latest'] == '18' and deps[0]['vulns']['count'] == 0 and deps[0]['vulns']['checked_version'] == '17'
     assert deps[1]['vulns'] is None and deps[1]['latest'] is None
     assert deps[2]['latest'] is None and deps[2]['latest_of'] == 'floating' and deps[2]['vulns'] is not None
@@ -186,7 +186,7 @@ def test_session_uses_the_peer_checking_pool():
 
 def test_redirects_are_followed_by_hand_and_checked(monkeypatch):
     hops = []
-    def fake_get(url, headers=None, params=None, timeout=None, allow_redirects=True):
+    def fake_get(method, url, headers=None, params=None, timeout=None, allow_redirects=True):
         assert allow_redirects is False
         hops.append((url, headers))
         if url == 'https://reg.example/a':
@@ -194,10 +194,74 @@ def test_redirects_are_followed_by_hand_and_checked(monkeypatch):
         if url == 'https://cdn.example/b':
             return Resp(307, headers={'Location': 'http://169.254.169.254/latest/meta-data'})
         return Resp(200, {})
-    monkeypatch.setattr(im.R, 'get', fake_get)
+    monkeypatch.setattr(im.R, 'request', fake_get)
     try:
         im._get('https://reg.example/a', headers={'Authorization': 'Bearer t'}, is_public=lambda h: True)
         assert False
     except RuntimeError as e:
         assert 'refused' in str(e)
     assert hops == [('https://reg.example/a', {'Authorization': 'Bearer t'}), ('https://cdn.example/b', None)]
+
+def test_floating_tag_resolves_to_the_version_with_the_same_digest():
+    digests = {'latest': 'sha256:b', '12.3.0': 'sha256:c', '12.2.1': 'sha256:b', '12.2': 'sha256:b'}
+    asked = []
+    def digest(host, path, ref, auth=None):
+        asked.append(ref)
+        return digests.get(ref), {'Authorization': 'Bearer t'}
+    tags = ['latest', '12.2', '12.2.1', '12.3.0', '12.3.0-ubuntu', 'main', '9.5.0']
+    assert im.version_of('grafana/grafana', 'latest', tags, digest=digest) == '12.2.1'
+    assert asked == ['latest', '12.3.0', '12.2.1']
+
+def test_floating_tag_without_a_match_stays_floating():
+    def digest(host, path, ref, auth=None):
+        return ('sha256:x' if ref == 'latest' else 'sha256:y'), None
+    assert im.version_of('a/b', 'latest', ['1.0.0', '2.0.0'], digest=digest, limit=1) is None
+
+def test_annotate_shows_the_version_behind_latest():
+    deps = [{'ecosystem': 'docker', 'name': 'grafana/grafana', 'version': 'latest', 'latest': None, 'vulns': None}]
+    im.annotate(deps, tags_of=lambda n: ['12.2.1', '12.3.0'], scan=lambda r: im.summarize([]), cache={}, is_public=lambda h: True,
+                resolve=lambda n, tag, ts: '12.2.1')
+    assert deps[0]['resolved'] == '12.2.1' and deps[0]['latest'] == '12.3.0' and deps[0]['latest_of'] == 'registry'
+
+def test_digest_uses_head_and_an_anonymous_token():
+    calls = []
+    def get(url, headers=None, params=None, method='GET'):
+        calls.append((method, url, dict(headers or {})))
+        if url.startswith('https://auth.example'):
+            return Resp(200, {'token': 'anon'})
+        if 'Authorization' not in (headers or {}):
+            return Resp(401, headers={'WWW-Authenticate': 'Bearer realm="https://auth.example/token",service="reg"'})
+        return Resp(200, headers={'Docker-Content-Digest': 'sha256:abc'})
+    d, auth = im.digest('reg.example', 'a/b', 'latest', get=get, is_public=lambda h: True)
+    assert d == 'sha256:abc' and auth == {'Authorization': 'Bearer anon'}
+    assert calls[0][0] == 'HEAD' and 'image.index' in calls[0][2]['Accept'] and calls[-1][0] == 'HEAD'
+
+def test_the_same_advisory_on_the_same_package_counts_once():
+    pkg = SCAN['results'][0]['packages'][0]
+    twice = {'results': [{'packages': [pkg, pkg]}]}
+    assert len(im.items_of(twice)) == 2
+
+def test_image_license_from_label_then_source_repo():
+    repo = lambda r: {'grafana/grafana': 'AGPL-3.0'}.get(r)
+    assert im.image_license({'org.opencontainers.image.licenses': 'MIT'}, repo) == ('MIT', 'label')
+    assert im.image_license({'org.opencontainers.image.licenses': 'Apache License 2.0'}, repo) == ('Apache-2.0', 'label')
+    assert im.image_license({'org.opencontainers.image.source': 'https://github.com/grafana/grafana'}, repo) == ('AGPL-3.0', 'source')
+    assert im.image_license({'org.label-schema.vcs-url': 'https://github.com/grafana/grafana.git'}, repo) == ('AGPL-3.0', 'source')
+    assert im.image_license({'org.opencontainers.image.source': 'https://gitlab.com/a/b'}, repo) == (None, None)
+    assert im.image_license({'org.opencontainers.image.source': 'https://github.com/../x'}, repo) == (None, None)
+    assert im.image_license({}, repo) == (None, None)
+
+def test_scan_reads_labels_from_the_pulled_image():
+    def run(cmd, **kw):
+        class P: returncode = 0; stdout = '{}'; stderr = ''
+        if cmd[1:3] == ['image', 'inspect'] and '--format' in cmd:
+            P.stdout = '{"org.opencontainers.image.licenses": "MIT"}'
+        return P()
+    got = im.scan('a:1', run=run, binary='/bin/osv', docker='/bin/docker')
+    assert got['labels'] == {'org.opencontainers.image.licenses': 'MIT'} and got['count'] == 0
+
+def test_annotate_sets_the_image_license():
+    deps = [{'ecosystem': 'docker', 'name': 'grafana/grafana', 'version': '13.2.2', 'latest': None, 'vulns': None}]
+    scan = lambda ref: {**im.summarize([]), 'labels': {'org.opencontainers.image.source': 'https://github.com/grafana/grafana'}}
+    im.annotate(deps, tags_of=lambda n: ['13.2.2'], scan=scan, cache={}, is_public=lambda h: True, license_of=lambda r: 'AGPL-3.0')
+    assert deps[0]['license'] == 'AGPL-3.0' and deps[0]['license_of'] == 'source' and 'labels' not in deps[0]['vulns']
