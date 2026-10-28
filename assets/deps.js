@@ -104,6 +104,7 @@ function row(d,single,i){
 const SORTS={
   repo:(a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name),
   stars:(a,b)=>(Number.isFinite(b.stars)?b.stars:-1)-(Number.isFinite(a.stars)?a.stars:-1)||displayName(a).localeCompare(displayName(b)),
+  stars_least:(a,b)=>(Number.isFinite(a.stars)?a.stars:Infinity)-(Number.isFinite(b.stars)?b.stars:Infinity)||displayName(a).localeCompare(displayName(b)),   // no stars still last
   name:(a,b)=>displayName(a).localeCompare(displayName(b),undefined,{sensitivity:'base'})||a.repository.localeCompare(b.repository),
   vulns:(a,b)=>((b.vulns||{}).count??-1)-((a.vulns||{}).count??-1)||SORTS.repo(a,b),
 };
