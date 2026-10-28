@@ -12,28 +12,34 @@ def group_name(g):
  g=str(g).strip().lower();return SPELLING.get(g,g)
 def key(eco,name):
  return (eco,normal(name) if eco=='python' else name)
-def _add(out,eco,name,group,source):
- e=out.setdefault(key(eco,name),{'groups':set(),'installed':None,'sources':set()})
+def _add(out,eco,name,group,source,declared=None):
+ e=out.setdefault(key(eco,name),{'name':name,'groups':set(),'installed':None,'sources':set(),'declared':None})
  e['groups'].add(group_name(group));e['sources'].add(source)
+ if declared and not e['declared']:e['declared']=str(declared).strip()
 def _pep508(spec):
  m=PEP508.match(spec) if isinstance(spec,str) else None
  return m.group(1) if m else None
+def _pep508_version(spec):
+ """The version part of 'pytest[extra]>=9.1.1 ; python_version>"3"' -> '>=9.1.1'."""
+ rest=PEP508.sub('',spec.split(';',1)[0],count=1).strip()
+ return re.sub(r'^\[[^\]]*\]','',rest).strip() or None
 def _npm(out,rel,text):
  d=json.loads(text)
  for field,group in NPM.items():
-  for name in (d.get(field) or {}):_add(out,'npm',name,group,rel)
+  for name,spec in (d.get(field) or {}).items():_add(out,'npm',name,group,rel,spec if isinstance(spec,str) else None)
 def _pyproject(out,rel,text):
  d=tomllib.loads(text);proj=d.get('project') or {};poetry=(d.get('tool') or {}).get('poetry') or {}
  sets=[('main',proj.get('dependencies') or [])]
  sets+=[(g,v) for g,v in (proj.get('optional-dependencies') or {}).items()]
  sets+=[(g,v) for g,v in (d.get('dependency-groups') or {}).items()]   # PEP 735; {include-group=...} entries are not packages
+ sets+=[('build',(d.get('build-system') or {}).get('requires') or [])]
  for g,specs in sets:
   for s in specs:
    n=_pep508(s)
-   if n:_add(out,'python',n,g,rel)
+   if n:_add(out,'python',n,g,rel,_pep508_version(s))
  for g,deps in [('main',poetry.get('dependencies') or {}),('dev',poetry.get('dev-dependencies') or {})]+[(g,(v or {}).get('dependencies') or {}) for g,v in (poetry.get('group') or {}).items()]:
-  for n in deps:
-   if n.lower()!='python':_add(out,'python',n,g,rel)
+  for n,spec in deps.items():
+   if n.lower()!='python':_add(out,'python',n,g,rel,spec if isinstance(spec,str) else (spec or {}).get('version') if isinstance(spec,dict) else None)
 def _requirements(out,rel,text):
  parts=rel.split('/');m=REQ.fullmatch(parts[-1])
  g=m.group('a') if m.group('a') else m.group('b') if len(parts)>1 and parts[-2]=='requirements' else None
@@ -42,7 +48,7 @@ def _requirements(out,rel,text):
   line=line.split('#',1)[0].strip()
   if not line or line.startswith('-'):continue
   n=_pep508(line)
-  if n:_add(out,'python',n,g,rel)
+  if n:_add(out,'python',n,g,rel,_pep508_version(line))
 def _gomod(out,rel,text):
  block=False
  for line in text.splitlines():
@@ -52,7 +58,7 @@ def _gomod(out,rel,text):
   if '// indirect' in s:continue
   if s.startswith('tool ') and len(s.split())==2:_add(out,'golang',s.split()[1],'tool',rel);continue
   body=s[len('require '):] if s.startswith('require ') and not s.endswith('(') else s if block else None
-  if body and len(body.split())>=2:_add(out,'golang',body.split()[0],'main',rel)
+  if body and len(body.split())>=2:_add(out,'golang',body.split()[0],'main',rel,body.split()[1])
 def _locks(rel,text,name):
  """{(ecosystem, name): version} of the packages a lockfile installs at top level."""
  if name=='package-lock.json':
@@ -81,7 +87,12 @@ def read(src,texts=None):
   for s in sorted(e['sources']):
    v=locks.get(os.path.dirname(s),{}).get(k)
    if v:e['installed']=v;break
- return {k:{'groups':sorted(e['groups']),'installed':e['installed'],'sources':sorted(e['sources'])} for k,e in out.items()}
+ return {k:{'name':e['name'],'declared':e['declared'],'groups':sorted(e['groups']),'installed':e['installed'],'sources':sorted(e['sources'])} for k,e in out.items()}
+def unlisted(found,rows):
+ """[ecosystem, name, version] for every package a manifest names that the stack analyser did not list (it reads neither
+ PEP 735 [dependency-groups] nor [build-system] requires, nor tools installed in workflows)."""
+ have={key(e,n) for e,n,_ in rows}
+ return [[k[0],e['name'],e['declared'] or e['installed'] or 'unknown'] for k,e in sorted(found.items()) if k not in have]
 def attach(deps,found):
  """Give every dependency row its groups (Docker images run, Actions are CI), its manifests, and the installed version when the
  manifest gives only a range."""

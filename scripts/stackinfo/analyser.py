@@ -45,8 +45,10 @@ def _texts(src,want):
     with os.fdopen(fd,encoding='utf-8',errors='replace') as f:yield p,f.read(MAX_TEXT_BYTES)
    except OSError:continue
 def read_manifests(src):
+ """Packages the manifests declare, plus tools the workflows install, keyed (ecosystem, name)."""
  from .manifests import read
- return read(src)
+ from .tools import read as read_tools, merge
+ return merge(read(src),read_tools(src))
 def resolve_image_versions(raw,src):
  """stack-analyser keeps an image tag like ${POSTGRES_VERSION:-17} only up to the first colon. Replace such a tag with the value the
  repo itself gives: the compose default (${VAR:-17} or ${VAR-17}) on that image's line, else VAR=value from an .env example file.

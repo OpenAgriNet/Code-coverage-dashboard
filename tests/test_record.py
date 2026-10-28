@@ -9,7 +9,8 @@ def no_star_lookups(monkeypatch):
     monkeypatch.setattr(r, 'annotate_stars', lambda deps: None)
     monkeypatch.setattr(r, 'fill_licenses', lambda deps: None)
     monkeypatch.setattr(r, 'explain', lambda deps: None)
-    monkeypatch.setattr(r, 'annotate_terraform', lambda deps: None)   # reasons have their own tests
+    monkeypatch.setattr(r, 'annotate_terraform', lambda deps: None)
+    monkeypatch.setattr(r, 'annotate_releases', lambda deps: None)   # reasons have their own tests
     monkeypatch.setattr(r, 'repo_stars', lambda repo: None)
 
 def test_stack_record_keeps_license_when_analyser_fails(monkeypatch):
@@ -82,3 +83,15 @@ def test_stack_record_labels_groups_from_the_manifests(monkeypatch):
     by = {d['name']: d for d in rec['dependencies']}; vite, redis = by['vite'], by['redis']
     assert vite['groups'] == ['dev'] and vite['installed'] == '5.4.2' and redis['groups'] == ['runtime']
     assert seen == {'vite': '5.4.2', 'redis': None}   # groups and installed are known before the vulnerability check
+
+def test_stack_record_adds_packages_the_analyser_missed(monkeypatch):
+    monkeypatch.setattr(r, 'repo_license', lambda repo: None)
+    raw = {'dependencies': [['python', 'fastapi', '>=0.1']],
+           'manifests': {('python', 'fastapi'): {'name': 'fastapi', 'declared': '>=0.1', 'installed': None, 'groups': ['main'], 'sources': ['pyproject.toml']},
+                         ('python', 'pytest'): {'name': 'pytest', 'declared': '>=9.1.1', 'installed': '9.1.2', 'groups': ['dev'], 'sources': ['pyproject.toml']},
+                         ('githubRelease', 'aquasecurity/trivy'): {'name': 'aquasecurity/trivy', 'declared': 'latest', 'installed': None, 'groups': ['security'], 'sources': ['.github/workflows/security.yml']}}}
+    rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
+                         info=lambda e, n, v: {'ecosystem': e, 'name': n, 'version': v}, vulns=lambda d: None, actions=lambda d: None, images=lambda d: None)
+    by = {d['name']: d for d in rec['dependencies']}
+    assert by['pytest']['groups'] == ['dev'] and by['pytest']['installed'] == '9.1.2'
+    assert by['aquasecurity/trivy']['groups'] == ['security'] and by['aquasecurity/trivy']['version'] == 'latest'

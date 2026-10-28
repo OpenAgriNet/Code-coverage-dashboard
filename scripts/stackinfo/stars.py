@@ -38,7 +38,7 @@ def fill_licenses(deps,license_of=None):
  e.g. a Go submodule deps.dev has no license for. A failed lookup leaves it empty."""
  license_of=license_of or images.project_license
  for d in deps:
-  if d.get('license') or d.get('license_of')=='error' or d.get('ecosystem') not in ('npm','python','golang','terraform'):continue
+  if d.get('license') or d.get('license_of')=='error' or d.get('ecosystem') not in ('npm','python','golang','terraform','githubRelease'):continue
   repo=source_repo(d)
   if not repo:continue
   try:lic=license_of(repo)
