@@ -59,31 +59,53 @@ R=requests.Session()   # no GitHub headers or tokens: registries are third parti
 R.trust_env=False      # no proxy or netrc credentials from the environment
 R.mount('https://',PublicAdapter());R.mount('http://',HTTPAdapter(max_retries=0))
 MAX_REDIRECTS=5
-def _get(url,headers=None,params=None,is_public=None):
- """GET over https only, following redirects by hand so every hop is checked like the first one."""
+def _get(url,headers=None,params=None,is_public=None,method='GET'):
+ """GET (or HEAD) over https only, following redirects by hand so every hop is checked like the first one."""
  is_public=is_public or public_host
  for _ in range(MAX_REDIRECTS+1):
   u=urlsplit(url)
   if u.scheme!='https' or not u.hostname or not is_public(u.netloc):raise RuntimeError(f'refused to fetch {u.scheme}://{u.netloc}: not a public https host')
-  r=R.get(url,headers=headers,params=params,timeout=30,allow_redirects=False)
+  r=R.request(method,url,headers=headers,params=params,timeout=30,allow_redirects=False)
   if r.status_code not in (301,302,303,307,308):return r
   url=requests.compat.urljoin(url,r.headers.get('Location',''));params=None
   if urlsplit(url).netloc!=u.netloc:headers=None   # never carry a registry token to another host
  raise RuntimeError('too many redirects')
 def _challenge(header):
  return dict(re.findall(r'(\w+)="([^"]*)"',header or ''))
+def _authorize(host,r,get,is_public):
+ """Anonymous bearer token for the registry's 401 challenge; the token realm must be a public https host."""
+ c=_challenge(r.headers.get('WWW-Authenticate'))
+ realm=urlsplit(c.get('realm',''))
+ if realm.scheme!='https' or not realm.hostname or not is_public(realm.netloc):raise RuntimeError(f'registry {host} asked for a token from a non-https or non-public realm')
+ t=get(c['realm'],params={k:c[k] for k in ('service','scope') if k in c});t.raise_for_status()
+ tok=t.json();return {'Authorization':'Bearer '+(tok.get('token') or tok.get('access_token') or '')}
+ACCEPT=', '.join(('application/vnd.oci.image.index.v1+json','application/vnd.docker.distribution.manifest.list.v2+json',
+ 'application/vnd.oci.image.manifest.v1+json','application/vnd.docker.distribution.manifest.v2+json'))
+def digest(host,path,ref,get=_get,is_public=public_host,auth=None):
+ """(content digest of host/path:ref, auth to reuse). A HEAD request, which Docker Hub does not count against its pull limit."""
+ url=f'https://{host}/v2/{path}/manifests/{ref}';h={'Accept':ACCEPT}
+ r=get(url,headers={**h,**(auth or {})},method='HEAD')
+ if r.status_code==401 and auth is None:auth=_authorize(host,r,get,is_public);r=get(url,headers={**h,**auth},method='HEAD')
+ return (r.headers.get('Docker-Content-Digest') if r.status_code==200 else None),auth
+RESOLVE_LIMIT=30
+def version_of(name,tag,tags,digest=digest,limit=None):
+ """The version tag that points at the same image as a floating tag such as latest, or None. Plain version tags are tried
+ newest first (12.2.1 before 12.2 before 12), at most RESOLVE_LIMIT of them."""
+ host,path=split(name);want,auth=digest(host,path,tag)
+ if not want:return None
+ plain=[t for t in tags for m in [SHAPE.fullmatch(t)] if m and not m.group(3)]
+ plain.sort(key=lambda t:tuple(int(n) for n in SHAPE.fullmatch(t).group(2).split('.')),reverse=True)
+ for t in plain[:limit or RESOLVE_LIMIT]:
+  got,auth=digest(host,path,t,auth=auth)
+  if got==want:return t
+ return None
 def tags(host,path,get=_get,pages=50,is_public=public_host):
  """Every tag of host/path from the registry HTTP API v2, with an anonymous bearer token when the registry asks for one."""
  base=f'https://{host}';url=f'{base}/v2/{path}/tags/list?n=1000';auth=None;out=[]
  for _ in range(pages):
   r=get(url,headers=auth)
   if r.status_code==401 and auth is None:
-   c=_challenge(r.headers.get('WWW-Authenticate'))
-   realm=urlsplit(c.get('realm',''))
-   if realm.scheme!='https' or not realm.hostname or not is_public(realm.netloc):raise RuntimeError(f'registry {host} asked for a token from a non-https or non-public realm')
-   t=get(c['realm'],params={k:c[k] for k in ('service','scope') if k in c});t.raise_for_status()
-   tok=t.json();auth={'Authorization':'Bearer '+(tok.get('token') or tok.get('access_token') or '')}
-   r=get(url,headers=auth)
+   auth=_authorize(host,r,get,is_public);r=get(url,headers=auth)
   r.raise_for_status();out+=r.json().get('tags') or []
   nxt=re.search(r'<([^>]+)>;\s*rel="next"',r.headers.get('Link') or '')
   if not nxt:return out
@@ -107,7 +129,7 @@ def _score(s):
  return 'CRITICAL' if x>=9 else 'HIGH' if x>=7 else 'MODERATE' if x>=4 else 'LOW' if x>0 else None
 def items_of(result):
  """One vulnerability item per package and advisory group in osv-scanner's JSON, in the shape vulns.py gives OSV advisories."""
- out=[]
+ out=[];seen=set()
  for res in result.get('results') or []:
   for p in res.get('packages') or []:
    pkg=p.get('package') or {};name,ver,eco=pkg.get('name',''),pkg.get('version',''),pkg.get('ecosystem','')
@@ -118,6 +140,8 @@ def items_of(result):
     fixes=[f for i in ids if i in recs for f in [fixed_after(recs[i],eco,name,ver)] if f]
     text=rec.get('summary') or (rec.get('details') or '').split('\n')[0][:160] or 'known vulnerability'
     vid=ids[0] if ids else '?'
+    if (vid,name,ver) in seen:continue   # the same package can be listed once per layer or sub-package
+    seen.add((vid,name,ver))
     out.append({'id':vid,'cve':next((a for a in g.get('aliases') or [] if a.startswith('CVE-')),None),'summary':f'{name} {ver}: {text}',
      'severity':sev,'fixed':min(fixes,key=loose) if fixes else None,'url':f'https://osv.dev/vulnerability/{vid}'})
  return out
@@ -144,16 +168,19 @@ def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
   raise RuntimeError(f'osv-scanner exit {p.returncode}: {last[-1][:150] if last else "no output"}')
  return summarize(items_of(json.loads(p.stdout)))
 CACHE={}
-def lookup(name,tag,tags_of,scan,log):
+def lookup(name,tag,tags_of,scan,log,resolve=version_of):
  out={'latest':None,'latest_of':None,'vulns':None}
- if not SHAPE.fullmatch(tag):out['latest_of']='floating'
- else:
-  try:out['latest']=latest_like(tag,tags_of(name));out['latest_of']='registry'
-  except Exception as e:log(f'WARN registry tags failed for {name}: {e}')
+ try:
+  if SHAPE.fullmatch(tag):out['latest']=latest_like(tag,tags_of(name));out['latest_of']='registry'
+  else:
+   # a floating tag (latest): find the version it points at today, then compare that version with the newest
+   out['latest_of']='floating';ts=tags_of(name);v=resolve(name,tag,ts)
+   if v:out.update(resolved=v,latest=latest_like(v,ts),latest_of='registry')
+ except Exception as e:log(f'WARN registry tags failed for {name}: {e}')
  try:out['vulns']={'checked_version':tag,'exact':True,**scan(f'{name}:{tag}')}
  except Exception as e:log(f'WARN image scan failed for {name}:{tag}: {e}')
  return out
-def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,file=sys.stderr),workers=WORKERS,is_public=public_host):
+def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,file=sys.stderr),workers=WORKERS,is_public=public_host,resolve=version_of):
  """Fill latest, latest_of and vulns of every Docker image in deps. An unresolved ${VAR} tag, a malformed name, a refused pull or a
  failed scan leaves vulns None (not checked), never 'none known'. Each image:tag is looked up once per run, several at a time."""
  rows=[]
@@ -167,5 +194,5 @@ def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=lambda m:print(m,fil
   rows.append((d,(name,tag)))
  todo=sorted({k for _,k in rows if k not in cache})
  with ThreadPoolExecutor(max_workers=workers) as ex:
-  for k,res in zip(todo,ex.map(lambda k:lookup(*k,tags_of,scan,log),todo)):cache[k]=res
+  for k,res in zip(todo,ex.map(lambda k:lookup(*k,tags_of,scan,log,resolve),todo)):cache[k]=res
  for d,k in rows:d.update({x:(dict(v) if isinstance(v,dict) else v) for x,v in cache[k].items()})

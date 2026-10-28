@@ -12,6 +12,19 @@
 <style>
 table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth-child(2){width:9%}table.deps th:nth-child(6){width:24%}
 .vuln summary{cursor:pointer;font-weight:600}.vuln ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}.vuln li{margin:4px 0}.sev{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.fix-open{all:unset;cursor:pointer;display:block;border-radius:4px}.fix-open:hover .open-hint{text-decoration:underline}.fix-open:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.open-hint{display:block;font-size:12px;color:var(--link)}
+dialog.card{width:min(960px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);box-shadow:0 16px 48px rgba(0,0,0,.28)}
+dialog.card::backdrop{background:rgba(10,16,12,.55)}
+.card-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;padding:18px 20px 12px;border-bottom:1px solid var(--line)}
+.card-head h2{margin:0;font-size:18px}.card-head .sub{margin:4px 0 0}
+.card-close{font:inherit;font-size:20px;line-height:1;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:4px 10px;cursor:pointer}
+.card-body{padding:12px 20px 20px;overflow:auto;max-height:calc(100vh - 170px)}
+.card-body table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+.card-body th.c-adv{width:19%}.card-body th.c-sev{width:10%}.card-body th.c-pkg{width:25%}.card-body th.c-fix{width:12%}.card-body th.c-sum{width:34%}
+.card-body th,.card-body td{padding:7px 8px;white-space:normal}
+.card-body td{overflow-wrap:anywhere}.card-body th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:-12px;background:var(--surface)}
+.card-body td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 </style>
 </head>
 <body>
@@ -52,6 +65,10 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
       <li><b>Docker images.</b> Latest is the newest tag of the same shape in the image's registry (<code>17</code> &rarr; <code>18</code>, <code>25.7-alpine</code> &rarr; <code>25.12-alpine</code>), asked anonymously; a floating tag such as <code>latest</code> has none (N/A). Vulnerabilities come from <a href="https://github.com/google/osv-scanner" target="_blank" rel="noopener">osv-scanner</a>, which pulls the image and checks the operating-system packages and binaries inside it against OSV (nothing in the image is run). Fixes belong to packages inside the image, so <i>Fixed in</i> counts how many are fixable; a newer tag usually includes them. Private images, images built only locally and unresolved <code>${VAR}</code> tags are not scanned (nil). License is N/A: an image holds many packages, each with its own license.</li>
     </ul>
   </details>
+  <dialog id="vuln-card" class="card" aria-labelledby="vc-title">
+    <div class="card-head"><div><h2 id="vc-title"></h2><p class="sub" id="vc-sub"></p></div><button type="button" class="card-close" id="vc-close" aria-label="Close">&times;</button></div>
+    <div class="card-body" id="vc-body"></div>
+  </dialog>
 </main>
 <script src="filters.js"></script>
 <script>
@@ -99,6 +116,23 @@ const FACETS=[
 // nil: the value exists but the dashboard could not get it; N/A: there is no such value for this dependency
 const local=d=>d.ecosystem==='githubAction'&&d.name.startsWith('./');
 const NIL=why=>`<span class="muted" title="${esc(why)}">nil</span>`,NA=why=>`<span class="muted" title="${esc(why)}">N/A</span>`;
+// The findings card behind Fixed in: every advisory with its package, severity and fix
+let shown=[];
+function sevBadge(s){return `<span class="sev ${SEVCLASS[s]||'warn'}">${esc(s==='UNKNOWN'?'not rated':String(s).toLowerCase())}</span>`}
+function openCard(d){
+  const q=d.vulns;if(!q)return;
+  const at=d.resolved||(q.checked_version&&q.checked_version!==d.version?q.checked_version:'');
+  $('vc-title').textContent=`${displayName(d)} ${d.version}${at?` (${at})`:''}`;
+  const fixable=q.fixable!=null?q.fixable:q.items.filter(i=>i.fixed).length;
+  $('vc-sub').innerHTML=`${esc(d.name)} · ${q.count} known · <span class="${SEVCLASS[q.severity]||'warn'}">worst ${esc(q.severity==='UNKNOWN'?'not rated':String(q.severity).toLowerCase())}</span> · ${q.fixed_in?`all fixable ones fixed in <code>${esc(q.fixed_in)}</code>`:`${fixable} fixable`}${q.unfixed?` · ${q.unfixed} with no fix released`:''}`;
+  const rows=q.items.map(i=>{
+    // image findings name the package inside the image in their summary ("glibc 2.36-9: ..."); a package's own findings are about itself
+    const m=d.ecosystem==='docker'&&/^(\S+) (\S+): (.*)$/.exec(i.summary||'');
+    const pkg=m?`${esc(m[1])} <span class="muted">${esc(m[2])}</span>`:`${esc(displayName(d))} <span class="muted">${esc(q.checked_version||d.version)}</span>`;
+    return `<tr><td><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.cve||i.id)}</a>${i.cve&&i.id!==i.cve?`<div class="sub">${esc(i.id)}</div>`:''}</td><td>${sevBadge(i.severity)}</td><td>${pkg}</td><td>${i.fixed?`<code>${esc(i.fixed)}</code>`:'<span class="bad">no fix</span>'}</td><td>${esc(m?m[3]:i.summary)}</td></tr>`}).join('');
+  $('vc-body').innerHTML=`<table><thead><tr><th class="c-adv">Advisory</th><th class="c-sev">Severity</th><th class="c-pkg">Package</th><th class="c-fix">Fixed in</th><th class="c-sum">Summary</th></tr></thead><tbody>${rows}</tbody></table>${q.count>q.items.length?`<p class="sub">The ${q.items.length} most severe of ${q.count} are listed.</p>`:''}`;
+  $('vuln-card').showModal();
+}
 function vulnCells(d){
   const q=d.vulns;
   if(local(d))return[NA('An action in this repository, not a published package'),NA('No vulnerabilities to fix')];
@@ -120,14 +154,14 @@ function licCell(d){
   const several=d.license.includes(', ')?' All of these licenses apply, so the strictest one counts.':'';
   return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
 }
-function row(d,single){
+function row(d,single,i){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
   const shown=displayName(d),full=shown===d.name?'':` title="${esc(d.name)}"`;
   const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
   const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):d.latest_of==='floating'?NA('A floating tag such as latest always points at the newest image'):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
   const [vc,fx]=vulnCells(d);
   const rs=(repos.find(r=>r.repository===d.repository)||{}).stars;
-  return `<tr><td>${name}${starChip(d.stars,d.stars_of)}${single?'':`<div class="sub">${esc(d.repository)}${starChip(rs,'github.com/'+(data.organization||'')+'/'+d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The release this tag points to today; vulnerabilities are checked at this version">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
+  return `<tr><td>${name}${starChip(d.stars,d.stars_of)}${single?'':`<div class="sub">${esc(d.repository)}${starChip(rs,'github.com/'+(data.organization||'')+'/'+d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The version this tag points to today">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${d.vulns&&d.vulns.count?`<button type="button" class="fix-open" data-i="${i}" aria-haspopup="dialog">${fx}<span class="open-hint">Details</span></button>`:fx}</td></tr>`;
 }
 function render(list,state){
   const sel=(state.selected.repository||[]),single=sel.length===1?sel[0]:null;
@@ -143,7 +177,7 @@ function render(list,state){
     +(risk?`<br>License risk: ${risk}`:'');
   const meta=single&&repos.find(x=>x.repository===single);
   $('dep-note').innerHTML=!meta?(view==='main'?'Each repository\'s default branch.':'Each repository\'s development branch.'):`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`;
-  $('rows').innerHTML=list.length?list.map(d=>row(d,single)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
+  $('rows').innerHTML=list.length?(shown=list).map((d,i)=>row(d,single,i)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
 }
 function renderPolicy(){
   const any=['green','yellow','red'].some(k=>(policy[k]||[]).length);
@@ -177,6 +211,9 @@ async function init(){
 }
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
 init();
+$('rows').addEventListener('click',e=>{const b=e.target.closest('.fix-open');if(b)openCard(shown[+b.dataset.i])});
+$('vc-close').addEventListener('click',()=>$('vuln-card').close());
+$('vuln-card').addEventListener('click',e=>{if(e.target===e.currentTarget)$('vuln-card').close()});   // a click on the backdrop
 </script>
 </body>
 </html>
