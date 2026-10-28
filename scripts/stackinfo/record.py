@@ -5,6 +5,7 @@ from .analyser import analyse as run_analyser, summarize
 from .depsdev import dep_info
 from .vulns import annotate
 from .actions import annotate as annotate_actions
+from .images import annotate as annotate_images
 from .policy import classify
 from .manifests import attach as attach_groups
 
@@ -13,7 +14,7 @@ def repo_license(repo):
  lic=(ac.api(f'/repos/{ac.ORG}/{repo}/license') or {}).get('license')
  if not lic:return None
  return lic.get('spdx_id') if lic.get('spdx_id') not in (None,'NOASSERTION') else 'Other'
-def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=annotate_actions,policy=None,stack=None):
+def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=annotate_actions,images=annotate_images,policy=None,stack=None):
  """Never raises: any failure becomes an `error` on the record, and the repo license is kept when it was read.
  `policy` is the green/yellow/red license lists; every license gets a license_class from it."""
  repo=t['name'];policy=policy or {}
@@ -27,7 +28,7 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   raw=analyse(repo,branch);s=summarize(raw,stack)
   out.update(languages=s['languages'],techs=s['techs'],dependencies=[info(*d) for d in s['dependencies']])
   attach_groups(out['dependencies'],raw.get('manifests') or {})
-  vulns(out['dependencies']);actions(out['dependencies'])
+  vulns(out['dependencies']);actions(out['dependencies']);images(out['dependencies'])
   for d in out['dependencies']:d['license_class']=classify(d.get('license'),policy)
  except Exception as e:out['error']=str(e)[:180];print(f'ERROR stack {repo}@{out["branch"]}: {e}',file=sys.stderr)
  return out

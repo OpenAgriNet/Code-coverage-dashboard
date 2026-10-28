@@ -35,7 +35,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45   # Docker image scans pull every image
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -58,7 +58,16 @@ jobs:
           DPG_QUERY_TOKEN: ${{ secrets.DPG_QUERY_TOKEN }}
           GITHUB_ORG: OpenAgriNet
         run: python scripts/aggregate_coverage.py
-      - name: Stack, dependencies and licenses (stack-analyser + deps.dev)
+      - name: Install osv-scanner (pinned, checksum checked)
+        env:
+          OSV_VERSION: v2.7.0
+          OSV_SHA256: 160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/osv-scanner" "https://github.com/google/osv-scanner/releases/download/$OSV_VERSION/osv-scanner_linux_amd64"
+          echo "$OSV_SHA256  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+          echo "OSV_SCANNER=$RUNNER_TEMP/osv-scanner" >> "$GITHUB_ENV"
+      - name: Stack, dependencies and licenses (stack-analyser + deps.dev + osv-scanner)
         continue-on-error: true  # keep the coverage refresh even if this step fails
         env:
           GH_TOKEN: ${{ github.token }}

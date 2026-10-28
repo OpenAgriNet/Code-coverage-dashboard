@@ -49,7 +49,7 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
       <li><b>License risk.</b> Each license is matched against the green, yellow and red lists under <code>licenses</code> in <code>config/repos.json</code>. For an expression <i>A OR B</i> the better class counts, for <i>A AND B</i> the worse (AND binds tighter, parentheses are respected). Several licenses listed together (<i>MIT, Apache-2.0</i>) are treated as all applying, so the worst counts. A license on no list, or one that cannot be read, is <i>unclassified</i>.</li>
       <li><b>Filters.</b> Within one filter the ticked values are OR-ed; different filters are AND-ed. Each option shows how many dependencies it would give. The address bar holds the filters, so a link shares the view.</li>
       <li><b>GitHub Actions.</b> From the GitHub API. A tag such as <code>v4</code> is checked at the newest release it covers today (shown under the version, e.g. <code>v4.3.0</code>); a commit pin at the release tag on that commit. Latest is the action's latest release, license is the action repository's license, and vulnerabilities come from the <a href="https://github.com/advisories?query=ecosystem%3Aactions" target="_blank" rel="noopener">GitHub Advisory Database</a> (OSV holds these advisories but cannot match them to a version). Actions inside the repository (<code>./.github/actions/...</code>) are N/A.</li>
-      <li><b>Docker images</b> are listed for completeness; their licenses, latest tags and vulnerabilities are not looked up yet (nil).</li>
+      <li><b>Docker images.</b> Latest is the newest tag of the same shape in the image's registry (<code>17</code> &rarr; <code>18</code>, <code>25.7-alpine</code> &rarr; <code>25.12-alpine</code>), asked anonymously; a floating tag such as <code>latest</code> has none (N/A). Vulnerabilities come from <a href="https://github.com/google/osv-scanner" target="_blank" rel="noopener">osv-scanner</a>, which pulls the image and checks the operating-system packages and binaries inside it against OSV (nothing in the image is run). Fixes belong to packages inside the image, so <i>Fixed in</i> counts how many are fixable; a newer tag usually includes them. Private images, images built only locally and unresolved <code>${VAR}</code> tags are not scanned (nil). License is N/A: an image holds many packages, each with its own license.</li>
     </ul>
   </details>
 </main>
@@ -94,17 +94,19 @@ const NIL=why=>`<span class="muted" title="${esc(why)}">nil</span>`,NA=why=>`<sp
 function vulnCells(d){
   const q=d.vulns;
   if(local(d))return[NA('An action in this repository, not a published package'),NA('No vulnerabilities to fix')];
-  if(!q)return[NIL(d.ecosystem==='githubAction'?'Not checked: pinned to a branch or a commit no release tag points at, or the GitHub lookup failed':LOOKED.includes(d.ecosystem)?'Not checked: the version is not exact or the lookup failed':'Not checked: vulnerability lookup does not cover this ecosystem yet'),NA('No known vulnerabilities to fix')];
+  if(!q)return[NIL(d.ecosystem==='docker'?'Not scanned: the tag is an unresolved ${VAR}, the image could not be pulled anonymously (private, or built locally), or the scan failed':d.ecosystem==='githubAction'?'Not checked: pinned to a branch or a commit no release tag points at, or the GitHub lookup failed':LOOKED.includes(d.ecosystem)?'Not checked: the version is not exact or the lookup failed':'Not checked: vulnerability lookup does not cover this ecosystem yet'),NA('No known vulnerabilities to fix')];
   if(!q.count)return['<span class="good">None known</span>',NA('No known vulnerabilities to fix')];
   const cls=SEVCLASS[q.severity]||'warn',worst=q.severity==='UNKNOWN'?'severity not rated':q.severity.toLowerCase();
   const list=q.items.map(i=>`<li><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.cve||i.id)}</a> <span class="sev ${SEVCLASS[i.severity]||'warn'}">${esc(i.severity==='UNKNOWN'?'not rated':i.severity.toLowerCase())}</span> ${esc(i.summary)} — ${i.fixed?`fixed in <code>${esc(i.fixed)}</code>`:'no fix released'}</li>`).join('');
   const note=q.exact?'':`<div class="sub">Checked at ${esc(q.checked_version)}, the lowest version the range allows</div>`;
-  const fixed=q.fixed_in?`<code>${esc(q.fixed_in)}</code>${q.unfixed?`<div class="sub">${q.unfixed} more with no fix released</div>`:''}`:'<span class="bad">No fix released</span>';
-  return[`<details class="vuln"><summary class="${cls}">${q.count} known · ${esc(worst)}</summary><ul>${list}</ul></details>${note}`,fixed];
+  const fixed=d.ecosystem==='docker'?(q.fixable?`<span class="warn" title="Fixed in newer versions of the packages inside the image; a newer image tag usually includes them">${q.fixable} fixable</span>`:'<span class="bad">No fix released</span>')+(q.fixable&&q.unfixed?`<div class="sub">${q.unfixed} with no fix released</div>`:'')
+    :q.fixed_in?`<code>${esc(q.fixed_in)}</code>${q.unfixed?`<div class="sub">${q.unfixed} more with no fix released</div>`:''}`:'<span class="bad">No fix released</span>';
+  return[`<details class="vuln"><summary class="${cls}">${q.count} known · ${esc(worst)}</summary><ul>${list}</ul>${q.count>q.items.length?`<div class="sub">The ${q.items.length} most severe of ${q.count} are listed.</div>`:''}</details>${note}`,fixed];
 }
 function licCell(d){
   if(d.license_of==='error')return '<span class="warn" title="deps.dev did not answer; this is not a missing license">Lookup failed</span>';
   if(local(d))return NA('An action in this repository, not a published package');
+  if(!d.license&&d.ecosystem==='docker')return NA('An image holds many packages, each with its own license');
   if(!d.license)return LOOKED.includes(d.ecosystem)?'<span class="muted">Unknown</span>':NIL('Not looked up: license lookup does not cover this ecosystem yet');
   const r=riskOf(d);
   const several=d.license.includes(', ')?' All of these licenses apply, so the strictest one counts.':'';
@@ -114,7 +116,7 @@ function row(d,single){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
   const shown=d.ecosystem==='docker'?image(d.name).short:d.name,full=shown===d.name?'':` title="${esc(d.name)}"`;
   const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
-  const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
+  const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):d.latest_of==='floating'?NA('A floating tag such as latest always points at the newest image'):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
   const [vc,fx]=vulnCells(d);
   return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:''}${d.resolved?`<div class="sub" title="The release this tag points to today; vulnerabilities are checked at this version">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
 }
@@ -128,7 +130,7 @@ function render(list,state){
   $('summary').innerHTML=`<strong>${list.length}</strong> ${list.length===1?'dependency':'dependencies'}${single?'':` in <strong>${new Set(list.map(d=>d.repository)).size}</strong> ${new Set(list.map(d=>d.repository)).size===1?'repository':'repositories'}`}. `
     +(down?'<strong class="warn">Vulnerability data is unavailable right now</strong> (the lookup failed; this is not a clean result). '
       :nv?`<strong class="bad">${nv}</strong> with known vulnerabilities. `:unchecked===list.length&&list.length?'':'No known vulnerabilities. ')
-    +(unchecked&&!down?`${unchecked} not checked (Docker images, local actions, unpinned versions). `:'')
+    +(unchecked&&!down?`${unchecked} not checked (unresolved or private images, local actions, unpinned versions). `:'')
     +(risk?`<br>License risk: ${risk}`:'');
   const meta=single&&repos.find(x=>x.repository===single);
   $('dep-note').innerHTML=!meta?(view==='main'?'Each repository\'s default branch.':'Each repository\'s development branch.'):`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`;

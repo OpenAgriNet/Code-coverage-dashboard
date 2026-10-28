@@ -69,7 +69,7 @@ def test_stack_record_labels_groups_from_the_manifests(monkeypatch):
     def vulns(deps):
         seen.update({d['name']: d.get('installed') for d in deps})
     rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
-                         info=lambda e, n, v: {'ecosystem': e, 'name': n, 'version': v}, vulns=vulns, actions=lambda d: None)
+                         info=lambda e, n, v: {'ecosystem': e, 'name': n, 'version': v}, vulns=vulns, actions=lambda d: None, images=lambda d: None)
     by = {d['name']: d for d in rec['dependencies']}; vite, redis = by['vite'], by['redis']
     assert vite['groups'] == ['dev'] and vite['installed'] == '5.4.2' and redis['groups'] == ['runtime']
     assert seen == {'vite': '5.4.2', 'redis': None}   # groups and installed are known before the vulnerability check
