@@ -68,5 +68,13 @@ def tags(host,path,get=_get,pages=None,is_public=public_host):
   url=base+nxt.group(1) if nxt.group(1).startswith('/') else nxt.group(1)
   if not url.startswith(base+'/'):raise RuntimeError(f'{host} sent its next page of tags from another host')
  raise RuntimeError(f'{host}/{path} has more than {pages} pages of tags; the newest could be on a page not read')
+def gone_from_docker_hub(name,get=_get):
+ """True when Docker Hub says the image's repository does not exist (404). Its registry answers 401 both for a private image and
+ for one that is gone, so the Hub's own API tells the two apart (minio/minio and minio/mc were removed in 2025)."""
+ host,path=split(name)
+ if host!='registry-1.docker.io':return False
+ try:return get(f'https://hub.docker.com/v2/repositories/{path}/').status_code==404
+ except Exception:return False
+GONE='no longer on Docker Hub: the repository does not exist there any more (404), so it cannot be pulled'
 def tags_of(name):
  return tags(*split(name))

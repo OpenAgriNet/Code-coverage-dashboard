@@ -95,3 +95,27 @@ def test_ghcr_images_take_the_repository_of_the_same_name():
     from stackinfo.lookups import images as im
     assert im.image_repo('ghcr.io/openagrinet/knowledge-provider', None, None) == 'openagrinet/knowledge-provider'
     assert im.image_repo('docker.io/library/redis', None, None) is None
+
+def test_a_non_standard_license_gets_a_second_opinion_from_the_source_repository():
+    deps = [{'ecosystem': 'python', 'name': 'huggingface-hub', 'project': 'github.com/huggingface/huggingface_hub', 'license': 'non-standard'},
+            {'ecosystem': 'python', 'name': 'pypdf', 'project': 'github.com/py-pdf/pypdf', 'license': 'non-standard'},
+            {'ecosystem': 'python', 'name': 'fastapi', 'project': 'github.com/fastapi/fastapi', 'license': 'MIT'}]
+    asked = []
+    def repo_license(repo):
+        asked.append(repo)
+        return {'huggingface/huggingface_hub': 'Apache-2.0'}.get(repo)   # pypdf: GitHub cannot name it either
+    s.fill_licenses(deps, license_of=repo_license, pypi=lambda name: {'pypdf': 'BSD-3-Clause'}.get(name))
+    assert deps[0]['license'] == 'Apache-2.0' and deps[0]['license_of'] == 'github'
+    assert deps[1]['license'] == 'BSD-3-Clause' and deps[1]['license_of'] == 'pypi'   # GitHub cannot name it; PyPI can
+    assert asked == ['huggingface/huggingface_hub', 'py-pdf/pypdf']   # a license deps.dev did name is left alone
+
+def test_pypi_license_reads_the_spdx_expression_else_an_aliased_text_or_classifier(monkeypatch):
+    monkeypatch.setattr(s.settings, 'get', lambda k: {'lgpl with exceptions': 'LGPL'})
+    class R:
+        status_code = 200
+        def __init__(self, info): self.info = info
+        def raise_for_status(self): pass
+        def json(self): return {'info': self.info}
+    assert s.pypi_license('pypdf', get=lambda u, timeout: R({'license_expression': 'BSD-3-Clause'})) == 'BSD-3-Clause'
+    assert s.pypi_license('psycopg2', get=lambda u, timeout: R({'license': 'LGPL with exceptions'})) == 'LGPL'
+    assert s.pypi_license('x', get=lambda u, timeout: R({'license': 'see LICENSE', 'classifiers': ['License :: Other/Proprietary License']})) is None
