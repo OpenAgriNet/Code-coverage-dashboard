@@ -47,7 +47,8 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
       <li><b>Vulnerabilities.</b> From <a href="https://osv.dev" target="_blank" rel="noopener">OSV.dev</a>, Google's open vulnerability database (GitHub advisories, PyPI, Go and others). It is a public API that needs no key or login, and only package names and versions are sent. A package is checked at the version listed here; for a range such as <code>^5.0.0</code> that is the lowest version the range allows, so the real installed version may be newer and already fixed. <i>Fixed in</i> is the one version that fixes every fixable advisory; advisories with no released fix are counted separately.</li>
       <li><b>License risk.</b> Each license is matched against the green, yellow and red lists under <code>licenses</code> in <code>config/repos.json</code>. For an expression <i>A OR B</i> the better class counts, for <i>A AND B</i> the worse (AND binds tighter, parentheses are respected). Several licenses listed together (<i>MIT, Apache-2.0</i>) are treated as all applying, so the worst counts. A license on no list, or one that cannot be read, is <i>unclassified</i>.</li>
       <li><b>Filters.</b> Within one filter the ticked values are OR-ed; different filters are AND-ed. Each option shows how many dependencies it would give. The address bar holds the filters, so a link shares the view.</li>
-      <li><b>Docker images and GitHub Actions</b> are listed for completeness; their licenses are not looked up.</li>
+      <li><b>GitHub Actions.</b> From the GitHub API. A tag such as <code>v4</code> is checked at the newest release it covers today (shown under the version, e.g. <code>v4.3.0</code>); a commit pin at the release tag on that commit. Latest is the action's latest release, license is the action repository's license, and vulnerabilities come from the <a href="https://github.com/advisories?query=ecosystem%3Aactions" target="_blank" rel="noopener">GitHub Advisory Database</a> (OSV holds these advisories but cannot match them to a version). Actions inside the repository (<code>./.github/actions/...</code>) are N/A.</li>
+      <li><b>Docker images</b> are listed for completeness; their licenses, latest tags and vulnerabilities are not looked up yet (nil).</li>
     </ul>
   </details>
 </main>
@@ -61,7 +62,7 @@ function image(n){const p=n.split('/'),host=p.length>1&&/[.:]|^localhost$/.test(
 const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
   docker:n=>{const i=image(n);return i.registry!=='docker.io'?null:`https://hub.docker.com/r/${i.path.includes('/')?i.path:'_/'+i.path}`},githubAction:n=>`https://github.com/${n}`};
 const ecoOf=d=>d.ecosystem==='docker'?image(d.name).registry:d.ecosystem;
-const LOOKED=['npm','python','golang'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
+const LOOKED=['npm','python','golang','githubAction'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
 const RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
@@ -72,7 +73,7 @@ try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
 const vnum=v=>{const m=String(v||'').replace(/^[\^~=<>v\s]+/,'').match(/^\d+(?:\.\d+)*/);return m?m[0].split('.').map(Number):null};
 function newer(a,b){const x=vnum(a),y=vnum(b);if(!x||!y)return null;for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0}return false}
 const updateOf=d=>{const n=newer(d.latest,d.version);return n===null?'unknown':n?'behind':'current'};
-const riskOf=d=>d.license?d.license_class||'unclassified':LOOKED.includes(d.ecosystem)?'none':'na';
+const riskOf=d=>d.license?d.license_class||'unclassified':LOOKED.includes(d.ecosystem)&&!local(d)?'none':'na';
 function vulnOf(d){const q=d.vulns;if(!q)return['unchecked'];if(!q.count)return['none'];return q.severity==='CRITICAL'||q.severity==='HIGH'?['any','critical-high']:['any']}
 
 const FACETS=[
@@ -90,7 +91,7 @@ const NIL=why=>`<span class="muted" title="${esc(why)}">nil</span>`,NA=why=>`<sp
 function vulnCells(d){
   const q=d.vulns;
   if(local(d))return[NA('An action in this repository, not a published package'),NA('No vulnerabilities to fix')];
-  if(!q)return[NIL(LOOKED.includes(d.ecosystem)?'Not checked: the version is not exact or the lookup failed':'Not checked: vulnerability lookup does not cover this ecosystem yet'),NA('No known vulnerabilities to fix')];
+  if(!q)return[NIL(d.ecosystem==='githubAction'?'Not checked: pinned to a branch or a commit no release tag points at, or the GitHub lookup failed':LOOKED.includes(d.ecosystem)?'Not checked: the version is not exact or the lookup failed':'Not checked: vulnerability lookup does not cover this ecosystem yet'),NA('No known vulnerabilities to fix')];
   if(!q.count)return['<span class="good">None known</span>',NA('No known vulnerabilities to fix')];
   const cls=SEVCLASS[q.severity]||'warn',worst=q.severity==='UNKNOWN'?'severity not rated':q.severity.toLowerCase();
   const list=q.items.map(i=>`<li><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.cve||i.id)}</a> <span class="sev ${SEVCLASS[i.severity]||'warn'}">${esc(i.severity==='UNKNOWN'?'not rated':i.severity.toLowerCase())}</span> ${esc(i.summary)} — ${i.fixed?`fixed in <code>${esc(i.fixed)}</code>`:'no fix released'}</li>`).join('');
@@ -112,19 +113,19 @@ function row(d,single){
   const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
   const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
   const [vc,fx]=vulnCells(d);
-  return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code></td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
+  return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code>${d.resolved?`<div class="sub" title="The release this tag points to today; vulnerabilities are checked at this version">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
 }
 function render(list,state){
   const sel=(state.selected.repository||[]),single=sel.length===1?sel[0]:null;
   $('title').textContent=single?`${single} dependencies`:'Dependencies';
-  const count=f=>list.filter(f).length,looked=list.filter(d=>LOOKED.includes(d.ecosystem));
+  const count=f=>list.filter(f).length,looked=list.filter(d=>LOOKED.includes(d.ecosystem)&&!local(d));
   const nv=count(d=>d.vulns&&d.vulns.count),unchecked=count(d=>!d.vulns),down=looked.length>0&&looked.every(d=>!d.vulns);
   const cls={};list.forEach(d=>{const r=riskOf(d);if(r!=='na')cls[r]=(cls[r]||0)+1});
   const risk=['red','yellow','green','unclassified','none'].filter(k=>cls[k]).map(k=>`<span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span>${RISK[k]} <strong>${cls[k]}</strong></span>`).join(' · ');
   $('summary').innerHTML=`<strong>${list.length}</strong> ${list.length===1?'dependency':'dependencies'}${single?'':` in <strong>${new Set(list.map(d=>d.repository)).size}</strong> ${new Set(list.map(d=>d.repository)).size===1?'repository':'repositories'}`}. `
     +(down?'<strong class="warn">Vulnerability data is unavailable right now</strong> (the lookup failed; this is not a clean result). '
       :nv?`<strong class="bad">${nv}</strong> with known vulnerabilities. `:unchecked===list.length&&list.length?'':'No known vulnerabilities. ')
-    +(unchecked&&!down?`${unchecked} not checked (Docker images, Actions, unpinned versions). `:'')
+    +(unchecked&&!down?`${unchecked} not checked (Docker images, local actions, unpinned versions). `:'')
     +(risk?`<br>License risk: ${risk}`:'');
   const meta=single&&repos.find(x=>x.repository===single);
   $('dep-note').innerHTML=!meta?(view==='main'?'Each repository\'s default branch.':'Each repository\'s development branch.'):`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:'<span class="lic none">No LICENSE file</span>'}`;
