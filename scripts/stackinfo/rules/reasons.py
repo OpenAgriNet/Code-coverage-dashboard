@@ -2,6 +2,7 @@
 shows a bare blank: state 'na' when the value does not exist for this dependency, 'nil' when it exists but could not be found."""
 import re
 from common.versions import clean_version
+from stackinfo import settings
 
 LOOKED=('npm','python','golang')
 REGISTRY={'npm':'npm','python':'PyPI','golang':'the Go module proxy'}
@@ -51,17 +52,28 @@ def vulns_reason(d,err):
   if not clean_version(d.get('installed') or d.get('version')):return 'nil','No version to check: the manifest gives no version and no lockfile pins one'
   return 'nil','Not checked'
  return 'nil','Vulnerabilities are not checked for this ecosystem'
+CHECK_OF={'docker':'images','githubAction':'actions','terraform':'terraform'}
+def turned_off(d,col):
+ """The dependencies.checks switch that is off and left this column empty, or None."""
+ eco=d.get('ecosystem')
+ if col=='vulns' and eco in LOOKED and not settings.check('vulnerabilities'):return 'vulnerabilities'
+ name=CHECK_OF.get(eco)
+ return name if name and not settings.check(name) else None
+def reason(col,d,err):
+ off=turned_off(d,col)
+ if off:return 'nil',f'Not looked up: dependencies.checks.{off} is turned off in config/repos.json'
+ return {'latest':latest_reason,'license':license_reason,'vulns':vulns_reason}[col](d,err)
 def explain(deps):
  """Set d['missing'] = {column: {'state': 'na'|'nil', 'why': text}} for every empty latest, license and vulns, from the
  errors the lookups left in d['errors'] (which is then removed)."""
  for d in deps:
   errs=d.pop('errors',None) or {};missing={}
   if not d.get('latest') and not (d.get('ecosystem')=='docker' and d.get('latest_of')=='floating' and d.get('resolved')):
-   s,w=latest_reason(d,errs.get('latest'));missing['latest']={'state':s,'why':w}
+   s,w=reason('latest',d,errs.get('latest'));missing['latest']={'state':s,'why':w}
   if not d.get('license'):
-   s,w=license_reason(d,errs.get('license'));missing['license']={'state':s,'why':w}
+   s,w=reason('license',d,errs.get('license'));missing['license']={'state':s,'why':w}
   if d.get('vulns') is None:
-   s,w=vulns_reason(d,errs.get('vulns'));missing['vulns']={'state':s,'why':w}
+   s,w=reason('vulns',d,errs.get('vulns'));missing['vulns']={'state':s,'why':w}
   if missing:d['missing']=missing
   else:d.pop('missing',None)
 def short_error(e,limit=150):

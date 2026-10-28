@@ -69,16 +69,18 @@ def test_global_releases_false_turns_off_everywhere_unless_a_repo_sets_its_own()
     assert c['repositories'][1]['releases']['sources'] == ['tag'] and c['repositories'][1]['releases']['max_versions'] == 10
 
 def test_license_policy_defaults_to_empty_lists():
-    assert n()['licenses'] == {'green': [], 'yellow': [], 'red': []}
+    assert n()['licenses'] == {'green': [], 'yellow': [], 'red': [], 'labels': config.LICENSE_LABELS}
 
 def test_license_policy_is_kept_and_trimmed():
-    assert n(licenses={'green': [' MIT ', 'Apache-2.0'], 'red': ['GPL-*']})['licenses'] == {'green': ['MIT', 'Apache-2.0'], 'yellow': [], 'red': ['GPL-*']}
+    assert n(licenses={'green': [' MIT ', 'Apache-2.0'], 'red': ['GPL-*']})['licenses'] == {'green': ['MIT', 'Apache-2.0'], 'yellow': [], 'red': ['GPL-*'], 'labels': config.LICENSE_LABELS}
 
 @pytest.mark.parametrize('bad,msg', [
     ({'green': ['MIT'], 'red': ['mit']}, 'in both green and red'),
     ({'blue': ['MIT']}, 'use only the keys'),
     ({'green': 'MIT'}, 'must be a list'),
     ({'green': ['']}, 'must be a list'),
+    ({'labels': {'blue': 'Fine'}}, 'licenses.labels'),
+    ({'labels': {'red': ''}}, 'licenses.labels'),
 ])
 def test_invalid_license_policy(bad, msg):
     with pytest.raises(ConfigError, match=msg):
@@ -182,3 +184,37 @@ def test_shipped_config_follows_the_new_shape():
     assert [s['type'] for s in c['sources']] == ['query'] and all('fallback' not in s for s in c['sources'])
     assert [r['name'] for r in c['repositories']] == ['infra-automation']
     assert 'engineering-tracker' in c['exclude'] and c['security']['workflow'] == 'security.yml'
+
+def test_license_labels_default_and_can_be_renamed_one_at_a_time():
+    assert n()['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Not to use'}
+    assert n(licenses={'labels': {'red': ' Avoid '}})['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Avoid'}
+
+def test_dependency_settings_default_to_everything_on():
+    d = n()['dependencies']
+    assert all(d['checks'].values()) and d['images']['workers'] == 4 and d['groups']['aliases']['tests'] == 'test'
+    assert d['terraform']['trusted_registries'] == ['registry.terraform.io', 'registry.opentofu.org'] and d['ecosystem_names']['golang'] == 'Go'
+
+def test_dependency_settings_override_one_key_at_a_time():
+    d = n(dependencies={'checks': {'images': False}, 'images': {'workers': 2}, 'groups': {'aliases': {'Specs': 'test'}},
+                        'ecosystem_names': {'golang': 'Go Modules'}})['dependencies']
+    assert d['checks']['images'] is False and d['checks']['actions'] is True and d['images']['workers'] == 2 and d['images']['scan_timeout'] == 900
+    assert d['groups']['aliases'] == {'specs': 'test'}   # a map given replaces the default, keys compared in lower case
+    assert d['ecosystem_names']['golang'] == 'Go Modules' and d['ecosystem_names']['npm'] == 'npm'   # names are merged over the defaults
+
+@pytest.mark.parametrize('bad,msg', [
+    ({'scan': True}, 'unknown key'),
+    ({'checks': {'images': 'no'}}, 'checks.images must be true or false'),
+    ({'checks': {'trivy': True}}, 'unknown key'),
+    ({'images': {'workers': 0}}, 'workers must be a whole number from 1 to 16'),
+    ({'images': {'scan_timeout': True}}, 'scan_timeout must be a whole number'),
+    ({'groups': {'aliases': {'tests': ''}}}, 'groups.aliases must map names'),
+    ({'groups': {'default_workflow_group': ''}}, 'default_workflow_group'),
+    ({'terraform': {'trusted_registries': 'registry.terraform.io'}}, 'must be a list'),
+    ({'license_aliases': ['MIT']}, 'license_aliases must map'),
+])
+def test_invalid_dependency_settings(bad, msg):
+    with pytest.raises(ConfigError, match=msg):
+        n(dependencies=bad)
+
+def test_the_shipped_config_loads():
+    assert config.load('config/repos.json')['dependencies']['checks']['images'] is True

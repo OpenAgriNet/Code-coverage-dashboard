@@ -2,6 +2,7 @@
 import json, os, subprocess, tempfile
 from common.github import ORG
 from common.proc import child_env
+from stackinfo import settings
 from stackinfo.sources.composevars import resolve_image_versions
 ANALYSER='@specfy/stack-analyser@1.27.6'
 def clone_error(stderr,branch):
@@ -26,7 +27,7 @@ def read_manifests(src):
  """Packages the manifests declare, plus tools the workflows install, keyed (ecosystem, name)."""
  from stackinfo.sources.manifests import read
  from stackinfo.sources.tools import read as read_tools, merge
- return merge(read(src),read_tools(src))
+ return merge(read(src),read_tools(src) if settings.check('workflow_tools') else {})
 def main_stack(langs,techs,stack):
  """Only the main stack: drop markup, data and tooling (stack['ignore_*'], compared ignoring case), then keep languages that are
  at least min_share of the remaining files (stack-analyser labels a stray go.mod as AMPL) and at most max_languages of them."""

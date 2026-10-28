@@ -121,6 +121,7 @@ List the licenses your team accepts under `licenses` in `config/repos.json`:
 - Every repo license and dependency license gets a class: **Preferred** (`green`), **Not recommended** (`yellow`), **Not to use** (`red`), or **unclassified** (on no list, or an expression that cannot be read). It is shown as a coloured dot, filterable as *License risk*, and the lists are printed under the dependency table.
 - Expressions follow SPDX: `A OR B` takes the better class (you may choose), `A AND B` the worse, `AND` binds tighter than `OR`, parentheses are respected, and `A WITH exception` uses the exception if you listed it, else `A`. Several licenses reported together for one package (`MIT, Apache-2.0`) are treated as all applying, so the worst counts, because deps.dev does not say whether they are alternatives.
 - Nothing is blocked or failed by this. It only colours and filters. An empty policy leaves everything *unclassified*.
+- The names shown for the three lists can be changed with `licenses.labels` (see *Configuring the dependency scan*); the keys stay `green`, `yellow` and `red`.
 
 ## Filters
 
@@ -131,32 +132,97 @@ Both pages share one filter component (`filters.js`).
 - Active filters appear as chips; click one to remove it, or *Clear all*. Escape closes a dropdown.
 - Filters live in the address bar (`?sec=failing&tag=DPG`), so a link shares the view. A link from the main page to `deps.html?repo=network-adapter&vuln=any` opens with that repository ticked and the vulnerability filter on.
 - **Main page**: one bar filters every table at once (Repository, Tag, Security, Coverage, License risk, License, Vulnerabilities, Language). Security and Coverage follow the Development/Main switch. The release table has its own *Found as* and *Stability* filters and a *Show version* selector.
-- **Dependency page**: Repository, Ecosystem, License, License risk, Vulnerabilities, Update status, and a text search.
+- **Dependency page**: Repository, Ecosystem, License, License risk, Vulnerabilities, Group, Update status, and a text search.
 - Tests: `node --test tests/filters.test.mjs` (also run in CI before the dashboard is built).
 
 ## Stack, dependencies and vulnerabilities
 
-`scripts/collect_stack.py` writes `data/stack.json` on every refresh. It shows each repo's license, languages and technologies, and `deps.html` lists every dependency.
+`scripts/collect_stack.py` writes `data/stack.json` on every refresh. The main page shows each repo's license, languages and technologies; `deps.html` lists every dependency each project names, on its development and its default branch.
 
-| Data | Source | Authorization |
-|---|---|---|
-| Languages, technologies, dependencies | [specfy/stack-analyser](https://github.com/specfy/stack-analyser) on a shallow clone of the development branch | The clone uses no token and runs with an allowlisted environment, so no secret reaches the third-party code |
-| Repo license | GitHub's license API | The workflow token |
-| Dependency license and latest version (npm, PyPI, Go) | [deps.dev](https://deps.dev) | None, public API |
-| Known vulnerabilities and the fixed version | [OSV.dev](https://osv.dev) (Google's open vulnerability database, which includes the GitHub advisories) | None: public API, no key or login. Only package names and versions are sent |
+**What is listed.** Every package a project names itself, in every group: `package.json` dependencies / dev / optional / peer; `pyproject.toml` `[project]` dependencies, optional-dependencies, `[dependency-groups]` (PEP 735), Poetry groups and `[build-system] requires`; `requirements*.txt`; direct `go.mod` requires and `tool` lines; Docker images from compose files and Dockerfiles; GitHub Actions; Terraform/OpenTofu providers; and tools that workflows install in their `run:` steps (`curl … install.sh | sh` from a GitHub repo such as Trivy, `pip`/`pipx`/`uv tool install`, `npm -g`, `npx`, `go install`). Indirect packages from lockfiles are not listed; lockfiles are read only for the exact version a range installs.
 
-- **Main stack only.** The Stack column lists the repo's real languages and frameworks, not every file type. `stack` in `config/repos.json` controls it: `ignore_languages` and `ignore_techs` (markup, data, CI and tooling by default), `max_languages`, `max_techs`, and `min_share` (a language must be at least that share of the remaining code files; stack-analyser labels a stray `go.mod` as AMPL). Names are compared ignoring case. Languages and tools that are already implied (for example `python` as a tool next to the language Python) are in the ignore list.
-- **Development / Main.** Both the stack table and `deps.html` have the same switch as the coverage tables: each repo's development branch, or its default branch. A repo whose development branch is its default branch is analysed once. The choice is remembered across the two pages and kept in the address bar (`?branch=main`).
-- **"OR", commas and AND in licenses.** A license can be an SPDX expression. `Apache-2.0 OR BSD-3-Clause` (for example `cryptography`) is a real choice. Several licenses reported together (`Apache-2.0, BSD-3-Clause`, for example Go modules that contain files under both) all apply, so the policy takes the strictest; each comma-separated item is classified on its own before that. Names such as `GPL-3.0-or-later` contain "or" as part of the id and are not expressions.
-- A package is checked at the version in its manifest. For a range such as `^5.0.0` that is the lowest version the range allows, so the version actually installed may be newer and already fixed; the page says so on those rows. Exact pins (`==`, Go modules) are checked exactly.
-- **Fixed in** is the single lowest version that fixes every advisory that has a fix. Advisories with no released fix are counted separately and shown as *no fix released*.
-- Docker images, GitHub Actions and unpinned versions (`latest`, `${VAR}`) are listed but not checked. They show *Not checked*, which is not the same as *None known*.
-- Severity is the one published with the advisory. Advisories without a rating (for example Go's) show *not rated*.
-- Only direct dependencies from manifests are listed, not the full lockfile tree.
+| Kind | Latest version | License | Vulnerabilities | Stars |
+|---|---|---|---|---|
+| npm, PyPI, Go | [deps.dev](https://deps.dev) | deps.dev, else the source repository's | [OSV.dev](https://osv.dev) at the installed version | deps.dev (source repository) |
+| GitHub Actions | the action's latest release | the action repository's | GitHub Advisory Database, at the release a tag like `v4` points to today | deps.dev |
+| Docker images | newest tag of the same shape in the registry (`17` → `18`); the version behind `latest` by digest | the image's license label, else its source repository's | [osv-scanner](https://github.com/google/osv-scanner) on the pulled image (OS packages and binaries inside it) | Docker Hub |
+| Terraform providers | the provider registry | the `terraform-provider-<type>` repository's | none (no public database covers them) | deps.dev |
+| Tools installed from a GitHub release | the latest release (what an unpinned install gets) | the repository's | OSV, when the tool is a Go module | deps.dev |
+
+- **Every empty cell says why.** *N/A* means the value does not exist (a local action has no releases; an image that declares no license). *nil* means it exists but was not found, and the tooltip gives the reason, for example *Not published on PyPI*, *Registry lookup failed: 401 Unauthorized*, *Scan failed: docker pull failed*, *The tag is an unresolved ${VAR}*, or *dependencies.checks.images is turned off*.
+- **Fixed in** is the one version that fixes every fixable advisory. For an image it is the count of fixable findings, since the fixes belong to packages inside the image; the card behind it lists every advisory with its package and fixed version.
+- **`${VAR}` tags** are resolved from the repo's own compose defaults (`${VAR:-17}`) and `.env` example files.
+- **Main stack only.** The Stack column lists the repo's real languages and frameworks. `stack` in `config/repos.json` controls it: `ignore_languages`, `ignore_techs`, `max_languages`, `max_techs`, `min_share`.
+- **Development / Main.** Both the stack table and `deps.html` follow the same switch as the coverage tables, remembered across the two pages and kept in the address bar (`?branch=main`).
+- **Licenses with OR, AND and commas.** `A OR B` takes the better class, `A AND B` the worse; several licenses reported together (`MIT, Apache-2.0`) all apply, so the strictest counts.
+
+**Safety.** Clones, manifests, workflow files, image names and registry answers all come from outside, so: the clone uses no token; child processes (git, npx, docker, osv-scanner) get an allowlisted environment without `GH_TOKEN`; files are read only if they are regular files under 1 MB; names are validated before they reach an API path or a command; registry calls go only to public hosts over HTTPS, with the connected address, every redirect, the response size (5 MB) and the time to receive it (60 s) checked; and log lines have control characters replaced.
+
+## Configuring the dependency scan
+
+Everything is optional. A key you leave out keeps its default, and a list or map you give replaces the default.
+
+```json
+"licenses": {
+  "labels": {"green": "Preferred", "yellow": "Not recommended", "red": "Not to use"}
+},
+"dependencies": {
+  "checks": {"vulnerabilities": true, "actions": true, "images": true, "terraform": true, "workflow_tools": true, "stars": true},
+  "images": {"workers": 4, "scan_timeout": 900, "max_findings": 50, "resolve_limit": 30, "max_tag_pages": 50},
+  "groups": {
+    "aliases": {"tests": "test", "testing": "test", "develop": "dev", "development": "dev"},
+    "workflow_purposes": {"security": "security", "scan": "security", "codeql": "security", "trivy": "security", "audit": "security",
+                          "test": "test", "lint": "lint", "format": "lint", "docs": "docs",
+                          "release": "build", "publish": "build", "build": "build", "docker": "build"},
+    "default_workflow_group": "ci"
+  },
+  "terraform": {"trusted_registries": ["registry.terraform.io", "registry.opentofu.org"]},
+  "ecosystem_names": {"golang": "Go Modules"}
+}
+```
+
+| Key | What it does |
+|---|---|
+| `licenses.labels` | The names the dashboard shows for the green, yellow and red lists. |
+| `checks.*` | Turn one kind of lookup off. Its cells then say it is turned off; `workflow_tools: false` stops listing CI tools at all. |
+| `images.workers` | How many images are looked up at once (1–16). |
+| `images.scan_timeout` | Seconds one image may take to pull and scan (60–3600). |
+| `images.max_findings` | How many of an image's findings are kept for the card (the counts stay exact). |
+| `images.resolve_limit` | How many version tags are compared by digest to find the version behind `latest`. |
+| `images.max_tag_pages` | Pages of 1000 tags read per image; more is an error rather than a partial list. |
+| `groups.aliases` | Group names read as another (`tests` → `test`), compared ignoring case. |
+| `groups.workflow_purposes` | Group of a workflow-installed tool: the first key the workflow's file name contains. |
+| `groups.default_workflow_group` | Group when no key matches. |
+| `terraform.trusted_registries` | Registries whose providers take the license and stars of `<namespace>/terraform-provider-<type>`. |
+| `license_aliases` | License texts in image labels and the SPDX id they mean. The defaults cover the usual spellings of Apache, MIT, BSD, GPL, AGPL and MPL; giving this key replaces them. |
+| `ecosystem_names` | Names shown for each ecosystem, merged over the built-in ones (`npm`, `python`, `golang`, `docker`, `githubAction`, `terraform`, `githubRelease`). |
+
+A mistake (an unknown key, a wrong type, a number out of range) stops the refresh with an error that names it.
+
+## Code layout
+
+```
+config/repos.json          what to track and how (see the sections above)
+index.html, deps.html      the two pages; filters.js and tabs.js are shared, style.css too
+data/                      coverage.json and stack.json, written by the workflow
+scripts/
+  aggregate_coverage.py    writes data/coverage.json
+  collect_stack.py         writes data/stack.json
+  repoconfig/              loads and validates config/repos.json, finds the repositories
+  releasefind/             release branches, tags and release sets
+  common/                  GitHub access, safe HTTPS to registries, versions, logging, child-process environment
+  stackinfo/
+    pipeline.py, record.py both branches of every repo; one repo's record
+    sources/               what a repo declares: the analyser, manifests, workflow tools, ${VAR} tags, safe file reads
+    lookups/               what other services say: deps.dev, OSV, Actions, registries, image scans, releases, Terraform, stars
+    rules/                 what the dashboard concludes: license class, why a value is missing, the shown name
+    settings.py            the dependencies block, applied for the run
+tests/                     pytest for scripts/, node --test for filters.js
+```
 
 ## Refreshing
 
-The workflow `.github/workflows/deploy.yml` runs every 6 hours, on pushes to `main` that touch the dashboard, and on demand from **Actions → Refresh and deploy coverage dashboard → Run workflow**.
+The workflow `.github/workflows/deploy.yml` runs once a day, on pushes to `main` that touch the dashboard, and on demand from **Actions → Refresh and deploy coverage dashboard → Run workflow**.
 
 The coverage and security badges are loaded live by the browser, so they are always current. Only the line counts and run links wait for the next refresh.
 
@@ -180,5 +246,6 @@ If Codecov has nothing for the branch, the script looks for a coverage file in t
 python -m pip install -r requirements-dev.txt
 python -m pytest tests -q
 GH_TOKEN=<read-only token> python scripts/aggregate_coverage.py
+GH_TOKEN=<read-only token> DPG_QUERY_TOKEN=<token> python scripts/collect_stack.py   # needs Node (npx), docker and osv-scanner for images (OSV_SCANNER=/path/to/osv-scanner)
 python -m http.server 8000   # open http://localhost:8000
 ```

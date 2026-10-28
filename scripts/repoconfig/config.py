@@ -38,16 +38,68 @@ def stack_settings(raw):
  if not isinstance(share,(int,float)) or isinstance(share,bool) or not 0<=share<=1:raise ConfigError('stack: "min_share" must be a number from 0 to 1')
  return out
 LICENSE_CLASSES=('green','yellow','red')
+LICENSE_LABELS={'green':'Preferred','yellow':'Not recommended','red':'Not to use'}   # what the dashboard calls each list
 def license_policy(raw):
- """{'green': [...], 'yellow': [...], 'red': [...]}: SPDX ids or patterns such as GPL-*. The same entry in two lists is an error."""
+ """{'green': [...], 'yellow': [...], 'red': [...], 'labels': {...}}: SPDX ids or patterns such as GPL-*, and the name the
+ dashboard shows for each list. The same entry in two lists is an error."""
  if raw is None:raw={}
- if not isinstance(raw,dict) or set(raw)-set(LICENSE_CLASSES):raise ConfigError(f'licenses: use only the keys {", ".join(LICENSE_CLASSES)}')
+ if not isinstance(raw,dict) or set(raw)-{*LICENSE_CLASSES,'labels'}:raise ConfigError(f'licenses: use only the keys {", ".join(LICENSE_CLASSES)}, labels')
  out={};seen={}
  for c in LICENSE_CLASSES:
   out[c]=name_list(raw,c,'licenses')
   for p in out[c]:
    if seen.setdefault(p.lower(),c)!=c:raise ConfigError(f'licenses: "{p}" is in both {seen[p.lower()]} and {c}')
+ labels=raw.get('labels',{})
+ if not isinstance(labels,dict) or set(labels)-set(LICENSE_CLASSES) or not all(isinstance(v,str) and v.strip() for v in labels.values()):
+  raise ConfigError(f'licenses.labels: map {", ".join(LICENSE_CLASSES)} to the names to show, for example {{"green": "Preferred"}}')
+ out['labels']={**LICENSE_LABELS,**{k:v.strip() for k,v in labels.items()}}
  return out
+# The dependency scan. Every key is optional; a list or map given here replaces the default rather than extending it.
+DEPENDENCY_DEFAULTS={
+ 'checks':{'vulnerabilities':True,'actions':True,'images':True,'terraform':True,'workflow_tools':True,'stars':True},
+ 'images':{'workers':4,'scan_timeout':900,'max_findings':50,'resolve_limit':30,'max_tag_pages':50},
+ 'groups':{'aliases':{'tests':'test','testing':'test','develop':'dev','development':'dev'},
+  'workflow_purposes':{'security':'security','scan':'security','codeql':'security','trivy':'security','audit':'security','test':'test',
+   'lint':'lint','format':'lint','docs':'docs','release':'build','publish':'build','build':'build','docker':'build'},
+  'default_workflow_group':'ci'},
+ 'terraform':{'trusted_registries':['registry.terraform.io','registry.opentofu.org']},
+ 'license_aliases':{'apache license 2.0':'Apache-2.0','apache license, version 2.0':'Apache-2.0','apache 2.0':'Apache-2.0','apache-2':'Apache-2.0',
+  'apache2':'Apache-2.0','mit license':'MIT','the mit license':'MIT','bsd':'BSD-3-Clause','gplv3':'GPL-3.0-only','gplv2':'GPL-2.0-only',
+  'agplv3':'AGPL-3.0-only','mpl 2.0':'MPL-2.0'},
+ 'ecosystem_names':{'npm':'npm','python':'PyPI','golang':'Go','docker':'Docker','githubAction':'GitHub Action','terraform':'Terraform provider',
+  'githubRelease':'GitHub release'},
+}
+IMAGE_LIMITS={'workers':(1,16),'scan_timeout':(60,3600),'max_findings':(1,500),'resolve_limit':(0,200),'max_tag_pages':(1,500)}
+def _keys(raw,allowed,where):
+ if raw is None:return {}
+ if not isinstance(raw,dict):raise ConfigError(f'{where} must be an object')
+ unknown=sorted(set(raw)-set(allowed))
+ if unknown:raise ConfigError(f'{where}: unknown key(s) {", ".join(unknown)}; allowed: {", ".join(allowed)}')
+ return raw
+def _text_map(raw,where,lower_keys=False):
+ if not isinstance(raw,dict) or not all(isinstance(k,str) and k.strip() and isinstance(v,str) and v.strip() for k,v in raw.items()):
+  raise ConfigError(f'{where} must map names to names, for example {{"tests": "test"}}')
+ return {(k.strip().lower() if lower_keys else k.strip()):v.strip() for k,v in raw.items()}
+def dependency_settings(raw):
+ """The dependency scan's switches, limits and names: config/repos.json's "dependencies" block over DEPENDENCY_DEFAULTS."""
+ D=DEPENDENCY_DEFAULTS;raw=_keys(raw,D,'dependencies')
+ checks={**D['checks'],**_keys(raw.get('checks'),D['checks'],'dependencies.checks')}
+ for k,v in checks.items():
+  if not isinstance(v,bool):raise ConfigError(f'dependencies.checks.{k} must be true or false')
+ images={**D['images'],**_keys(raw.get('images'),D['images'],'dependencies.images')}
+ for k,(lo,hi) in IMAGE_LIMITS.items():
+  v=images[k]
+  if not isinstance(v,int) or isinstance(v,bool) or not lo<=v<=hi:raise ConfigError(f'dependencies.images.{k} must be a whole number from {lo} to {hi}')
+ g=_keys(raw.get('groups'),D['groups'],'dependencies.groups')
+ groups={'aliases':_text_map(g.get('aliases',D['groups']['aliases']),'dependencies.groups.aliases',lower_keys=True),
+  'workflow_purposes':_text_map(g.get('workflow_purposes',D['groups']['workflow_purposes']),'dependencies.groups.workflow_purposes',lower_keys=True),
+  'default_workflow_group':g.get('default_workflow_group',D['groups']['default_workflow_group'])}
+ if not isinstance(groups['default_workflow_group'],str) or not groups['default_workflow_group'].strip():raise ConfigError('dependencies.groups.default_workflow_group must be a group name')
+ tf={**D['terraform'],**_keys(raw.get('terraform'),D['terraform'],'dependencies.terraform')}
+ tf['trusted_registries']=name_list(tf,'trusted_registries','dependencies.terraform')
+ return {'checks':checks,'images':images,'groups':groups,'terraform':tf,
+  'license_aliases':_text_map(raw.get('license_aliases',D['license_aliases']),'dependencies.license_aliases',lower_keys=True),
+  'ecosystem_names':{**D['ecosystem_names'],**_text_map(raw.get('ecosystem_names',{}),'dependencies.ecosystem_names')}}
 def releases(raw,base,where):
  """Effective release-finding settings: `base` (or the defaults) overridden by `raw`. None when `raw` is false (releases off)."""
  if raw is False:return None
@@ -137,7 +189,7 @@ def normalize(cfg):
   if r['name'].lower() in seen:raise ConfigError(f'repositories: "{r["name"]}" is listed twice (names are case-insensitive); merge the entries')
   seen[r['name'].lower()]=r
  sec=security_settings(cfg.get('security'))
- return {**cfg,'stack':stack_settings(cfg.get('stack')),'licenses':license_policy(cfg.get('licenses')),'releases':rel,'repositories':repos,'sources':[source(s,i) for i,s in enumerate(cfg.get('sources',[]))],
+ return {**cfg,'dependencies':dependency_settings(cfg.get('dependencies')),'stack':stack_settings(cfg.get('stack')),'licenses':license_policy(cfg.get('licenses')),'releases':rel,'repositories':repos,'sources':[source(s,i) for i,s in enumerate(cfg.get('sources',[]))],
   'exclude':name_list(cfg,'exclude','config'),'branches':branches_settings(cfg.get('branches')),'coverage':coverage_settings(cfg.get('coverage')),'security':sec,
   'release_sets':release_sets(cfg.get('release_sets')),'default_security_workflow':sec['workflow']}
 def load(path):

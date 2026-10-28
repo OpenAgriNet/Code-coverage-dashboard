@@ -2,14 +2,14 @@
 lockfile installs. Only packages the project names itself; indirect packages in lockfiles are never listed."""
 import json, os, re, tomllib
 from common.versions import is_exact, normal
-SPELLING={'tests':'test','testing':'test','develop':'dev','development':'dev'}
+from stackinfo import settings
 NPM={'dependencies':'main','devDependencies':'dev','optionalDependencies':'optional','peerDependencies':'peer'}
 BY_ECOSYSTEM={'docker':'runtime','githubAction':'ci'}
 REQ=re.compile(r'requirements(?:[-_](?P<a>[\w.-]+))?\.txt|(?P<b>[\w.-]+)\.txt')
 PEP508=re.compile(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)')
 
 def group_name(g):
- g=str(g).strip().lower();return SPELLING.get(g,g)
+ g=str(g).strip().lower();return settings.get('groups','aliases').get(g,g)   # tests/testing -> test, develop -> dev
 def key(eco,name):
  return (eco,normal(name) if eco=='python' else name)
 def add_entry(out,eco,name,group,source,declared=None):

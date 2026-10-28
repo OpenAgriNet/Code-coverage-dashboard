@@ -3,9 +3,8 @@ import json, os, re, shutil, subprocess
 from common.log import warn
 from common.proc import child_env
 from common.versions import normal
+from stackinfo import settings
 from stackinfo.lookups.osv import SEVERITIES, severity as osv_severity
-MAX_ITEMS=50   # postgres alone has hundreds; the counts stay exact, the list keeps the worst
-SCAN_TIMEOUT=900
 
 def loose(v):
  """Sort key from every number in a version, so OS package revisions compare (2.44-r10 < 2.44-r11, 1:2.3-4 < 1:2.3-5)."""
@@ -40,11 +39,12 @@ def items_of(result):
  return out
 def summarize(items):
  """Like vulns.summarize, but no single fixed_in: the fixes belong to different packages inside the image.
- items keeps the MAX_ITEMS worst (fixable first within a severity); count, fixable and unfixed cover all of them."""
+ items keeps the worst dependencies.images.max_findings (fixable first within a severity; postgres alone has hundreds);
+ count, fixable and unfixed cover all of them."""
  rank=lambda i:SEVERITIES.index(i['severity']) if i['severity'] in SEVERITIES else -1
  fixable=sum(1 for i in items if i['fixed'])
  worst=sorted(items,key=lambda i:(-rank(i),i['fixed'] is None,i['summary']))
- return {'count':len(items),'severity':worst[0]['severity'] if items else None,'fixed_in':None,'fixable':fixable,'unfixed':len(items)-fixable,'items':worst[:MAX_ITEMS]}
+ return {'count':len(items),'severity':worst[0]['severity'] if items else None,'fixed_in':None,'fixable':fixable,'unfixed':len(items)-fixable,'items':worst[:settings.get('images','max_findings')]}
 DOCKER_TIMEOUT=60
 def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
  """Pull the image, then let osv-scanner read it. Pulling first matters: osv-scanner uses a copy that is already on the machine,
@@ -58,11 +58,11 @@ def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
  labels={}
  try:
   if docker:
-   pull=run([docker,'pull','-q',ref],capture_output=True,text=True,env=env,timeout=SCAN_TIMEOUT)
+   pull=run([docker,'pull','-q',ref],capture_output=True,text=True,env=env,timeout=settings.get('images','scan_timeout'))
    if pull.returncode!=0:
     last=(pull.stderr or '').strip().splitlines()
     raise RuntimeError(f'docker pull failed: {last[-1][:150] if last else "no output"}')
-  p=run([binary,'scan','image','--format','json',ref],capture_output=True,text=True,timeout=SCAN_TIMEOUT,env=env)
+  p=run([binary,'scan','image','--format','json',ref],capture_output=True,text=True,timeout=settings.get('images','scan_timeout'),env=env)
   if docker:labels=_labels(run([docker,'image','inspect','--format','{{json .Config.Labels}}',ref],capture_output=True,text=True,env=env,timeout=DOCKER_TIMEOUT))
  finally:
   if docker and not had:
@@ -79,9 +79,6 @@ def _labels(p):
  try:got=json.loads(p.stdout) if p.returncode==0 else None
  except (TypeError,ValueError):return {}
  return {str(k):str(v) for k,v in got.items()} if isinstance(got,dict) else {}
-# license texts images put in labels -> SPDX ids the policy knows
-SPDX={'apache license 2.0':'Apache-2.0','apache license, version 2.0':'Apache-2.0','apache 2.0':'Apache-2.0','apache-2':'Apache-2.0','apache2':'Apache-2.0',
- 'mit license':'MIT','the mit license':'MIT','bsd':'BSD-3-Clause','gplv3':'GPL-3.0-only','gplv2':'GPL-2.0-only','agplv3':'AGPL-3.0-only','mpl 2.0':'MPL-2.0'}
 LABEL_LICENSE=('org.opencontainers.image.licenses','org.label-schema.license','license')
 LABEL_SOURCE=('org.opencontainers.image.source','org.label-schema.vcs-url')
 REPO=re.compile(r'(?!\.)[A-Za-z0-9_.-]+/(?!\.)[A-Za-z0-9_.-]+')   # no x/. or x/..
@@ -90,7 +87,7 @@ def image_license(labels,repo_license):
  """(license, where): the image's own license label, else the license of the GitHub repo its source label names, else (None, None).
  repo_license('owner/repo') gives that repo's SPDX id."""
  lic=next((labels[k].strip() for k in LABEL_LICENSE if labels.get(k,'').strip()),None)
- if lic:return SPDX.get(lic.lower(),lic),'label'
+ if lic:return settings.get('license_aliases').get(lic.lower(),lic),'label'   # 'Apache License 2.0' -> Apache-2.0
  src=next((labels[k].strip() for k in LABEL_SOURCE if labels.get(k,'').strip()),'')
  m=GITHUB_REPO.fullmatch(src)
  if m and REPO.fullmatch(m.group(1)):

@@ -54,7 +54,7 @@ dialog.card::backdrop{background:rgba(10,16,12,.55)}
   </section>
 
   <section id="sec-policy" role="tabpanel" aria-labelledby="tab-policy" hidden>
-    <h2>License policy: Preferred, Not recommended, Not to use</h2>
+    <h2 id="policy-title">License policy: Preferred, Not recommended, Not to use</h2>
     <div id="policy"></div>
   </section>
 
@@ -197,6 +197,7 @@ function render(list,state){
   $('rows').innerHTML=list.length?(shown=list).map((d,i)=>row(d,single,i)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
 }
 function renderPolicy(){
+  $('policy-title').textContent=`License policy: ${RISK.green}, ${RISK.yellow}, ${RISK.red}`;
   const any=['green','yellow','red'].some(k=>(policy[k]||[]).length);
   $('policy').innerHTML=any?`<ul class="policy">${['green','yellow','red'].map(k=>`<li><span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span><b>${RISK[k]}</b></span> ${(policy[k]||[]).length?(policy[k]).map(x=>`<code>${esc(x)}</code>`).join(' '):'<span class="muted">none listed</span>'}</li>`).join('')}</ul>`
     :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code> (Preferred), <code>yellow</code> (Not recommended) and <code>red</code> (Not to use) in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
@@ -216,6 +217,8 @@ async function init(){
   try{
     const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);
     data=await res.json();policy=data.license_policy||policy;load();
+    // names set in config/repos.json (licenses.labels, dependencies.ecosystem_names); the built-in ones cover older data
+    Object.assign(RISK,policy.labels||{});Object.assign(ECO,(data.display||{}).ecosystems||{});
     $('updated').textContent=data.generated_at?'Updated '+new Date(data.generated_at).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
     renderPolicy();
     bar=Filters.createFilterBar($('filters'),{facets:FACETS,items:all,noun:'dependencies',text:{param:'q',placeholder:'Find a package or license',of:d=>d.name+' '+(d.license||'')},onChange:render});

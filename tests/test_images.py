@@ -2,6 +2,7 @@ import json, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 from common import safehttp as sh
+from stackinfo import settings
 from stackinfo.lookups import images as im, imagescan as sc, projects as pj, registry as rg
 
 def test_split_names_registry_and_repository_path():
@@ -132,7 +133,7 @@ def test_scan_removes_only_images_it_pulled():
     assert ['/bin/docker', 'image', 'rm', '-f', 'new:1'] in cmds and ['/bin/docker', 'image', 'rm', '-f', 'have:1'] not in cmds
 
 def test_long_lists_keep_the_worst_items_and_exact_counts(monkeypatch):
-    monkeypatch.setattr(sc, 'MAX_ITEMS', 2)
+    monkeypatch.setitem(settings.CURRENT['images'], 'max_findings', 2)
     items = [{'id': str(n), 'severity': s, 'fixed': f, 'summary': str(n)} for n, (s, f) in enumerate([('LOW', None), ('CRITICAL', None), ('HIGH', '2'), ('CRITICAL', '1')])]
     got = sc.summarize(items)
     assert [i['id'] for i in got['items']] == ['3', '1'] and got['count'] == 4 and got['fixable'] == 2 and got['unfixed'] == 2 and got['severity'] == 'CRITICAL'

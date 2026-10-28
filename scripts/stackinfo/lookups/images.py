@@ -6,7 +6,7 @@ from stackinfo.rules.reasons import short_error
 from stackinfo.lookups.registry import NAME, TAG, SHAPE, split, canonical, latest_like, tags_of, version_of
 from stackinfo.lookups.imagescan import scan, image_license
 from stackinfo.lookups.projects import project_license
-WORKERS=4
+from stackinfo import settings
 CACHE={}
 def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  license_of=license_of or project_license
@@ -29,7 +29,7 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
    if lic:out.update(license=lic,license_of=where)
  if errors:out['errors']=errors
  return out
-def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=warn,workers=WORKERS,is_public=public_host,resolve=version_of,license_of=None):
+def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=warn,workers=None,is_public=public_host,resolve=version_of,license_of=None):
  """Fill latest, latest_of and vulns of every Docker image in deps. An unresolved ${VAR} tag, a malformed name, a refused pull or a
  failed scan leaves vulns None (not checked), never 'none known'. Each image:tag is looked up once per run, several at a time."""
  rows=[]
@@ -42,6 +42,6 @@ def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=warn,workers=WORKERS
   if not is_public(split(name)[0]):log(f'WARN image not checked, registry is not a public host: {name}');continue
   rows.append((d,(canonical(name),tag)))
  todo=sorted({k for _,k in rows if k not in cache})
- with ThreadPoolExecutor(max_workers=workers) as ex:
+ with ThreadPoolExecutor(max_workers=workers or settings.get('images','workers')) as ex:
   for k,res in zip(todo,ex.map(lambda k:lookup(*k,tags_of,scan,log,resolve,license_of),todo)):cache[k]=res
  for d,k in rows:d.update({x:(dict(v) if isinstance(v,dict) else v) for x,v in cache[k].items()})

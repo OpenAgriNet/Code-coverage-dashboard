@@ -1,6 +1,7 @@
 """One repository's stack record: own license, analyser output, per-dependency license, vulnerabilities and license class."""
 from common import github
 from common.log import warn
+from stackinfo import settings
 from stackinfo.sources.analyser import analyse as run_analyser, summarize
 from stackinfo.sources.manifests import attach as attach_groups, unlisted
 from stackinfo.lookups.depsdev import dep_info
@@ -38,7 +39,14 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   rows=s['dependencies']+unlisted(found,s['dependencies'])   # what the analyser misses: dependency-groups, build requires, CI tools
   out.update(languages=s['languages'],techs=s['techs'],dependencies=[info(*d) for d in rows])
   attach_groups(out['dependencies'],found);add_short(out['dependencies'])
-  vulns(out['dependencies']);actions(out['dependencies']);images(out['dependencies']);(providers or annotate_terraform)(out['dependencies']);(tools or annotate_releases)(out['dependencies']);(stars or annotate_stars)(out['dependencies'])
+  deps=out['dependencies']
+  # each lookup can be turned off under dependencies.checks; explain() then says so in the empty cells
+  if settings.check('vulnerabilities'):vulns(deps)
+  if settings.check('actions'):actions(deps)
+  if settings.check('images'):images(deps)
+  if settings.check('terraform'):(providers or annotate_terraform)(deps)
+  (tools or annotate_releases)(deps)   # rows exist only when dependencies.checks.workflow_tools listed them
+  if settings.check('stars'):(stars or annotate_stars)(deps)
   (licenses or fill_licenses)(out['dependencies'])
   for d in out['dependencies']:d['license_class']=classify(d.get('license'),policy)
   explain(out['dependencies'])   # every empty latest, license and vulns gets a reason

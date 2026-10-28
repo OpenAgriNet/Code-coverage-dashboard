@@ -1,6 +1,7 @@
 """Tools a repository's GitHub workflows install in their run steps: a release installed with curl ... install.sh | sh
 (Trivy), pip / pipx / uv tool installs, npm -g and npx, and go install. Each is grouped by what its workflow is for."""
 import os, re
+from stackinfo import settings
 from stackinfo.sources.manifests import add_entry, pep508_name, pep508_version
 
 # Every quantifier is bounded: workflow files come from the tracked repos, and unbounded lazy matches here took quadratic time
@@ -11,13 +12,13 @@ NPM=re.compile(r'\bnpm\s+(?:install|i|add)\s+(?:-g|--global)\s+([^\n&|;#]+)|\bnp
 GO=re.compile(r'\bgo\s+install\s+([A-Za-z0-9_./-]+)@(\S+)')
 VERSION=re.compile(r'v?\d+\.\d+(?:\.\d+)?')
 TAKES_VALUE={'-r','-c','-e','--requirement','--constraint','--editable','-i','--index-url','--extra-index-url','-f','--find-links','--python','--target','-t'}
-PURPOSE=(('security','security'),('scan','security'),('codeql','security'),('trivy','security'),('audit','security'),
- ('test','test'),('lint','lint'),('format','lint'),('docs','docs'),('release','build'),('publish','build'),('build','build'),('docker','build'))
 
 def purpose(filename):
- """Group of a tool by the workflow that installs it: security.yml -> security, test.yml -> test, otherwise ci."""
+ """Group of a tool by the workflow that installs it: the first key of dependencies.groups.workflow_purposes the file name
+ contains (security.yml -> security, run-tests.yml -> test), otherwise dependencies.groups.default_workflow_group (ci)."""
  n=filename.lower()
- return next((g for k,g in PURPOSE if k in n),'ci')
+ g=settings.get('groups')
+ return next((grp for k,grp in g['workflow_purposes'].items() if k in n),g['default_workflow_group'])
 def _words(text):
  return [w.strip('\'"') for w in text.split()]
 def _pip(out,args,group,rel):

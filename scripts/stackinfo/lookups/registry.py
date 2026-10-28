@@ -2,6 +2,7 @@
 import re
 from urllib.parse import urlsplit
 from common.safehttp import get as _get, public_host
+from stackinfo import settings
 
 # image names and tags come from compose files, Dockerfiles and charts in the tracked repos
 NAME=re.compile(r'[a-z0-9][a-z0-9._-]*(?::\d+)?(?:/[a-z0-9][a-z0-9._-]*)*')
@@ -43,21 +44,20 @@ def digest(host,path,ref,get=_get,is_public=public_host,auth=None):
  r=get(url,headers={**h,**(auth or {})},method='HEAD')
  if r.status_code==401 and auth is None:auth=_authorize(host,r,get,is_public);r=get(url,headers={**h,**auth},method='HEAD')
  return (r.headers.get('Docker-Content-Digest') if r.status_code==200 else None),auth
-RESOLVE_LIMIT=30
 def version_of(name,tag,tags,digest=digest,limit=None):
  """The version tag that points at the same image as a floating tag such as latest, or None. Plain version tags are tried
- newest first (12.2.1 before 12.2 before 12), at most RESOLVE_LIMIT of them."""
+ newest first (12.2.1 before 12.2 before 12), at most dependencies.images.resolve_limit of them."""
  host,path=split(name);want,auth=digest(host,path,tag)
  if not want:return None
  plain=[t for t in tags for m in [SHAPE.fullmatch(t)] if m and not m.group(3)]
  plain.sort(key=lambda t:tuple(int(n) for n in SHAPE.fullmatch(t).group(2).split('.')),reverse=True)
- for t in plain[:limit or RESOLVE_LIMIT]:
+ for t in plain[:settings.get('images','resolve_limit') if limit is None else limit]:
   got,auth=digest(host,path,t,auth=auth)
   if got==want:return t
  return None
-def tags(host,path,get=_get,pages=50,is_public=public_host):
+def tags(host,path,get=_get,pages=None,is_public=public_host):
  """Every tag of host/path from the registry HTTP API v2, with an anonymous bearer token when the registry asks for one."""
- base=f'https://{host}';url=f'{base}/v2/{path}/tags/list?n=1000';auth=None;out=[]
+ base=f'https://{host}';url=f'{base}/v2/{path}/tags/list?n=1000';auth=None;out=[];pages=pages or settings.get('images','max_tag_pages')
  for _ in range(pages):
   r=get(url,headers=auth)
   if r.status_code==401 and auth is None:
