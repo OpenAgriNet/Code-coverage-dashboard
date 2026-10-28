@@ -62,15 +62,9 @@ const ECO={npm:'npm',python:'PyPI',golang:'Go',docker:'Docker',githubAction:'Git
 function image(n){const p=n.split('/'),host=p.length>1&&/[.:]|^localhost$/.test(p[0]);return {registry:host?p[0]:'docker.io',path:(host?p.slice(1):p).join('/')}}
 const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
   docker:n=>{const i=image(n);return i.registry!=='docker.io'?null:`https://hub.docker.com/r/${i.path.includes('/')?i.path:'_/'+i.path}`},githubAction:n=>`https://github.com/${n}`};
-// The one place a dependency's shown name comes from: the collector's short (scripts/stackinfo/names.py short_name), or
-// the same rule for data written before it existed. Last path segment, a major-version suffix kept with its parent
-// (github.com/jackc/pgx/v5 -> pgx/v5, @tanstack/react-query -> react-query); local actions keep their path.
-function displayName(d){
-  if(d.short)return d.short;
-  if(d.ecosystem==='githubAction'&&d.name.startsWith('./'))return d.name;
-  const p=d.name.split('/').filter(Boolean);
-  return p.length>1&&/^v\d+$/.test(p[p.length-1])?p.slice(-2).join('/'):p[p.length-1]||d.name;
-}
+// The shown name is the collector's short (scripts/stackinfo/names.py short_name, written on every refresh);
+// the full name stays in the tooltip, search and link.
+const displayName=d=>d.short||d.name;
 // GitHub (or Docker Hub) stars, compact: 950, 4.8k, 230k
 const starCount=n=>n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':n>=1e4?Math.round(n/1e3)+'k':n>=1e3?(n/1e3).toFixed(1).replace(/\.0$/,'')+'k':String(n);
 // GitHub's star octicon (MIT, primer/octicons)
