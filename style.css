@@ -129,3 +129,8 @@ tr.row-risk-yellow>td{background:color-mix(in srgb,var(--warn) 10%,var(--surface
 tr.row-risk-red>td{background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
 tr.row-risk-yellow>td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 tr.row-risk-red>td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
+.tabs{display:flex;gap:4px;margin:24px 0 20px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs [role=tab]{font:inherit;font-size:15px;font-weight:600;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:10px 16px;background:none;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tabs [role=tab]:hover{color:var(--ink)}
+.tabs [role=tab][aria-selected="true"]{color:var(--ink);border-bottom-color:var(--link)}
+[role=tabpanel][hidden]{display:none}

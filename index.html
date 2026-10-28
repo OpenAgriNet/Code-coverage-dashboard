@@ -22,7 +22,14 @@
   <p class="summary" id="summary">Reading the latest coverage reports.</p>
   <div id="filters"></div>
 
-  <section aria-labelledby="dev-title">
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab-dev" data-tab="dev" aria-controls="sec-dev" aria-selected="true">Development</button>
+    <button type="button" role="tab" id="tab-release" data-tab="release" aria-controls="sec-release" aria-selected="false" tabindex="-1">Latest release</button>
+    <button type="button" role="tab" id="tab-stack" data-tab="stack" aria-controls="sec-stack" aria-selected="false" tabindex="-1">Stack and licenses</button>
+    <button type="button" role="tab" id="tab-about" data-tab="about" aria-controls="sec-about" aria-selected="false" tabindex="-1">How this is measured</button>
+  </div>
+
+  <section id="sec-dev" role="tabpanel" aria-labelledby="tab-dev">
     <div class="sec-head"><div>
       <h2 id="dev-title">Development</h2>
       <p class="sub" id="dev-note">Each repository's development branch: its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>, else the default branch.</p>
@@ -38,7 +45,7 @@
     </table></div>
   </section>
 
-  <section aria-labelledby="rel-title">
+  <section id="sec-release" role="tabpanel" aria-labelledby="tab-release" hidden>
     <div class="sec-head"><div>
       <h2 id="rel-title">Latest release</h2>
       <p class="sub">Each repository's newest stable version, or the tags of a named release (when the config defines release sets). Choose a release or one version for every repository here, or change a single repository in its row. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
@@ -53,7 +60,7 @@
     </table></div>
   </section>
 
-  <section aria-labelledby="stack-title">
+  <section id="sec-stack" role="tabpanel" aria-labelledby="tab-stack" hidden>
     <div class="sec-head"><div>
       <h2 id="stack-title">Stack and licenses</h2>
       <p class="sub" id="stack-note">Each repository's development branch. <a href="deps.html">All dependencies →</a></p>
@@ -64,7 +71,8 @@
     </table></div>
   </section>
 
-  <details class="how">
+  <section id="sec-about" role="tabpanel" aria-labelledby="tab-about" hidden>
+  <details class="how" open>
     <summary>How this is measured</summary>
     <ul>
       <li><b>Branch.</b> Set per repository in <code>config/repos.json</code> (the <code>dev_branch</code> in the config, else the first branch matching <code>branches.development</code>, else the default branch).</li>
@@ -78,8 +86,10 @@
       <li><b>No report</b> or an <i>unknown</i> badge means nothing was uploaded for that branch. It does not mean 0%. This dashboard never reruns tests.</li>
     </ul>
   </details>
+  </section>
 </main>
 <script src="filters.js"></script>
+<script src="tabs.js"></script>
 <script>
 let data={repositories:[],main:[],releases:[]},view='dev';
 try{if(localStorage.getItem('branchView')==='main')view='main'}catch(e){}
@@ -186,13 +196,14 @@ function setView(v){
   if(bar)bar.setItems(repoItems());else{summary();render()}
 }
 let stack=null;
-const LOOKED_UP=['npm','python','golang'];
+// a local action (./.github/actions/x) is not a published package and has no license to find
+const licensable=d=>!(d.ecosystem==='githubAction'&&d.name.startsWith('./'));
 function stackRow(r){
   const url=repoUrl(r),deps=r.dependencies||[],langs=(r.languages||[]).slice(0,3).map(l=>l[0]).join(' · '),techs=r.techs||[];
   const lic=r.license?`<span class="lic risk risk-${esc(r.license_class||'unclassified')}" title="${esc(RISK[r.license_class||'unclassified'])}"><span class="dot" aria-hidden="true"></span>${esc(r.license)}</span><span class="sr"> (${esc(RISK[r.license_class||'unclassified'])})</span>`:'<span class="lic none">No LICENSE file</span>';
-  const vuln=deps.filter(d=>d.vulns&&d.vulns.count).length,known=deps.filter(d=>d.license).length,pkgs=deps.filter(d=>LOOKED_UP.includes(d.ecosystem)).length;
+  const vuln=deps.filter(d=>d.vulns&&d.vulns.count).length,known=deps.filter(d=>d.license).length,pkgs=deps.filter(licensable).length;
   const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
-    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} packages with a known license`:'Docker images and actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
+    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} with a known license`:'Local actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
     :'<span class="muted">None found</span>';
   return `<tr${r.license_class==='red'||r.license_class==='yellow'?` class="row-risk-${r.license_class}"`:''}><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}${devDefault(r)}</div></td>`
     +`<td data-label="License">${lic}</td>`
@@ -212,7 +223,7 @@ function render(){
 }
 /* ---- filters: one bar for every table (a repository is shown when it passes all of them) ---- */
 const SECL={passing:'Passing',failing:'Failing','no runs':'No runs','no workflow':'No security workflow','branch not found':'Branch not found',unknown:'Unknown'};
-const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No LICENSE file'};
+const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Preferred',yellow:'Not recommended',red:'Not to use',unclassified:'Unclassified',none:'No LICENSE file'};
 const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const stackList=()=>!stack?[]:(view==='main'?stack.main||stack.repositories:stack.repositories)||[];
 function repoItems(){

@@ -105,7 +105,7 @@ Releases can exist as release branches, git tags, GitHub Releases, or a mix. The
 
 **A branch only has data if the repository measures it.** Coverage exists only if that repo uploads to Codecov on pushes to the branch, and security status only if its `security.yml` runs on pushes to the branch. If not, the row shows an *unknown* coverage badge and *No runs on this branch*. That is not 0% and not a failure. To fix it, add the branch to `on.push.branches` in the repo's `coverage.yml` and `security.yml`.
 
-## License policy (green, yellow, red)
+## License policy (Preferred, Not recommended, Not to use)
 
 List the licenses your team accepts under `licenses` in `config/repos.json`:
 
@@ -118,7 +118,7 @@ List the licenses your team accepts under `licenses` in `config/repos.json`:
 ```
 
 - Entries are SPDX ids or patterns (`*` matches anything), compared ignoring case. The same entry in two lists is a config error. If patterns overlap, the most restrictive class wins.
-- Every repo license and dependency license gets a class: **green**, **yellow**, **red**, or **unclassified** (on no list, or an expression that cannot be read). It is shown as a coloured dot, filterable as *License risk*, and the lists are printed under the dependency table.
+- Every repo license and dependency license gets a class: **Preferred** (`green`), **Not recommended** (`yellow`), **Not to use** (`red`), or **unclassified** (on no list, or an expression that cannot be read). It is shown as a coloured dot, filterable as *License risk*, and the lists are printed under the dependency table.
 - Expressions follow SPDX: `A OR B` takes the better class (you may choose), `A AND B` the worse, `AND` binds tighter than `OR`, parentheses are respected, and `A WITH exception` uses the exception if you listed it, else `A`. Several licenses reported together for one package (`MIT, Apache-2.0`) are treated as all applying, so the worst counts, because deps.dev does not say whether they are alternatives.
 - Nothing is blocked or failed by this. It only colours and filters. An empty policy leaves everything *unclassified*.
 
