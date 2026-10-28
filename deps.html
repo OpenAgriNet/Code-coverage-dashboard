@@ -56,8 +56,11 @@ table.deps{min-width:980px}table.deps th:first-child{width:22%}table.deps th:nth
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ECO={npm:'npm',python:'PyPI',golang:'Go',docker:'Docker',githubAction:'GitHub Action'};
+// a Docker image reference split into its registry (Docker Hub when none is named) and its own name, the last path segment
+function image(n){const p=n.split('/'),host=p.length>1&&/[.:]|^localhost$/.test(p[0]);return {registry:host?p[0]:'docker.io',path:(host?p.slice(1):p).join('/'),short:p[p.length-1]}}
 const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
-  docker:n=>n.includes('/')&&n.split('/')[0].includes('.')?null:`https://hub.docker.com/r/${n.includes('/')?n:'_/'+n}`,githubAction:n=>`https://github.com/${n}`};
+  docker:n=>{const i=image(n);return i.registry!=='docker.io'?null:`https://hub.docker.com/r/${i.path.includes('/')?i.path:'_/'+i.path}`},githubAction:n=>`https://github.com/${n}`};
+const ecoOf=d=>d.ecosystem==='docker'?image(d.name).registry:d.ecosystem;
 const LOOKED=['npm','python','golang'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
 const RISK={green:'Green',yellow:'Yellow',red:'Red',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
@@ -74,7 +77,7 @@ function vulnOf(d){const q=d.vulns;if(!q)return['unchecked'];if(!q.count)return[
 
 const FACETS=[
   {key:'repository',param:'repo',label:'Repository',get:d=>d.repository},
-  {key:'ecosystem',param:'eco',label:'Ecosystem',get:d=>d.ecosystem,valueLabel:v=>ECO[v]||v},
+  {key:'ecosystem',param:'eco',label:'Ecosystem',get:ecoOf,valueLabel:v=>ECO[v]||v},
   {key:'license',param:'license',label:'License',get:d=>d.license||'(none)'},
   {key:'risk',label:'License risk',get:riskOf,valueLabel:v=>RISK[v]||v,order:['red','yellow','green','unclassified','none','na']},
   {key:'vuln',label:'Vulnerabilities',get:vulnOf,valueLabel:v=>VULN[v]||v,order:['critical-high','any','none','unchecked']},
@@ -100,10 +103,11 @@ function licCell(d){
 }
 function row(d,single){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
-  const name=href?`<a class="pkg" href="${esc(href)}" target="_blank" rel="noopener">${esc(d.name)}</a>`:`<span class="pkg">${esc(d.name)}</span>`;
+  const shown=d.ecosystem==='docker'?image(d.name).short:d.name,full=shown===d.name?'':` title="${esc(d.name)}"`;
+  const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
   const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:esc(d.latest||'—');
   const [vc,fx]=vulnCells(d);
-  return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[d.ecosystem]||d.ecosystem)}</td><td data-label="Version"><code>${esc(d.version)}</code></td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
+  return `<tr><td>${name}${single?'':`<div class="sub">${esc(d.repository)}</div>`}</td><td data-label="Ecosystem">${esc(ECO[ecoOf(d)]||ecoOf(d))}</td><td data-label="Version"><code>${esc(d.version)}</code></td><td data-label="Latest">${latest}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${vc}</td><td data-label="Fixed in">${fx}</td></tr>`;
 }
 function render(list,state){
   const sel=(state.selected.repository||[]),single=sel.length===1?sel[0]:null;
