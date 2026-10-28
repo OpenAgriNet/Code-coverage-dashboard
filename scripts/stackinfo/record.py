@@ -7,6 +7,7 @@ from .vulns import annotate
 from .actions import annotate as annotate_actions
 from .images import annotate as annotate_images
 from .policy import classify
+from .manifests import attach as attach_groups
 
 def repo_license(repo):
  """SPDX id of the repo's own LICENSE file, 'Other' if GitHub can't classify it, None if there is none."""
@@ -24,8 +25,9 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
  out['license_class']=classify(out['license'],policy)
  try:
   branch=out['branch']=t.get('branch') or ac.default_branch(repo)
-  s=summarize(analyse(repo,branch),stack)
+  raw=analyse(repo,branch);s=summarize(raw,stack)
   out.update(languages=s['languages'],techs=s['techs'],dependencies=[info(*d) for d in s['dependencies']])
+  attach_groups(out['dependencies'],raw.get('manifests') or {})
   vulns(out['dependencies']);actions(out['dependencies']);images(out['dependencies'])
   for d in out['dependencies']:d['license_class']=classify(d.get('license'),policy)
  except Exception as e:out['error']=str(e)[:180];print(f'ERROR stack {repo}@{out["branch"]}: {e}',file=sys.stderr)

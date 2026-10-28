@@ -106,3 +106,12 @@ def test_one_failing_advisory_lookup_leaves_only_that_dependency_unchecked():
     logs = []
     v.annotate(deps, post=post, fetch=fetch, log=logs.append)
     assert deps[0]['vulns'] is None and deps[1]['vulns']['count'] == 1 and any('a:' in l for l in logs)
+
+def test_installed_version_from_the_lockfile_is_checked_instead_of_the_range():
+    deps = [{'ecosystem': 'npm', 'name': 'vite', 'version': '^5.0.0', 'installed': '5.4.2'}]
+    asked = []
+    def post(path, body):
+        asked.extend(q['version'] for q in body['queries'])
+        return {'results': [{}]}
+    v.annotate(deps, post=post, fetch=lambda p: {})
+    assert asked == ['5.4.2'] and deps[0]['vulns']['checked_version'] == '5.4.2' and deps[0]['vulns']['exact'] is True
