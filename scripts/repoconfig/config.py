@@ -38,7 +38,7 @@ def stack_settings(raw):
  if not isinstance(share,(int,float)) or isinstance(share,bool) or not 0<=share<=1:raise ConfigError('stack: "min_share" must be a number from 0 to 1')
  return out
 LICENSE_CLASSES=('green','yellow','red')
-LICENSE_LABELS={'green':'Preferred','yellow':'Not recommended','red':'Not to use'}   # what the dashboard calls each list
+LICENSE_LABELS={'green':'Preferred','yellow':'Not recommended','red':'Restricted use'}   # what the dashboard calls each list
 def license_policy(raw):
  """{'green': [...], 'yellow': [...], 'red': [...], 'labels': {...}}: SPDX ids or patterns such as GPL-*, and the name the
  dashboard shows for each list. The same entry in two lists is an error."""

@@ -99,7 +99,7 @@ function setView(v){
   if(bar)bar.setItems(repoItems());else{summary();render()}
 }
 let stack=null;
-// each license list's name with its colour, e.g. Not to use (red); the names come from licenses.labels
+// each license list's name with its colour, e.g. Restricted use (red); the names come from licenses.labels
 const withColour=l=>Object.fromEntries(Object.entries(l||{}).filter(([k])=>['green','yellow','red'].includes(k)).map(([k,v])=>[k,`${v} (${k})`]));
 // a local action (./.github/actions/x) is not a published package and has no license to find
 const licensable=d=>!(d.ecosystem==='githubAction'&&d.name.startsWith('./'));
@@ -129,7 +129,7 @@ function render(){
 }
 /* ---- filters: one bar for every table (a repository is shown when it passes all of them) ---- */
 const SECL={passing:'Passing',failing:'Failing','no runs':'No runs','no workflow':'No security workflow','branch not found':'Branch not found',unknown:'Unknown'};
-const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Not to use (red)',unclassified:'Unclassified',none:'No LICENSE file'};
+const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Restricted use (red)',unclassified:'Unclassified',none:'No LICENSE file'};
 const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const stackList=()=>!stack?[]:(view==='main'?stack.main||stack.repositories:Branches.devOnly(stack.repositories))||[];
 function repoItems(){

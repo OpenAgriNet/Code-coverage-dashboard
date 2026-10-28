@@ -17,7 +17,7 @@ const STAR='<svg class="star-icon" viewBox="0 0 16 16" width="12" height="12" ar
 const starChip=(n,of)=>!Number.isFinite(n)?'':` <span class="stars" title="${esc(n.toLocaleString()+' stars on '+of)}">${STAR}${starCount(n)}<span class="sr"> stars</span></span>`;
 const ecoOf=d=>d.ecosystem==='docker'?image(d.name).registry:d.ecosystem;
 const LOOKED=['npm','python','golang','githubAction'],SEVCLASS={CRITICAL:'bad',HIGH:'bad',MODERATE:'warn',LOW:'muted',UNKNOWN:'warn'};
-const RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Not to use (red)',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
+const RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Restricted use (red)',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const VULN={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
 const GROUP={main:'main (installed with the app)',dev:'dev',test:'test',security:'security',optional:'optional',peer:'peer',runtime:'runtime (Docker image)',ci:'ci (GitHub Action)',tool:'tool','(not found)':'not found in a manifest'};
 const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
@@ -105,7 +105,7 @@ const SORTS={
   name:(a,b)=>displayName(a).localeCompare(displayName(b),undefined,{sensitivity:'base'})||a.repository.localeCompare(b.repository),
   vulns:(a,b)=>((b.vulns||{}).count??-1)-((a.vulns||{}).count??-1)||SORTS.repo(a,b),
 };
-// each license list's name with its colour, e.g. Not to use (red); the names come from licenses.labels
+// each license list's name with its colour, e.g. Restricted use (red); the names come from licenses.labels
 const withColour=l=>Object.fromEntries(Object.entries(l||{}).filter(([k])=>['green','yellow','red'].includes(k)).map(([k,v])=>[k,`${v} (${k})`]));
 let sortBy=(k=>SORTS[k]?k:'repo')(new URLSearchParams(location.search).get('sort'));
 function render(list,state){
@@ -129,7 +129,7 @@ function renderPolicy(){
   $('policy-title').textContent=`License policy: ${RISK.green}, ${RISK.yellow}, ${RISK.red}`;
   const any=['green','yellow','red'].some(k=>(policy[k]||[]).length);
   $('policy').innerHTML=any?`<ul class="policy">${['green','yellow','red'].map(k=>`<li><span class="risk risk-${k}"><span class="dot" aria-hidden="true"></span><b>${RISK[k]}</b></span> ${(policy[k]||[]).length?(policy[k]).map(x=>`<code>${esc(x)}</code>`).join(' '):'<span class="muted">none listed</span>'}</li>`).join('')}${policy.no_license?`<li><span class="risk risk-${esc(policy.no_license)}"><span class="dot" aria-hidden="true"></span><b>${esc(RISK[policy.no_license])}</b></span> also: <i>no license</i> (nothing states one; a failed lookup is not counted)</li>`:''}</ul>`
-    :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code> (Preferred), <code>yellow</code> (Not recommended) and <code>red</code> (Not to use) in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
+    :'<p class="muted" style="margin:0 0 14px">No license policy yet. Add SPDX ids or patterns (such as <code>GPL-*</code>) under <code>licenses.green</code> (Preferred), <code>yellow</code> (Not recommended) and <code>red</code> (Restricted use) in <code>config/repos.json</code>; licenses on no list show as unclassified.</p>';
 }
 function load(){   // the records of the branch being shown
   // Development lists only repos whose development branch was found; the note under the switch names the others

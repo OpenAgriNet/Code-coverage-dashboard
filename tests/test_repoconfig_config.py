@@ -187,7 +187,7 @@ def test_shipped_config_follows_the_new_shape():
     assert {'engineering-tracker', 'infra-automation'} <= set(c['exclude']) and c['security']['workflow'] == 'security.yml'
 
 def test_license_labels_default_and_can_be_renamed_one_at_a_time():
-    assert n()['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Not to use'}
+    assert n()['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Restricted use'}
     assert n(licenses={'labels': {'red': ' Avoid '}})['licenses']['labels'] == {'green': 'Preferred', 'yellow': 'Not recommended', 'red': 'Avoid'}
 
 def test_dependency_settings_default_to_everything_on():
