@@ -123,7 +123,8 @@ function licCell(d){
 }
 function row(d,single){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
-  const shown=shortName(d),full=shown===d.name?'':` title="${esc(d.name)}"`;
+  const shown=d.short||shortName(d),   // short is set by the collector; shortName covers data from before it
+ full=shown===d.name?'':` title="${esc(d.name)}"`;
   const name=href?`<a class="pkg" href="${esc(href)}"${full} target="_blank" rel="noopener">${esc(shown)}</a>`:`<span class="pkg"${full}>${esc(shown)}</span>`;
   const latest=updateOf(d)==='behind'?`<span class="warn">${esc(d.latest)}</span>`:d.latest?esc(d.latest):d.latest_of==='floating'?NA('A floating tag such as latest always points at the newest image'):local(d)?NA('An action in this repository has no releases'):NIL('Latest version not looked up for this ecosystem yet');
   const [vc,fx]=vulnCells(d);
