@@ -63,7 +63,7 @@ def annotate(deps,post=post,fetch=get,log=lambda m:print(m,file=sys.stderr)):
  otherwise {checked_version, exact, count, severity, fixed_in, unfixed, items}. fixed_in is the one version that fixes every fixable item."""
  todo=[]
  for d in deps:
-  d['vulns']=None;eco=ECOSYSTEMS.get(d['ecosystem']);v=clean_version(d['version'])
+  d['vulns']=None;eco=ECOSYSTEMS.get(d['ecosystem']);v=clean_version(d.get('installed') or d['version'])  # the lockfile's version beats a range
   if eco and v:todo.append((d,eco,v))
  for i in range(0,len(todo),BATCH):
   chunk=todo[i:i+BATCH]
@@ -77,6 +77,6 @@ def annotate(deps,post=post,fetch=get,log=lambda m:print(m,file=sys.stderr)):
       ids={vuln['id'],*vuln.get('aliases',[])}
       if vuln.get('withdrawn') or ids&seen:continue  # withdrawn, or the same advisory under another id (GHSA/PYSEC/CVE)
       seen|=ids;items.append(item(vuln,eco,d['name'],v))
-     d['vulns']={'checked_version':v,'exact':is_exact(d['version']),**summarize(items)}
+     d['vulns']={'checked_version':v,'exact':bool(d.get('installed')) or is_exact(d['version']),**summarize(items)}
     except Exception as e:log(f'WARN OSV advisory lookup failed for {d["name"]}: {e}')
   except Exception as e:log(f'WARN OSV lookup failed for {len(chunk)} dependencies: {e}')

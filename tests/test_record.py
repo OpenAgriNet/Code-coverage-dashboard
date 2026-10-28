@@ -15,7 +15,7 @@ def test_stack_record_adds_dependency_info(monkeypatch):
     raw = {'languages': {'Go': 3}, 'techs': ['golang'], 'dependencies': [['golang', 'github.com/a/b', 'v1.0.0']]}
     rec = r.stack_record({'name': 'na', 'branch': 'development'}, analyse=lambda repo, branch: raw,
                          info=lambda e, n, v: {'name': n, 'license': 'MIT'}, vulns=lambda deps: None)
-    assert rec['languages'] == [('Go', 3)] and rec['dependencies'] == [{'name': 'github.com/a/b', 'license': 'MIT', 'license_class': 'unclassified'}] and rec['error'] is None
+    assert rec['languages'] == [('Go', 3)] and rec['dependencies'] == [{'name': 'github.com/a/b', 'license': 'MIT', 'groups': [], 'license_class': 'unclassified'}] and rec['error'] is None
 
 def test_stack_record_runs_vulnerability_check_on_the_dependencies(monkeypatch):
     monkeypatch.setattr(r, 'repo_license', lambda repo: None)
@@ -25,7 +25,7 @@ def test_stack_record_runs_vulnerability_check_on_the_dependencies(monkeypatch):
             d['vulns'] = {'count': 2}
     rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
                          info=lambda e, n, v: {'name': n}, vulns=vulns)
-    assert rec['dependencies'] == [{'name': 'jinja2', 'vulns': {'count': 2}, 'license_class': None}]
+    assert rec['dependencies'] == [{'name': 'jinja2', 'groups': [], 'vulns': {'count': 2}, 'license_class': None}]
 
 def test_repo_license(monkeypatch):
     monkeypatch.setattr(r.ac, 'api', lambda p: {'license': {'spdx_id': 'MIT'}})
@@ -59,4 +59,17 @@ def test_stack_record_runs_the_actions_lookup_before_classifying(monkeypatch):
             d['license'] = 'MIT'
     rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
                          info=lambda e, n, v: {'name': n}, vulns=lambda deps: None, actions=actions, policy={'green': ['MIT']})
-    assert rec['dependencies'] == [{'name': 'actions/cache', 'license': 'MIT', 'license_class': 'green'}]
+    assert rec['dependencies'] == [{'name': 'actions/cache', 'groups': [], 'license': 'MIT', 'license_class': 'green'}]
+
+def test_stack_record_labels_groups_from_the_manifests(monkeypatch):
+    monkeypatch.setattr(r, 'repo_license', lambda repo: None)
+    raw = {'dependencies': [['npm', 'vite', '^5.0.0'], ['docker', 'redis', '7']],
+           'manifests': {('npm', 'vite'): {'groups': ['dev'], 'installed': '5.4.2', 'sources': ['package.json']}}}
+    seen = {}
+    def vulns(deps):
+        seen.update({d['name']: d.get('installed') for d in deps})
+    rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
+                         info=lambda e, n, v: {'ecosystem': e, 'name': n, 'version': v}, vulns=vulns, actions=lambda d: None)
+    by = {d['name']: d for d in rec['dependencies']}; vite, redis = by['vite'], by['redis']
+    assert vite['groups'] == ['dev'] and vite['installed'] == '5.4.2' and redis['groups'] == ['runtime']
+    assert seen == {'vite': '5.4.2', 'redis': None}   # groups and installed are known before the vulnerability check

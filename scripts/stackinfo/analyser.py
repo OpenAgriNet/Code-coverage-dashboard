@@ -25,6 +25,7 @@ def analyse(repo,branch):
   # the CLI joins -o onto the working directory, so pass a bare file name
   subprocess.run(['npx','--yes',ANALYSER,src,'--flat','-o','out.json'],cwd=tmp,check=True,timeout=600,stdout=subprocess.DEVNULL,env=env)
   with open(os.path.join(tmp,'out.json'),encoding='utf-8') as f:raw=json.load(f)
+  raw['manifests']=read_manifests(src)   # groups and installed versions, read before the clone is removed
   return resolve_image_versions(raw,src)
 SKIP_DIRS={'.git','node_modules','vendor','.venv'}
 MAX_TEXT_BYTES=1_000_000
@@ -43,6 +44,9 @@ def _texts(src,want):
     fd=os.open(p,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
     with os.fdopen(fd,encoding='utf-8',errors='replace') as f:yield p,f.read(MAX_TEXT_BYTES)
    except OSError:continue
+def read_manifests(src):
+ from .manifests import read
+ return read(src)
 def resolve_image_versions(raw,src):
  """stack-analyser keeps an image tag like ${POSTGRES_VERSION:-17} only up to the first colon. Replace such a tag with the value the
  repo itself gives: the compose default (${VAR:-17} or ${VAR-17}) on that image's line, else VAR=value from an .env example file.
