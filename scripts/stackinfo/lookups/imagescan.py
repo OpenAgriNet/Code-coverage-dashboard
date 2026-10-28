@@ -100,6 +100,11 @@ LABEL_LICENSE=('org.opencontainers.image.licenses','org.label-schema.license','l
 LABEL_SOURCE=('org.opencontainers.image.source','org.label-schema.vcs-url')
 REPO=re.compile(r'(?!\.)[A-Za-z0-9_.-]+/(?!\.)[A-Za-z0-9_.-]+')   # no x/. or x/..
 GITHUB_REPO=re.compile(r'(?:https?://|git@)?github\.com[/:]([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?(?:[#?].*)?')
+def source_repo(labels):
+ """owner/repo of the GitHub repository an image's source label names, or None."""
+ src=next((labels[k].strip() for k in LABEL_SOURCE if labels.get(k,'').strip()),'')
+ m=GITHUB_REPO.fullmatch(src)
+ return m.group(1) if m and REPO.fullmatch(m.group(1)) else None
 def image_license(labels,repo_license):
  """(license, where): the image's own license label, else the license of the GitHub repo its source label names, else (None, None).
  repo_license('owner/repo') gives that repo's SPDX id."""

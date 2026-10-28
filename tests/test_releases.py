@@ -24,3 +24,27 @@ def test_non_go_tool_is_explained_not_checked():
     reasons.explain(deps)
     assert deps[0]['latest'] == 'v1.0.0' and 'resolved' not in deps[0]
     assert 'not a Go module' in deps[0]['missing']['vulns']['why']
+
+def test_when_github_refuses_the_latest_release_comes_from_deps_dev(monkeypatch):
+    def forbidden(path):
+        raise RuntimeError('403 Client Error: Forbidden')
+    monkeypatch.setattr(rl, 'depsdev_fetch', lambda path: {'versions': [{'versionKey': {'version': 'v0.76.1'}, 'isDefault': True}]})
+    checked = []
+    def check(deps):
+        checked.extend(d['version'] for d in deps)
+        for d in deps:
+            d['vulns'] = {'count': 1}
+    deps = [{'ecosystem': 'githubRelease', 'name': 'aquasecurity/trivy', 'version': 'latest'}]
+    rl.annotate(deps, api=forbidden, is_go=lambda m: True, check=check, cache={}, log=lambda m: None)
+    assert deps[0]['latest'] == 'v0.76.1' and deps[0]['resolved'] == 'v0.76.1' and checked == ['v0.76.1'] and 'errors' not in deps[0]
+    assert deps[0]['project'] == 'github.com/aquasecurity/trivy'
+
+def test_the_repository_is_kept_even_when_every_lookup_fails():
+    def boom(path):
+        raise RuntimeError('403 Client Error: Forbidden')
+    deps = [{'ecosystem': 'githubRelease', 'name': 'x/tool', 'version': 'latest'}]
+    rl.annotate(deps, api=boom, is_go=lambda m: False, check=lambda d: None, cache={}, log=lambda m: None)
+    assert deps[0]['project'] == 'github.com/x/tool' and stars.source_repo(deps[0]) == 'x/tool'
+    assert '403' in deps[0]['errors']['latest']
+    reasons.explain(deps)
+    assert deps[0]['missing']['latest']['why'].startswith('GitHub lookup failed')

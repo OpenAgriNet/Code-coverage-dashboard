@@ -7,18 +7,24 @@ from common.log import warn
 from stackinfo.lookups.actions import NAME, latest as latest_release
 from stackinfo.lookups.depsdev import fetch as depsdev_fetch
 from stackinfo.lookups.osv import annotate as osv_annotate
+from common.versions import latest_stable
 from stackinfo.rules.reasons import short_error
 CACHE={}
 
-def lookup(repo,version,api,is_go,check):
- out={'latest':latest_release(repo,api),'project':f'github.com/{repo}'}
- at=out['latest'] if version in ('latest','',None) else version
+def lookup(repo,version,api,is_go,check,log=warn):
+ """latest, resolved and vulns of a release tool. The latest release comes from GitHub, or from deps.dev's record of the Go module
+ when GitHub's releases call fails (it answered 403 for aquasecurity/trivy from Actions while it served every action)."""
+ out={};err=None;mod=f'github.com/{repo}';go=is_go(mod)
+ try:out['latest']=latest_release(repo,api)
+ except Exception as e:err=f'GitHub: {short_error(e)}';log(f'WARN release tool {repo}: {e}')
+ if not out.get('latest') and go:out['latest']=latest_stable((depsdev_fetch(f'GO/packages/{quote(mod,safe="")}') or {}).get('versions',[]))
+ at=out.get('latest') if version in ('latest','',None) else version
  if at and at!=version:out['resolved']=at
- mod=f'github.com/{repo}'
- if at and is_go(mod):
+ if at and go:
   probe=[{'ecosystem':'golang','name':mod,'version':at}];check(probe)
   out['vulns']=probe[0]['vulns']
   if probe[0].get('errors'):out['errors']=probe[0]['errors']
+ if err and not out.get('latest'):out.setdefault('errors',{}).update(latest=err,vulns=err)
  return out
 def is_go_module(mod):
  return depsdev_fetch(f'GO/packages/{quote(mod,safe="")}') is not None
@@ -27,6 +33,7 @@ def annotate(deps,api=github.api,is_go=is_go_module,check=osv_annotate,cache=CAC
   if d.get('ecosystem')!='githubRelease':continue
   repo,ver=d['name'],str(d.get('version') or 'latest')
   if not NAME.fullmatch(repo) or '..' in repo:log(f'WARN release tool not checked: {repo}');continue
+  d['project']=f'github.com/{repo}'   # the install line names the repository: license and stars come from it whatever GitHub answers
   k=(repo,ver)
   if k not in cache:
    try:cache[k]=lookup(repo,ver,api,is_go,check)

@@ -58,7 +58,9 @@
       "minio/mc": "minio/mc",
       "cgr.dev/chainguard/minio": "minio/minio",
       "temporalio/auto-setup": "temporalio/temporal",
-      "temporalio/ui": "temporalio/ui"
+      "temporalio/ui": "temporalio/ui",
+      "docker.langfuse.com/langfuse/langfuse": "langfuse/langfuse",
+      "docker.langfuse.com/langfuse/langfuse-worker": "langfuse/langfuse"
     },
     "image_licenses": {
       "postgres": "PostgreSQL",

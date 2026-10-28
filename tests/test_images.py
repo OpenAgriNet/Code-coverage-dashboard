@@ -368,3 +368,10 @@ def test_a_configured_license_survives_a_failed_scan(image_config):
         raise RuntimeError('docker pull failed: denied')
     got = im.lookup('docker.io/library/postgres', '17', lambda n: ['17'], boom, lambda m: None, resolve=lambda *a: None, license_of=lambda r: None)
     assert got['license'] == 'PostgreSQL' and got['license_of'] == 'config' and got['vulns'] is None and set(got['errors']) == {'vulns'}
+
+def test_the_image_repository_comes_from_config_then_its_label_then_its_go_module(image_config):
+    image_config(image_sources={'docker.langfuse.com/langfuse/langfuse': 'langfuse/langfuse'})
+    assert im.image_repo('docker.langfuse.com/langfuse/langfuse', None, None) == 'langfuse/langfuse'
+    assert im.image_repo('docker.io/x/y', {'org.opencontainers.image.source': 'https://github.com/o/r'}, None) == 'o/r'
+    assert im.image_repo('docker.io/grafana/loki', {}, ('AGPL-3.0', 'github.com/grafana/loki/v3 3.7.9')) == 'grafana/loki'
+    assert im.image_repo('docker.io/library/redis', {}, None) is None

@@ -40,7 +40,7 @@ def license_reason(d,err):
   if err:return 'nil',f'The image could not be read, so its labels are unknown: {err}','error'
   return 'nil',('No license found: the image has no license label, its source label names no GitHub repository, config/repos.json '
    'gives none (dependencies.image_licenses or image_sources), and no package inside it is named like the image'),'none'
- if d.get('license_of')=='error':return 'nil',f'Lookup failed{": "+err if err else ""}; this is not a missing license','error'
+ if d.get('license_of')=='error' or err:return 'nil',f'Lookup failed{": "+err if err else ""}; this is not a missing license','error'
  if d.get('license_of')=='not found':return 'nil',f'No license found: not published on {REGISTRY.get(eco,"its registry")}, and no source repository is known','none'
  return 'nil','No license found: neither the registry nor the source repository states a license','none'
 def vulns_reason(d,err):

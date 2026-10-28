@@ -9,6 +9,7 @@ from common.safehttp import get as safe_get
 from stackinfo.lookups.actions import NAME, repo_of
 from stackinfo.lookups import registry
 from stackinfo.lookups.projects import project_stars, project_license
+from stackinfo.rules.reasons import short_error
 GH=re.compile(r'github\.com/([^/]+/[^/]+)')
 CACHE={}
 
@@ -41,12 +42,12 @@ def fill_licenses(deps,license_of=None):
   repo=source_repo(d)
   if not repo:continue
   try:lic=license_of(repo)
-  except Exception:continue
+  except Exception as e:d.setdefault('errors',{})['license']=f'deps.dev: {short_error(e)}';continue   # not a missing license
   if lic:d.update(license=lic,license_of='source')
 def annotate(deps,api=project_stars,hub=hub_stars,cache=CACHE,log=warn):
  """Add stars and stars_of (where they were counted) to every dependency that has a known home. A failed lookup adds nothing."""
  for d in deps:
-  if d.get('ecosystem')=='docker':
+  if d.get('ecosystem')=='docker' and not source_repo(d):   # no GitHub repository known: Docker Hub's own stars
    if not registry.NAME.fullmatch(d['name']) or registry.split(d['name'])[0]!='registry-1.docker.io':continue
    key=('hub',registry.split(d['name'])[1]);where='hub.docker.com/'+key[1].replace('library/','_/',1);fetch=lambda:hub(d['name'])
   else:

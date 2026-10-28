@@ -57,3 +57,24 @@ def test_only_whole_numbers_become_stars():
     answers = {'a/b': '<img src=x onerror=alert(1)>', 'c/d': -5, 'e/f': 7}
     s.annotate(deps, api=lambda repo: answers[repo], cache={})
     assert [d.get('stars') for d in deps] == [None, None, 7]
+
+def test_an_image_with_a_known_repository_counts_its_github_stars():
+    deps = [{'ecosystem': 'docker', 'name': 'docker.langfuse.com/langfuse/langfuse', 'project': 'github.com/langfuse/langfuse'},
+            {'ecosystem': 'docker', 'name': 'postgres'}, {'ecosystem': 'docker', 'name': 'cgr.dev/chainguard/minio'}]
+    hub_asked = []
+    def hub(name):
+        hub_asked.append(name)
+        return 15045
+    s.annotate(deps, api=lambda repo: {'langfuse/langfuse': 26000}.get(repo), hub=hub, cache={})
+    assert deps[0]['stars'] == 26000 and deps[0]['stars_of'] == 'github.com/langfuse/langfuse'
+    assert deps[1]['stars'] == 15045 and hub_asked == ['postgres']   # no repository known: Docker Hub
+    assert 'stars' not in deps[2]                                     # neither: nothing
+
+def test_a_failed_license_lookup_is_not_no_license():
+    from stackinfo.rules.reasons import explain
+    def boom(repo):
+        raise RuntimeError('deps.dev down')
+    deps = [{'ecosystem': 'githubRelease', 'name': 'x/tool', 'project': 'github.com/x/tool', 'license': None, 'latest': 'v1', 'vulns': {'count': 0}}]
+    s.fill_licenses(deps, license_of=boom)
+    explain(deps)
+    assert deps[0]['missing']['license']['kind'] == 'error' and 'deps.dev down' in deps[0]['missing']['license']['why']

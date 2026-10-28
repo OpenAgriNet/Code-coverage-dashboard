@@ -4,7 +4,7 @@ from common.log import warn
 from common.safehttp import public_host
 from stackinfo.rules.reasons import short_error
 from stackinfo.lookups.registry import NAME, TAG, SHAPE, split, canonical, latest_like, tags_of, version_of
-from stackinfo.lookups.imagescan import scan, image_license
+from stackinfo.lookups.imagescan import scan, image_license, source_repo
 from stackinfo.lookups.projects import project_license
 from stackinfo import settings
 CACHE={}
@@ -27,6 +27,11 @@ def license_for(name,labels,main,license_of):
   if lic:return lic,where,None
  if main:return main[0],'package',main[1]
  return None
+def image_repo(name,labels,main):
+ """owner/repo of the image's GitHub repository: the one config/repos.json names, its source label's, or its main Go module's."""
+ repo=configured(name,'image_sources') or (labels and source_repo(labels))
+ if not repo and main and main[1].startswith('github.com/'):repo='/'.join(main[1].split()[0].split('/')[1:3])
+ return repo or None
 def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  license_of=license_of or project_license
  out={'latest':None,'latest_of':None,'vulns':None};errors={}
@@ -47,6 +52,8 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  except Exception as e:lic=None;errors['license']=short_error(e);log(f'WARN license lookup failed for {name}:{tag}: {e}')
  if lic:out.update(license=lic[0],license_of=lic[1],**({'license_from':lic[2]} if lic[2] else {}))
  elif res is None and 'license' not in errors:errors['license']=errors['vulns']
+ repo=image_repo(name,res and labels,res and main)
+ if repo:out['project']=f'github.com/{repo}'   # its GitHub stars, like every other row
  if errors:out['errors']=errors
  return out
 def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=warn,workers=None,is_public=public_host,resolve=version_of,license_of=None):
