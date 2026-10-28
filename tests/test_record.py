@@ -50,3 +50,13 @@ def test_stack_record_survives_default_branch_failure(monkeypatch):
     monkeypatch.setattr(r.ac, 'default_branch', boom)
     rec = r.stack_record({'name': 'na', 'branch': None}, analyse=lambda *a: {})
     assert rec['license'] == 'MIT' and rec['error'] == '502' and rec['dependencies'] == []
+
+def test_stack_record_runs_the_actions_lookup_before_classifying(monkeypatch):
+    monkeypatch.setattr(r, 'repo_license', lambda repo: None)
+    raw = {'dependencies': [['githubAction', 'actions/cache', 'v4']]}
+    def actions(deps):
+        for d in deps:
+            d['license'] = 'MIT'
+    rec = r.stack_record({'name': 'na', 'branch': 'main'}, analyse=lambda repo, branch: raw,
+                         info=lambda e, n, v: {'name': n}, vulns=lambda deps: None, actions=actions, policy={'green': ['MIT']})
+    assert rec['dependencies'] == [{'name': 'actions/cache', 'license': 'MIT', 'license_class': 'green'}]
