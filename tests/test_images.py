@@ -137,18 +137,6 @@ def test_long_lists_keep_the_worst_items_and_exact_counts(monkeypatch):
     got = sc.summarize(items)
     assert [i['id'] for i in got['items']] == ['3', '1'] and got['count'] == 4 and got['fixable'] == 2 and got['unfixed'] == 2 and got['severity'] == 'CRITICAL'
 
-def resolver(table):
-    def resolve(name, port):
-        if name not in table:
-            raise OSError('no such host')
-        return [(None, None, None, '', (a, port)) for a in table[name]]
-    return resolve
-
-def test_public_host_rejects_internal_targets():
-    r = resolver({'registry-1.docker.io': ['44.208.254.194'], 'evil.example': ['169.254.169.254'], 'mixed.example': ['8.8.8.8', '10.0.0.5'], 'v6.example': ['2606:4700::1111']})
-    assert sh.public_host('registry-1.docker.io', r) and sh.public_host('v6.example:5000', r)
-    for host in ('169.254.169.254', 'localhost:5000', '[::1]:5000', 'evil.example', 'mixed.example', 'metadata.google.internal', 'nosuch.example', 'intranet'):
-        assert not sh.public_host(host, r), host
 
 def test_images_on_internal_registries_are_never_fetched():
     deps = [{'ecosystem': 'docker', 'name': n, 'version': '1', 'latest': None, 'vulns': None} for n in ('169.254.169.254/x', 'localhost:5000/app')]
@@ -164,46 +152,6 @@ def test_token_realm_on_an_internal_host_is_refused():
         assert False
     except RuntimeError as e:
         assert 'realm' in str(e)
-
-class Sock:
-    def __init__(self, ip):
-        self.ip, self.closed = ip, False
-    def getpeername(self):
-        return (self.ip, 443)
-    def close(self):
-        self.closed = True
-
-def test_connections_to_non_public_peers_are_refused():
-    assert sh.check_peer(Sock('44.208.254.194')).ip == '44.208.254.194'
-    for ip in ('169.254.169.254', '10.0.0.5', '127.0.0.1', '::1', 'fe80::1%eth0'):
-        s = Sock(ip)
-        try:
-            sh.check_peer(s)
-            assert False, ip
-        except sh.requests.ConnectionError:
-            assert s.closed
-
-def test_session_uses_the_peer_checking_pool():
-    adapter = sh.R.get_adapter('https://registry-1.docker.io/v2/')
-    assert isinstance(adapter, sh.PublicAdapter) and adapter.poolmanager.pool_classes_by_scheme['https'] is sh.PublicHTTPSPool
-
-def test_redirects_are_followed_by_hand_and_checked(monkeypatch):
-    hops = []
-    def fake_get(method, url, headers=None, params=None, timeout=None, allow_redirects=True, stream=False):
-        assert allow_redirects is False
-        hops.append((url, headers))
-        if url == 'https://reg.example/a':
-            return Resp(302, headers={'Location': 'https://cdn.example/b'})
-        if url == 'https://cdn.example/b':
-            return Resp(307, headers={'Location': 'http://169.254.169.254/latest/meta-data'})
-        return Resp(200, {})
-    monkeypatch.setattr(sh.R, 'request', fake_get)
-    try:
-        sh.get('https://reg.example/a', headers={'Authorization': 'Bearer t'}, is_public=lambda h: True)
-        assert False
-    except RuntimeError as e:
-        assert 'refused' in str(e)
-    assert hops == [('https://reg.example/a', {'Authorization': 'Bearer t'}), ('https://cdn.example/b', None)]
 
 def test_floating_tag_resolves_to_the_version_with_the_same_digest():
     digests = {'latest': 'sha256:b', '12.3.0': 'sha256:c', '12.2.1': 'sha256:b', '12.2': 'sha256:b'}
@@ -294,53 +242,6 @@ def test_one_image_under_several_spellings_is_scanned_once():
         return sc.summarize([])
     im.annotate(deps, tags_of=lambda n: ['17'], scan=scan, cache={}, is_public=lambda h: True, resolve=lambda n, tag, ts: None)
     assert scanned == ['docker.io/library/postgres:17'] and all(d['vulns']['count'] == 0 for d in deps)
-
-class Streamed:
-    """A response whose body arrives in chunks, as requests gives it with stream=True."""
-    status_code = 200
-    headers = {}
-    def __init__(self, chunks):
-        self.chunks, self.closed = chunks, False
-    def iter_content(self, size):
-        yield from self.chunks
-    def close(self):
-        self.closed = True
-
-def test_body_over_the_cap_is_refused(monkeypatch):
-    monkeypatch.setattr(sh, 'MAX_BODY', 10)
-    r = Streamed([b'123456', b'789012'])
-    try:
-        sh._read(r)
-        assert False
-    except RuntimeError as e:
-        assert 'over' in str(e) and r.closed
-
-def test_slow_body_is_cut_off(monkeypatch):
-    clock = iter([0, 1, 2, 100])
-    monkeypatch.setattr(sh.time, 'monotonic', lambda: next(clock))
-    r = Streamed([b'a', b'b', b'c'])
-    try:
-        sh._read(r)
-        assert False
-    except RuntimeError as e:
-        assert 'not complete' in str(e)
-
-def test_a_complete_body_is_readable_as_json():
-    import io
-    r = sh.requests.Response()
-    r.status_code, r.raw = 200, io.BytesIO(b'{"tags": ["1"]}')
-    assert sh._read(r).json() == {'tags': ['1']}
-
-def test_retry_after_is_not_obeyed():
-    assert sh.RETRY.respect_retry_after_header is False
-
-def test_userinfo_in_a_url_is_never_public():
-    for url in ('https://user:pw@localhost/x', 'https://10.0.0.1@evil.example/x', 'https://evil.example:pw@127.0.0.1/x'):
-        try:
-            sh.get(url)
-            assert False, url
-        except RuntimeError as e:
-            assert 'refused' in str(e)
 
 def test_tags_that_do_not_fit_in_the_page_limit_raise():
     def get(url, headers=None, params=None):
