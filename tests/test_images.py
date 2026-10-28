@@ -214,9 +214,9 @@ def test_scan_reads_labels_from_the_pulled_image():
     assert got['labels'] == {'org.opencontainers.image.licenses': 'MIT'} and got['count'] == 0
 
 def test_annotate_sets_the_image_license():
-    deps = [{'ecosystem': 'docker', 'name': 'grafana/grafana', 'version': '13.2.2', 'latest': None, 'vulns': None}]
-    scan = lambda ref: {**sc.summarize([]), 'labels': {'org.opencontainers.image.source': 'https://github.com/grafana/grafana'}}
-    im.annotate(deps, tags_of=lambda n: ['13.2.2'], scan=scan, cache={}, is_public=lambda h: True, license_of=lambda r: 'AGPL-3.0')
+    deps = [{'ecosystem': 'docker', 'name': 'acme/app', 'version': '1.2.2', 'latest': None, 'vulns': None}]
+    scan = lambda ref: {**sc.summarize([]), 'labels': {'org.opencontainers.image.source': 'https://github.com/acme/app'}}
+    im.annotate(deps, tags_of=lambda n: ['1.2.2'], scan=scan, cache={}, is_public=lambda h: True, license_of=lambda r: 'AGPL-3.0')
     assert deps[0]['license'] == 'AGPL-3.0' and deps[0]['license_of'] == 'source' and 'labels' not in deps[0]['vulns']
 
 def test_project_license_asks_github_when_deps_dev_cannot_name_it(monkeypatch):
@@ -350,7 +350,7 @@ def image_config():
     def apply(**block):
         settings.configure(config.dependency_settings(block))
     yield apply
-    settings.configure(config.dependency_settings(None))
+    settings.reset()   # back to config/dependencies.json
 
 def test_license_order_config_first_then_labels_then_the_main_package(image_config):
     repo = lambda r: {'jaegertracing/jaeger': 'Apache-2.0', 'o/labelled': 'MIT'}.get(r)

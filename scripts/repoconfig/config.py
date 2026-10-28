@@ -57,31 +57,14 @@ def license_policy(raw):
  out['no_license']=raw.get('no_license')
  if out['no_license'] not in (None,*LICENSE_CLASSES):raise ConfigError(f'licenses.no_license must be one of {", ".join(LICENSE_CLASSES)} (or left out)')
  return out
-# The dependency scan. Every key is optional; a list or map given here replaces the default rather than extending it.
+# The dependency scan's settings live in config/dependencies.json (every mapping: image sources and licenses, image kinds, names,
+# group aliases, ...). The built-in defaults are only switches and limits, so a missing file means 'everything on, nothing mapped'.
 DEPENDENCY_DEFAULTS={
  'checks':{'vulnerabilities':True,'actions':True,'images':True,'terraform':True,'workflow_tools':True,'stars':True},
  'images':{'workers':4,'scan_timeout':900,'max_findings':50,'resolve_limit':30,'max_tag_pages':50},
- 'groups':{'aliases':{'tests':'test','testing':'test','develop':'dev','development':'dev'},
-  'workflow_purposes':{'security':'security','scan':'security','codeql':'security','trivy':'security','audit':'security','test':'test',
-   'lint':'lint','format':'lint','docs':'docs','release':'build','publish':'build','build':'build','docker':'build'},
-  'default_workflow_group':'ci'},
- 'terraform':{'trusted_registries':['registry.terraform.io','registry.opentofu.org']},
- 'license_aliases':{'apache license 2.0':'Apache-2.0','apache license, version 2.0':'Apache-2.0','apache 2.0':'Apache-2.0','apache-2':'Apache-2.0',
-  'apache2':'Apache-2.0','mit license':'MIT','the mit license':'MIT','bsd':'BSD-3-Clause','gplv3':'GPL-3.0-only','gplv2':'GPL-2.0-only',
-  'agplv3':'AGPL-3.0-only','mpl 2.0':'MPL-2.0'},
- # an image's license when nothing machine-readable gives one: its GitHub repo (license looked up), or the license itself
- 'image_sources':{},'image_licenses':{},
- 'ecosystem_names':{'npm':'Node.js','python':'Python','golang':'Go','docker':'Container','githubAction':'GitHub Actions','terraform':'Terraform',
-  'githubRelease':'CLI tool'},
- # what a Docker image is, shown as its ecosystem: the first keyword its full name contains (postgres -> Database); else the default
- 'image_kinds':{'pgvector':'Database','postgres':'Database','mysql':'Database','mariadb':'Database','mongo':'Database','clickhouse-server':'Database',
-  'cassandra':'Database','redis':'Cache','valkey':'Cache','memcached':'Cache','qdrant':'Vector / search','weaviate':'Vector / search',
-  'milvus':'Vector / search','elasticsearch':'Vector / search','opensearch':'Vector / search','minio':'Object storage','minio/mc':'Object storage',
-  'grafana':'Observability','loki':'Observability','prometheus':'Observability','jaeger':'Observability','zipkin':'Observability',
-  'opentelemetry':'Observability','otel/':'Observability','clickstack':'Observability','hyperdx':'Observability','langfuse':'AI / LLM',
-  'ollama':'AI / LLM','temporal':'Workflow','nginx':'Proxy','traefik':'Proxy','envoy':'Proxy','keycloak':'Identity','kafka':'Messaging',
-  'rabbitmq':'Messaging','nats':'Messaging'},
- 'default_image_kind':'Application',
+ 'groups':{'aliases':{},'workflow_purposes':{},'default_workflow_group':'ci','by_ecosystem':{}},
+ 'terraform':{'trusted_registries':[]},
+ 'license_aliases':{},'ecosystem_names':{},'image_kinds':{},'default_image_kind':'Application','image_sources':{},'image_licenses':{},
 }
 IMAGE_LIMITS={'workers':(1,16),'scan_timeout':(60,3600),'max_findings':(1,500),'resolve_limit':(0,200),'max_tag_pages':(1,500)}
 def _keys(raw,allowed,where):
@@ -115,6 +98,7 @@ def dependency_settings(raw):
   if not isinstance(v,int) or isinstance(v,bool) or not lo<=v<=hi:raise ConfigError(f'dependencies.images.{k} must be a whole number from {lo} to {hi}')
  g=_keys(raw.get('groups'),D['groups'],'dependencies.groups')
  groups={'aliases':_text_map(g.get('aliases',D['groups']['aliases']),'dependencies.groups.aliases',lower_keys=True),
+  'by_ecosystem':_text_map(g.get('by_ecosystem',D['groups']['by_ecosystem']),'dependencies.groups.by_ecosystem'),
   'workflow_purposes':_text_map(g.get('workflow_purposes',D['groups']['workflow_purposes']),'dependencies.groups.workflow_purposes',lower_keys=True),
   'default_workflow_group':g.get('default_workflow_group',D['groups']['default_workflow_group'])}
  if not isinstance(groups['default_workflow_group'],str) or not groups['default_workflow_group'].strip():raise ConfigError('dependencies.groups.default_workflow_group must be a group name')
@@ -219,7 +203,27 @@ def normalize(cfg):
  return {**cfg,'dependencies':dependency_settings(cfg.get('dependencies')),'stack':stack_settings(cfg.get('stack')),'licenses':license_policy(cfg.get('licenses')),'releases':rel,'repositories':repos,'sources':[source(s,i) for i,s in enumerate(cfg.get('sources',[]))],
   'exclude':name_list(cfg,'exclude','config'),'branches':branches_settings(cfg.get('branches')),'coverage':coverage_settings(cfg.get('coverage')),'security':sec,
   'release_sets':release_sets(cfg.get('release_sets')),'default_security_workflow':sec['workflow']}
-def load(path):
+def drop_notes(v):
+ """The value without its notes: keys starting with _ document the file and are not settings."""
+ if isinstance(v,dict):return {k:drop_notes(x) for k,x in v.items() if not str(k).startswith('_')}
+ return v
+def _read(path):
  try:
-  with open(path,encoding='utf-8') as f:return normalize(json.load(f))
+  with open(path,encoding='utf-8') as f:return json.load(f)
  except json.JSONDecodeError as e:raise ConfigError(f'{path}: invalid JSON ({e})') from e
+DEPENDENCIES_FILE='dependencies.json'   # next to repos.json
+def load_dependencies(path):
+ """The validated settings of a dependencies.json; the built-in defaults when the file does not exist."""
+ import os
+ if not os.path.exists(path):return dependency_settings(None)
+ try:return dependency_settings(drop_notes(_read(path)))
+ except ConfigError as e:raise ConfigError(f'{path}: {e}') from e
+def load(path):
+ """config/repos.json, with the dependency scan's settings from config/dependencies.json beside it."""
+ import os
+ cfg=_read(path)
+ if isinstance(cfg,dict) and 'dependencies' in cfg:
+  raise ConfigError(f'{path}: "dependencies" moved to {DEPENDENCIES_FILE} beside it; put image sources, licenses, kinds and the other scan settings there')
+ out=normalize(cfg)
+ out['dependencies']=load_dependencies(os.path.join(os.path.dirname(path),DEPENDENCIES_FILE))
+ return out

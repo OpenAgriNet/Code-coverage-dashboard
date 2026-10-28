@@ -161,31 +161,24 @@ Both pages share one filter component (`assets/filters.js`).
 
 ## Configuring the dependency scan
 
-Everything is optional. A key you leave out keeps its default, and a list or map you give replaces the default.
+**Every mapping and setting of the dependency scan lives in `config/dependencies.json`**, separate from `config/repos.json` (which says what to track and the license policy). Add an image's repository, state a license, class a new image or rename a group there; no code changes. Keys starting with `_` are notes and are ignored, so an entry can say why it was added:
 
 ```json
-"licenses": {
-  "labels": {"green": "Preferred", "yellow": "Not recommended", "red": "Restricted use"}
-},
-"dependencies": {
-  "checks": {"vulnerabilities": true, "actions": true, "images": true, "terraform": true, "workflow_tools": true, "stars": true},
-  "images": {"workers": 4, "scan_timeout": 900, "max_findings": 50, "resolve_limit": 30, "max_tag_pages": 50},
-  "groups": {
-    "aliases": {"tests": "test", "testing": "test", "develop": "dev", "development": "dev"},
-    "workflow_purposes": {"security": "security", "scan": "security", "codeql": "security", "trivy": "security", "audit": "security",
-                          "test": "test", "lint": "lint", "format": "lint", "docs": "docs",
-                          "release": "build", "publish": "build", "build": "build", "docker": "build"},
-    "default_workflow_group": "ci"
-  },
-  "terraform": {"trusted_registries": ["registry.terraform.io", "registry.opentofu.org"]},
-  "ecosystem_names": {"golang": "Go Modules"}
+{
+  "image_sources":  {"_note": "beckn-onix per its Docker Hub page", "fidedocker/onix-adapter": "beckn/beckn-onix"},
+  "image_licenses": {"postgres": "PostgreSQL", "redis:7": "LicenseRef-RSALv2 OR SSPL-1.0"},
+  "image_kinds":    {"postgres": "Database", "redis": "Cache", "grafana": "Observability"},
+  "checks":         {"images": true},
+  "images":         {"workers": 4, "scan_timeout": 900}
 }
 ```
+
+Every key is optional. A key left out keeps its built-in default, which is only switches and limits (everything on, nothing mapped); a list or map given replaces the built-in one. The shipped file holds all the current mappings. A mistake (unknown key, wrong type, number out of range) stops the refresh with an error that names the file and the key. A `"dependencies"` block in `repos.json` is an error that points here. The display names of the three license lists stay in `repos.json` under `licenses.labels`, next to the lists themselves.
 
 | Key | What it does |
 |---|---|
 | `licenses.labels` | The names the dashboard shows for the green, yellow and red lists. |
-| `checks.*` | Turn one kind of lookup off. Its cells then say it is turned off; `workflow_tools: false` stops listing CI tools at all. |
+| `checks.*` (dependencies.json) | Turn one kind of lookup off. Its cells then say it is turned off; `workflow_tools: false` stops listing CI tools at all. |
 | `images.workers` | How many images are looked up at once (1–16). |
 | `images.scan_timeout` | Seconds one image may take to pull and scan (60–3600). |
 | `images.max_findings` | How many of an image's findings are kept for the card (the counts stay exact). |
@@ -193,6 +186,7 @@ Everything is optional. A key you leave out keeps its default, and a list or map
 | `images.max_tag_pages` | Pages of 1000 tags read per image; more is an error rather than a partial list. |
 | `groups.aliases` | Group names read as another (`tests` → `test`), compared ignoring case. |
 | `groups.workflow_purposes` | Group of a workflow-installed tool: the first key the workflow's file name contains. |
+| `groups.by_ecosystem` | The group of every Docker image (`runtime`) and GitHub Action (`ci`). |
 | `groups.default_workflow_group` | Group when no key matches. |
 | `terraform.trusted_registries` | Registries whose providers take the license and stars of `<namespace>/terraform-provider-<type>`. |
 | `license_aliases` | License texts in image labels and the SPDX id they mean. The defaults cover the usual spellings of Apache, MIT, BSD, GPL, AGPL and MPL; giving this key replaces them. |
@@ -210,6 +204,7 @@ A mistake (an unknown key, a wrong type, a number out of range) stops the refres
 
 ```
 config/repos.json          what to track and how (see the sections above)
+config/dependencies.json   every mapping and setting of the dependency scan (image sources and licenses, kinds, names, groups)
 index.html, deps.html      the two pages (markup only)
 assets/                    style.css and filters.js, tabs.js (shared); index.js, deps.js, deps.css (one page each)
 data/                      coverage.json and stack.json, written by the workflow

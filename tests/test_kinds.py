@@ -11,7 +11,7 @@ def configured():
     def apply(**block):
         settings.configure(config.dependency_settings(block))
     yield apply
-    settings.configure(config.dependency_settings(None))
+    settings.reset()   # back to config/dependencies.json
 
 def test_images_are_classed_by_what_they_are():
     assert [image_kind(n) for n in ('postgres', 'docker.io/postgres', 'redis', 'grafana/loki', 'jaegertracing/all-in-one',

@@ -44,31 +44,6 @@
     "max_techs": 6
   },
 
-  "dependencies": {
-    "image_sources": {
-      "clickhouse/clickhouse-server": "ClickHouse/ClickHouse",
-      "jaegertracing/all-in-one": "jaegertracing/jaeger",
-      "openzipkin/zipkin": "openzipkin/zipkin",
-      "grafana/grafana": "grafana/grafana",
-      "grafana/loki": "grafana/loki",
-      "otel/opentelemetry-collector-contrib": "open-telemetry/opentelemetry-collector-contrib",
-      "minio/minio": "minio/minio",
-      "minio/mc": "minio/mc",
-      "cgr.dev/chainguard/minio": "minio/minio",
-      "temporalio/auto-setup": "temporalio/temporal",
-      "temporalio/ui": "temporalio/ui",
-      "docker.langfuse.com/langfuse/langfuse": "langfuse/langfuse",
-      "docker.langfuse.com/langfuse/langfuse-worker": "langfuse/langfuse",
-      "fidedocker/onix-adapter": "beckn/beckn-onix"
-    },
-    "image_licenses": {
-      "postgres": "PostgreSQL",
-      "redis:7": "LicenseRef-RSALv2 OR SSPL-1.0",
-      "redis:alpine": "LicenseRef-RSALv2 OR SSPL-1.0 OR AGPL-3.0-only",
-      "pgvector/pgvector": "PostgreSQL"
-    }
-  },
-
   "licenses": {
     "no_license": "red",
     "green": ["MIT", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Apache-2.0", "Zlib", "BSL-1.0", "PSF-2.0", "Python-2.0", "Unlicense", "CC0-1.0", "0BSD"],
