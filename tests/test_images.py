@@ -265,3 +265,17 @@ def test_annotate_sets_the_image_license():
     scan = lambda ref: {**im.summarize([]), 'labels': {'org.opencontainers.image.source': 'https://github.com/grafana/grafana'}}
     im.annotate(deps, tags_of=lambda n: ['13.2.2'], scan=scan, cache={}, is_public=lambda h: True, license_of=lambda r: 'AGPL-3.0')
     assert deps[0]['license'] == 'AGPL-3.0' and deps[0]['license_of'] == 'source' and 'labels' not in deps[0]['vulns']
+
+def test_project_license_asks_github_when_deps_dev_cannot_name_it(monkeypatch):
+    class R:
+        status_code = 200
+        def raise_for_status(self): pass
+        def json(self): return {'license': 'non-standard'}
+    monkeypatch.setattr(im.D, 'get', lambda url, timeout=None: R())
+    monkeypatch.setattr(im, 'LICENSES', {})
+    asked = []
+    def github(path):
+        asked.append(path)
+        return {'license': {'spdx_id': 'MPL-2.0'}}
+    assert im.project_license('hashicorp/terraform-provider-aws', github=github) == 'MPL-2.0'
+    assert asked == ['/repos/hashicorp/terraform-provider-aws/license']

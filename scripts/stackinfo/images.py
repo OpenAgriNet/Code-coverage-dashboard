@@ -197,12 +197,20 @@ def image_license(labels,repo_license):
   lic=repo_license(m.group(1))
   if lic:return lic,'source'
  return None,None
-def project_license(repo):
- """SPDX license of a GitHub repo as deps.dev reports it (no GitHub API quota used)."""
+LICENSES={}
+def project_license(repo,github=None):
+ """SPDX license of a GitHub repo: deps.dev's answer (no GitHub API quota), or GitHub's own license detection when deps.dev
+ cannot name it ('non-standard', as for the MPL-2.0 HashiCorp providers). Cached per run."""
+ if repo in LICENSES:return LICENSES[repo]
  r=D.get(f'https://api.deps.dev/v3/projects/{quote("github.com/"+repo,safe="")}',timeout=30)
- if r.status_code==404:return None
- r.raise_for_status();lic=r.json().get('license')
- return lic if lic and lic not in ('non-standard','NOASSERTION') else None
+ lic=None
+ if r.status_code!=404:r.raise_for_status();lic=r.json().get('license')
+ if not lic or lic in ('non-standard','NOASSERTION'):
+  import aggregate_coverage as ac
+  got=((github or ac.api)(f'/repos/{repo}/license') or {}).get('license') or {}
+  lic=got.get('spdx_id') if got.get('spdx_id') not in (None,'NOASSERTION') else None
+ LICENSES[repo]=lic
+ return lic
 CACHE={}
 def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  license_of=license_of or project_license
