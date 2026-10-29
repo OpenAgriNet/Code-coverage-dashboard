@@ -44,7 +44,7 @@
           <option value="stars_least">Stars (least first)</option>
           <option value="name">Package name</option>
           <option value="vulns">Vulnerabilities (most first)</option>
-        </select></div>
+        </select><button type="button" class="btn btn-sm" data-export="packages" title="Download the rows this table shows (branch and filters applied) as Excel: a Packages sheet and a Vulnerabilities sheet with every advisory">Excel</button></div>
     </div>
     <div class="table-wrap"><table class="deps">
       <thead><tr><th scope="col">Package</th><th scope="col">Ecosystem</th><th scope="col">Version</th><th scope="col">Latest</th><th scope="col">License</th><th scope="col">Vulnerabilities</th><th scope="col">Fixed in</th></tr></thead>
@@ -80,6 +80,8 @@
 <script src="assets/filters.js"></script>
 <script src="assets/tabs.js"></script>
 <script src="assets/branches.js"></script>
+<script src="assets/xlsx.js"></script>
+<script src="assets/export.js"></script>
 <script src="assets/deps.js"></script>
 </body>
 </html>

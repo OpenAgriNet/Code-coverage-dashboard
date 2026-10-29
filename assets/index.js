@@ -83,9 +83,10 @@ function relRow(g){
   return row({...v,repository:g.repository,html_url:g.html_url,tags:g.tags,dpg:g.dpg},
     `<div><label class="sr" for="${id}">Version of ${esc(g.repository)}</label><select class="ver" id="${id}" data-repo="${esc(g.repository)}">${opts}</select></div><div class="sub">${how}</div>${more}`);
 }
+const lastShown={};   // the rows each table shows, for its Excel button
 function fill(id,list,empty,render1=row){
   const cv=r=>r.versions?0:isNum(r.coverage)?+r.coverage:-1;  // release rows keep name order so a row does not jump while its version is changed
-  const a=list.filter(shown).sort((x,y)=>cv(y)-cv(x)||x.repository.localeCompare(y.repository));
+  const a=list.filter(shown).sort((x,y)=>cv(y)-cv(x)||x.repository.localeCompare(y.repository));lastShown[id]=a;
   $(id).innerHTML=a.length?a.map(x=>render1(x)).join(''):`<tr><td colspan="3" class="empty">${visibleSet&&list.length?'No repositories match these filters.':empty}</td></tr>`;
 }
 const viewList=()=>(view==='main'?data.main:Branches.devOnly(data.repositories))||[];   // Development: only repos whose development branch was found
@@ -119,7 +120,7 @@ function stackRow(r){
 function fillStack(){
   stackCards();
   if(!stack)return;
-  const a=stackList().filter(shown).sort((x,y)=>x.repository.localeCompare(y.repository));
+  const a=stackList().filter(shown).sort((x,y)=>x.repository.localeCompare(y.repository));lastShown['stack-rows']=a;
   $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${visibleSet&&stackList().length?'No repositories match these filters.':'No repositories analysed yet.'}</td></tr>`;
 }
 /* ---- cards above each table: computed from the rows that table shows (the branch switch and the filters apply) ---- */
@@ -247,4 +248,30 @@ $('rel-all').addEventListener('change',e=>{relAll=e.target.value;for(const k in 
 $('rel-set').addEventListener('change',e=>{relSet=e.target.value;relAll='';$('rel-all').value='';$('rel-all').disabled=!!relSet;for(const k in picked)delete picked[k];setUrl('ver','');setUrl('set',relSet||'latest');render()});
 $('rel-rows').addEventListener('change',e=>{const s=e.target.closest('select.ver');if(s){picked[s.dataset.repo]=s.value;render();const again=document.querySelector(`select.ver[data-repo="${CSS.escape(s.dataset.repo)}"]`);if(again)again.focus()}});
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
+/* ---- Excel: each table's rows as shown, or one workbook with everything ---- */
+const branchName=()=>view==='main'?'main':'development';
+const deps=repos=>(repos||[]).flatMap(r=>(r.dependencies||[]).map(d=>({...d,repository:r.repository})));
+const EXPORTS={
+  dev:()=>[`openagrinet-coverage-${branchName()}`,[{name:`Coverage (${branchName()})`,rows:Export.coverage(lastShown['dev-rows'])}]],
+  release:()=>[`openagrinet-releases`,[{name:'Releases',rows:Export.releases(lastShown['rel-rows'],relPick)}]],
+  stack:()=>[`openagrinet-stack-${branchName()}`,[{name:`Stack (${branchName()})`,rows:Export.stack(lastShown['stack-rows'],(stack&&stack.license_policy||{}).labels)}]],
+};
+document.querySelectorAll('[data-export]').forEach(b=>b.addEventListener('click',()=>{const [f,sheets]=EXPORTS[b.dataset.export]();Xlsx.download(Export.filename(f),sheets)}));
+$('export-all').addEventListener('click',()=>{
+  const s=stack||{},labels=(s.license_policy||{}).labels,eco=(s.display||{}).ecosystems,dev=deps(s.repositories),main=deps(s.main||s.repositories);
+  Xlsx.download(Export.filename('openagrinet-dashboard'),[
+    {name:'About',rows:[['Item','Value'],['Organization',data.organization||s.organization],['Coverage data updated',data.generated_at],['Stack data updated',s.generated_at],['Exported',new Date().toISOString()],
+      ['Note','Everything on the dashboard, both branches, with no filters. Development is each repository\'s development branch, or its default branch when none was found.']]},
+    {name:'Coverage (development)',rows:Export.coverage(data.repositories)},
+    {name:'Coverage (main)',rows:Export.coverage(data.main)},
+    {name:'Releases (all versions)',rows:Export.releases(data.releases)},
+    {name:'Stack (development)',rows:Export.stack(s.repositories,labels)},
+    {name:'Stack (main)',rows:Export.stack(s.main||s.repositories,labels)},
+    {name:'Dependencies (development)',rows:Export.dependencies(dev,labels,eco)},
+    {name:'Dependencies (main)',rows:Export.dependencies(main,labels,eco)},
+    {name:'Vulnerabilities (development)',rows:Export.vulnerabilities(dev)},
+    {name:'Vulnerabilities (main)',rows:Export.vulnerabilities(main)},
+    {name:'License policy',rows:Export.policy(s.license_policy)},
+  ]);
+});
 init();initStack();
