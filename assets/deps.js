@@ -87,7 +87,7 @@ function licCell(d){
   if(!d.license)return LOOKED.includes(d.ecosystem)?'<span class="muted">Unknown</span>':NIL('Not looked up: license lookup does not cover this ecosystem yet');
   const r=riskOf(d);
   const several=d.license.includes(', ')?' All of these licenses apply, so the strictest one counts.':'';
-  return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}${d.license_of==='source'&&d.ecosystem!=='docker'?' <span class="sub" title="The registry states no license; this is the license of the package\'s source repository">(source repo)</span>':''}${d.license_of==='github'?' <span class="sub" title="deps.dev could not name this license (non-standard); this is GitHub\'s own license detection for the package\'s source repository">(GitHub detection)</span>':''}${d.license_of==='pypi'?' <span class="sub" title="deps.dev and GitHub could not name this license; this is the license PyPI\'s own metadata states">(PyPI metadata)</span>':''}${d.license_of==='repository'?' <span class="sub" title="This is the repository\'s own image, built from its Dockerfile: the repository\'s license">(this repository)</span>':''}${d.license_of==='config'?' <span class="sub" title="Stated in config/repos.json (dependencies.image_licenses)">(set in config)</span>':''}${d.license_of==='repo'?` <span class="sub" title="${esc('License of '+(d.license_from||'the GitHub repository')+', which config/repos.json names as this image\'s source (dependencies.image_sources)')}">(source repo)</span>`:''}${d.license_of==='package'?` <span class="sub" title="${esc('License of the image\'s own program inside it: '+(d.license_from||'its main package'))}">(main package)</span>`:''}${d.license_of==='label'?' <span class="sub" title="From the image\'s own license label (org.opencontainers.image.licenses): declared by whoever published the image, not verified">(image label)</span>':d.license_of==='source'&&d.ecosystem==='docker'?' <span class="sub" title="The image has no license label; this is the license of the GitHub repository its source label names">(source repo)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
+  return `<span class="lic risk risk-${r}" title="${esc(RISK[r]+'.'+several)}"><span class="dot" aria-hidden="true"></span>${esc(d.license)}</span>${d.license_of==='latest'?' <span class="sub" title="Listed version not on deps.dev; license of the latest release">(latest)</span>':''}${d.license_of==='source'&&d.ecosystem!=='docker'?' <span class="sub" title="The registry states no license; this is the license of the package\'s source repository">(source repo)</span>':''}${d.license_of==='github'?' <span class="sub" title="deps.dev could not name this license (non-standard); this is GitHub\'s own license detection for the package\'s source repository">(GitHub detection)</span>':''}${d.license_of==='wheel'?' <span class="sub" title="Not on PyPI: installed from a wheel file; this is the license the wheel\'s own metadata states">(wheel metadata)</span>':''}${d.license_of==='pypi'?' <span class="sub" title="deps.dev and GitHub could not name this license; this is the license PyPI\'s own metadata states">(PyPI metadata)</span>':''}${d.license_of==='repository'?' <span class="sub" title="This is the repository\'s own image, built from its Dockerfile: the repository\'s license">(this repository)</span>':''}${d.license_of==='config'?' <span class="sub" title="Stated in config/repos.json (dependencies.image_licenses)">(set in config)</span>':''}${d.license_of==='repo'?` <span class="sub" title="${esc('License of '+(d.license_from||'the GitHub repository')+', this image\'s source repository (named in config/dependencies.json image_sources, or the GitHub repository of the same name for a ghcr.io image)')}">(source repo)</span>`:''}${d.license_of==='package'?` <span class="sub" title="${esc('License of the image\'s own program inside it: '+(d.license_from||'its main package'))}">(main package)</span>`:''}${d.license_of==='label'?' <span class="sub" title="From the image\'s own license label (org.opencontainers.image.licenses): declared by whoever published the image, not verified">(image label)</span>':d.license_of==='source'&&d.ecosystem==='docker'?' <span class="sub" title="The image has no license label; this is the license of the GitHub repository its source label names">(source repo)</span>':''}<span class="sr"> (${esc(RISK[r])})</span>`;
 }
 function row(d,single,i){
   const href=(LINK[d.ecosystem]||(()=>null))(d.name);
@@ -111,6 +111,7 @@ const SORTS={
 };
 // each license list's name with its colour, e.g. Restricted use (red); the names come from licenses.labels
 const withColour=l=>Object.fromEntries(Object.entries(l||{}).filter(([k])=>['green','yellow','red'].includes(k)).map(([k,v])=>[k,`${v} (${k})`]));
+let current=[];   // the rows the table shows, for the Excel button
 let sortBy=(k=>SORTS[k]?k:'repo')(new URLSearchParams(location.search).get('sort'));
 function render(list,state){
   list=list.slice().sort(SORTS[sortBy]);
@@ -127,6 +128,7 @@ function render(list,state){
     +(risk?`<br>License risk: ${risk}`:'');
   const meta=single&&repos.find(x=>x.repository===single);
   $('dep-note').innerHTML=!meta?`On the ${view==='main'?'default':'development'} branch, as chosen above.`:`Branch <code>${esc(meta.branch)}</code>${view==='dev'&&meta.branch_source==='default'?' <span class="muted" title="No branch matched the development pattern in config/repos.json">(default branch; no development branch found)</span>':''} · Repository license: ${meta.license?`<span class="lic risk risk-${meta.license_class||'unclassified'}"><span class="dot" aria-hidden="true"></span>${esc(meta.license)}</span>`:meta.license_class?`<span class="lic risk risk-${esc(meta.license_class)}"><span class="dot" aria-hidden="true"></span>No LICENSE file</span>`:'<span class="lic none">No LICENSE file</span>'}`;
+  current=list;
   $('rows').innerHTML=list.length?(shown=list).map((d,i)=>row(d,single,i)).join(''):`<tr><td colspan="7" class="empty">${all.length?'No dependencies match these filters.':'No dependencies found.'}</td></tr>`;
 }
 function renderPolicy(){
@@ -170,6 +172,11 @@ $('sort').addEventListener('change',e=>{
   if(bar)bar.setItems(all);   // re-renders through the filter bar, which keeps the filters
 });
 $('view-dev').addEventListener('click',()=>setView('dev'));$('view-main').addEventListener('click',()=>setView('main'));
+document.querySelector('[data-export="packages"]').addEventListener('click',()=>{
+  const b=view==='main'?'main':'development',labels=(policy||{}).labels;
+  Xlsx.download(Export.filename(`openagrinet-dependencies-${b}`),[{name:`Packages (${b})`,rows:Export.dependencies(current,labels,(data.display||{}).ecosystems)},
+    {name:`Vulnerabilities (${b})`,rows:Export.vulnerabilities(current)},{name:'License policy',rows:Export.policy(policy)}]);
+});
 init();
 $('rows').addEventListener('click',e=>{const b=e.target.closest('.fix-open');if(b)openCard(shown[+b.dataset.i])});
 $('vc-close').addEventListener('click',()=>$('vuln-card').close());

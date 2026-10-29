@@ -118,15 +118,18 @@
     "temporalio/ui": "temporalio/ui",
     "docker.langfuse.com/langfuse/langfuse": "langfuse/langfuse",
     "docker.langfuse.com/langfuse/langfuse-worker": "langfuse/langfuse",
-    "fidedocker/onix-adapter": "beckn/beckn-onix"
+    "fidedocker/onix-adapter": "beckn/beckn-onix",
+    "fidedocker/sandbox-2.0": "beckn/sandbox",
+    "postgres": "postgres/postgres",
+    "pgvector/pgvector": "pgvector/pgvector"
   },
   "image_licenses": {
-    "_note": "A license stated for an image when nothing machine-readable gives one. name:tag is tried before name (redis 7.4 and 8.x differ). Wins over every other source.",
-    "postgres": "PostgreSQL",
-    "redis:7": "LicenseRef-RSALv2 OR SSPL-1.0",
-    "redis:alpine": "LicenseRef-RSALv2 OR SSPL-1.0 OR AGPL-3.0-only",
-    "pgvector/pgvector": "PostgreSQL"
+    "_note": "A license stated for an image when nothing machine-readable gives one. Tried in order: name:tag, name@range for the version the tag points at today (>=7.4,<8; a partial tag such as 7 counts only when all its versions are in range), then name. Wins over every other source.",
+    "redis@<7.4": "BSD-3-Clause",
+    "redis@>=7.4,<8": "LicenseRef-RSALv2 OR SSPL-1.0",
+    "redis@>=8": "LicenseRef-RSALv2 OR SSPL-1.0 OR AGPL-3.0-only"
   },
+  "license_texts": ["PostgreSQL"],
   "license_aliases": {
     "_note": "License texts found in image labels and in PyPI metadata (license text or classifier), and the license id they mean. LGPL with no version stated stays LGPL.",
     "apache license 2.0": "Apache-2.0",

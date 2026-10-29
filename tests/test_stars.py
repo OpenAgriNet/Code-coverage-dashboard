@@ -119,3 +119,9 @@ def test_pypi_license_reads_the_spdx_expression_else_an_aliased_text_or_classifi
     assert s.pypi_license('pypdf', get=lambda u, timeout: R({'license_expression': 'BSD-3-Clause'})) == 'BSD-3-Clause'
     assert s.pypi_license('psycopg2', get=lambda u, timeout: R({'license': 'LGPL with exceptions'})) == 'LGPL'
     assert s.pypi_license('x', get=lambda u, timeout: R({'license': 'see LICENSE', 'classifiers': ['License :: Other/Proprietary License']})) is None
+
+def test_a_package_installed_from_a_wheel_url_takes_the_wheels_license():
+    url = 'https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl'
+    deps = [{'ecosystem': 'python', 'name': 'en-core-web-sm', 'license': None, 'license_of': 'not found', 'url': url}]
+    s.fill_licenses(deps, license_of=lambda repo: None, wheel=lambda u: 'MIT' if u == url else None)
+    assert deps[0]['license'] == 'MIT' and deps[0]['license_of'] == 'wheel'

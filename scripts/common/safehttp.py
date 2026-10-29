@@ -68,13 +68,14 @@ def _read(r):
   r.close();raise
  r._content=bytes(body);r._content_consumed=True
  return r
-def get(url,headers=None,params=None,is_public=None,method='GET'):
- """GET (or HEAD) over https only, following redirects by hand so every hop is checked like the first one."""
+def get(url,headers=None,params=None,is_public=None,method='GET',plain=None):
+ """GET (or HEAD) over https only, following redirects by hand so every hop is checked like the first one. plain headers carry
+ no credential (Range) and go to every hop; headers stop at the first other host."""
  is_public=is_public or public_host
  for _ in range(MAX_REDIRECTS+1):
   u=urlsplit(url)
   if u.scheme!='https' or not u.hostname or not is_public(u.netloc):raise RuntimeError(f'refused to fetch {u.scheme}://{u.netloc}: not a public https host')
-  r=R.request(method,url,headers=headers,params=params,timeout=(10,READ_TIMEOUT),allow_redirects=False,stream=True)
+  r=R.request(method,url,headers={**(plain or {}),**(headers or {})} or None,params=params,timeout=(10,READ_TIMEOUT),allow_redirects=False,stream=True)
   if r.status_code not in (301,302,303,307,308):return _read(r)
   r.close()
   url=requests.compat.urljoin(url,r.headers.get('Location',''));params=None

@@ -132,3 +132,16 @@ def test_a_tool_is_listed_as_the_module_that_provides_it(tmp_path):
     assert got[('golang', 'github.com/golangci/golangci-lint/v2')] == {'name': 'github.com/golangci/golangci-lint/v2', 'declared': 'v2.5.0', 'groups': ['tool'], 'installed': None, 'sources': ['tools/go.mod']}
     assert got[('golang', 'golang.org/x/vuln')]['declared'] == 'v1.1.4'   # the longest matching module, not golang.org/x
     assert len(got) == 2   # indirect requires that provide no tool are not listed
+
+def test_a_package_installed_from_a_url_keeps_that_url(tmp_path):
+    whl = 'https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl'
+    src = tree(tmp_path, {
+        'pyproject.toml': '[project]\nname = "x"\ndependencies = ["en-core-web-sm", "fastapi>=0.1"]\n',
+        'uv.lock': f'[[package]]\nname = "en-core-web-sm"\nversion = "3.8.0"\nsource = {{ url = "{whl}" }}\n\n'
+                   '[[package]]\nname = "fastapi"\nversion = "0.115.0"\nsource = { registry = "https://pypi.org/simple" }\n'})
+    found = m.read(src)
+    assert found[('python', 'en-core-web-sm')]['url'] == whl and found[('python', 'en-core-web-sm')]['installed'] == '3.8.0'
+    assert 'url' not in found[('python', 'fastapi')]
+    deps = [{'ecosystem': 'python', 'name': 'en-core-web-sm', 'version': 'latest'}, {'ecosystem': 'python', 'name': 'fastapi', 'version': '>=0.1'}]
+    m.attach(deps, found)
+    assert deps[0]['url'] == whl and 'url' not in deps[1]

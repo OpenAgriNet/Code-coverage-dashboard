@@ -1,9 +1,12 @@
 """Facts about a GitHub repository from deps.dev's project data: license and star count, at no cost to the workflow token's
 GitHub API quota. One request per repository per run serves both. GitHub's own license detection is the fallback when
-deps.dev cannot name a license ('non-standard', as for the MPL-2.0 HashiCorp providers)."""
+deps.dev cannot name a license ('non-standard', as for the MPL-2.0 HashiCorp providers), and the license text itself, matched
+against SPDX's, when GitHub cannot either (NOASSERTION, as for the PostgreSQL License)."""
+import base64
 from urllib.parse import quote
 from common import github
 from stackinfo.lookups.depsdev import D
+from stackinfo.lookups import licensetext
 PROJECTS={}
 LICENSES={}
 
@@ -18,11 +21,12 @@ def project_stars(repo):
  """GitHub stars of owner/repo as deps.dev last saw them (refreshed daily)."""
  return (project(repo) or {}).get('starsCount')
 def project_license(repo,api=None):
- """SPDX license of owner/repo: deps.dev's, else GitHub's own detection. Cached per run."""
+ """SPDX license of owner/repo: deps.dev's, else GitHub's own detection, else its license file's text matched to SPDX's. Cached per run."""
  if repo in LICENSES:return LICENSES[repo]
  lic=(project(repo) or {}).get('license')
  if not lic or lic in ('non-standard','NOASSERTION'):
-  got=((api or github.api)(f'/repos/{repo}/license') or {}).get('license') or {}
+  file=(api or github.api)(f'/repos/{repo}/license') or {};got=file.get('license') or {}
   lic=got.get('spdx_id') if got.get('spdx_id') not in (None,'NOASSERTION') else None
+  if not lic and file.get('content'):lic=licensetext.identify(base64.b64decode(file['content']).decode('utf-8','replace'))
  LICENSES[repo]=lic
  return lic

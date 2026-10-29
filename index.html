@@ -15,6 +15,7 @@
   <header>
     <h1>OpenAgriNet DPG repositories code coverage</h1>
     <div class="refresh">
+      <button type="button" class="btn" id="export-all" title="One Excel workbook with everything on this dashboard: coverage on both branches, every release version, stack, every dependency and vulnerability, and the license policy. Filters are not applied.">Download all (Excel)</button>
       <span class="updated" id="updated">Loading data…</span>
       <a class="btn" href="https://github.com/OpenAgriNet/Code-coverage-dashboard/actions/workflows/deploy.yml" target="_blank" rel="noopener" title="Opens GitHub Actions. Click “Run workflow” there (needs write access). The page updates about two minutes after the run finishes.">Refresh data</a>
     </div>
@@ -41,7 +42,7 @@
     <div class="sec-head"><div>
       <h2 id="dev-title">Coverage and security</h2>
       <p class="sub" id="dev-note">On the branch chosen above. A repository's development branch is its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>.</p>
-    </div></div>
+    </div><button type="button" class="btn btn-sm" data-export="dev" title="Download the rows this table shows (branch and filters applied) as an Excel sheet">Excel</button></div>
     <div class="kpis" id="kpi-dev" aria-label="Coverage and security at a glance"></div>
     <div class="table-wrap"><table>
       <thead><tr><th scope="col">Repository</th><th scope="col">Code coverage</th><th scope="col">Security</th></tr></thead>
@@ -55,7 +56,7 @@
       <p class="sub">Each repository's newest stable version, or the tags of a named release (when the config defines release sets). Choose a release or one version for every repository here, or change a single repository in its row. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
     </div>
       <div class="controls"><label class="sub" for="rel-set" id="rel-set-label" hidden>Release</label><select class="ver" id="rel-set" hidden><option value="">Each repo's latest</option></select>
-        <label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select></div>
+        <label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select><button type="button" class="btn btn-sm" data-export="release" title="Download the rows this table shows (branch and filters applied) as an Excel sheet">Excel</button></div>
     </div>
     <div class="kpis" id="kpi-release" aria-label="Releases at a glance"></div>
     <div id="rel-filters"></div>
@@ -69,7 +70,7 @@
     <div class="sec-head"><div>
       <h2 id="stack-title">Stack and licenses</h2>
       <p class="sub" id="stack-note">Each repository's development branch. <a href="deps.html">All dependencies →</a></p>
-    </div></div>
+    </div><button type="button" class="btn btn-sm" data-export="stack" title="Download the rows this table shows (branch and filters applied) as an Excel sheet">Excel</button></div>
     <div class="kpis" id="kpi-stack" aria-label="Stack, dependencies and licenses at a glance"></div>
     <div class="table-wrap"><table class="wide">
       <thead><tr><th scope="col">Repository</th><th scope="col">License</th><th scope="col">Stack</th><th scope="col">Dependencies</th></tr></thead>
@@ -97,6 +98,8 @@
 <script src="assets/filters.js"></script>
 <script src="assets/tabs.js"></script>
 <script src="assets/branches.js"></script>
+<script src="assets/xlsx.js"></script>
+<script src="assets/export.js"></script>
 <script src="assets/index.js"></script>
 </body>
 </html>

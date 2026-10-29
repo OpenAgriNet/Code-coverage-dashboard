@@ -375,3 +375,24 @@ def test_the_image_repository_comes_from_config_then_its_label_then_its_go_modul
     assert im.image_repo('docker.io/x/y', {'org.opencontainers.image.source': 'https://github.com/o/r'}, None) == 'o/r'
     assert im.image_repo('docker.io/grafana/loki', {}, ('AGPL-3.0', 'github.com/grafana/loki/v3 3.7.9')) == 'grafana/loki'
     assert im.image_repo('docker.io/library/redis', {}, None) is None
+
+def test_a_partial_or_variant_tag_resolves_among_tags_of_its_own_kind():
+    digests = {'7': 'a', '7.4.12': 'a', 'alpine': 'b', '8.10.3-alpine': 'b', '8.10.3': 'c'}
+    asked = []
+    def digest(host, path, ref, auth=None):
+        asked.append(ref)
+        return digests.get(ref), None
+    tags = ['7', '7.2.5', '7.4.12', '8.10.3', '8.10.3-alpine', 'alpine']
+    assert rg.version_of('redis', '7', tags, digest=digest) == '7.4.12'
+    assert '8.10.3' not in asked                                       # 7 only looks among 7.x tags
+    assert rg.version_of('redis', 'alpine', tags, digest=digest) == '8.10.3-alpine'
+    assert rg.version_of('redis', '7.4.12', tags, digest=digest) is None   # nothing more precise to find
+
+def test_a_license_can_be_set_for_a_version_range(image_config):
+    image_config(image_licenses={'redis@<7.4': 'BSD-3-Clause', 'redis@>=7.4,<8': 'RSAL OR SSPL', 'redis@>=8': 'RSAL OR SSPL OR AGPL'})
+    none = lambda r: None
+    assert im.license_for('docker.io/library/redis', {}, None, none, '7', '7.4.12') == ('RSAL OR SSPL', 'config', None)
+    assert im.license_for('redis', {}, None, none, 'alpine', '8.10.3-alpine') == ('RSAL OR SSPL OR AGPL', 'config', None)
+    assert im.license_for('redis', {}, None, none, '6') == ('BSD-3-Clause', 'config', None)   # every 6.x is before 7.4
+    assert im.license_for('redis', {}, None, none, '7') is None                             # 7 unresolved: 7.2 or 7.4, unknown
+    assert im.license_for('redis', {}, None, none, 'alpine') is None

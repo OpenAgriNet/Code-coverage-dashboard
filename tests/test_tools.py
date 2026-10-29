@@ -56,3 +56,22 @@ def test_crafted_workflow_text_cannot_stall_the_reader(tmp_path):
     start = time.time()
     t.read(src)
     assert time.time() - start < 2   # was about 16 s at 140 KB
+
+def test_actions_used_inside_a_local_composite_action(tmp_path):
+    action = '''runs:
+  using: composite
+  steps:
+    - id: date
+      shell: bash
+      run: echo "uses: not/this@v1"
+    - uses: actions/cache@v4
+    - uses: "docker/login-action@v3"   # quoted
+    - uses: ./.github/actions/other
+    - uses: docker://alpine:3
+'''
+    src = tree(tmp_path, {'.github/actions/trivy-cache/action.yml': action, 'action.yml': '    - uses: x/root@v1'})
+    got = t.read(src)
+    assert got[('githubAction', 'actions/cache')]['declared'] == 'v4' and got[('githubAction', 'actions/cache')]['groups'] == ['ci']
+    assert got[('githubAction', 'actions/cache')]['sources'] == ['.github/actions/trivy-cache/action.yml']
+    assert got[('githubAction', 'docker/login-action')]['declared'] == 'v3'
+    assert [k for k in got if k[0] == 'githubAction'] == [('githubAction', 'actions/cache'), ('githubAction', 'docker/login-action')]
