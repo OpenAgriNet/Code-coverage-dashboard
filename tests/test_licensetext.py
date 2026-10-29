@@ -16,7 +16,8 @@ def fake(texts):
 
 def test_a_license_text_is_named_by_the_policy_license_it_matches(monkeypatch):
     monkeypatch.setattr(lt, 'TEXTS', {})
-    lt.use({'green': ['MIT', 'PostgreSQL', 'BSD-*'], 'red': ['non-standard']})
+    monkeypatch.setattr(lt.settings, 'get', lambda k: ['PostgreSQL'])   # recognised, though on no policy list
+    lt.use({'green': ['MIT', 'BSD-*'], 'red': ['non-standard']})
     get = fake({'MIT': MIT, 'PostgreSQL': POSTGRES})
     assert lt.candidates() == ['MIT', 'PostgreSQL', 'non-standard']   # patterns name no single text
     assert lt.identify('Portions Copyright (c) 1996-2026, PostgreSQL Global Development Group\n' + POSTGRES, get=get) == 'PostgreSQL'

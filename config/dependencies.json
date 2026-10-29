@@ -129,6 +129,7 @@
     "redis@>=7.4,<8": "LicenseRef-RSALv2 OR SSPL-1.0",
     "redis@>=8": "LicenseRef-RSALv2 OR SSPL-1.0 OR AGPL-3.0-only"
   },
+  "license_texts": ["PostgreSQL"],
   "license_aliases": {
     "_note": "License texts found in image labels and in PyPI metadata (license text or classifier), and the license id they mean. LGPL with no version stated stays LGPL.",
     "apache license 2.0": "Apache-2.0",

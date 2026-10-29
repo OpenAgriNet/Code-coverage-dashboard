@@ -1,9 +1,11 @@
 """Name a license from its text when no service can: GitHub says NOASSERTION and deps.dev 'non-standard' for the PostgreSQL License
 (postgres, pgvector), though the text is the standard one. The text is compared with the SPDX reference text of every license the
-policy in config/repos.json names exactly, by the words they share once copyright lines are dropped; the best one is taken only
+policy in config/repos.json names exactly, and of those config/dependencies.json license_texts lists (a license is recognised there
+without being given a class), by the words they share once copyright lines are dropped; the best one is taken only
 when it is clearly alike (MATCH) and clearly ahead of the next (MARGIN). No license is named by hand."""
 import re
 from common.safehttp import get as safe_get
+from stackinfo import settings
 SPDX='https://raw.githubusercontent.com/spdx/license-list-data/main/text/{}.txt'
 SPDX_ID=re.compile(r'[A-Za-z0-9][A-Za-z0-9.+-]*')
 MATCH=0.8
@@ -18,8 +20,9 @@ def use(policy):
 def words(text):
  return set(re.findall(r'[a-z0-9]+',COPYRIGHT.sub('',text).lower()))
 def candidates():
- """Exact SPDX ids the policy lists (patterns like GPL-* name no single text)."""
- return sorted({p for c in ('green','yellow','red') for p in POLICY.get(c,[]) if SPDX_ID.fullmatch(p) and not p.startswith('LicenseRef-')})
+ """Exact SPDX ids the policy lists (patterns like GPL-* name no single text), and dependencies.license_texts."""
+ ids={p for c in ('green','yellow','red') for p in POLICY.get(c,[])}|set(settings.get('license_texts'))
+ return sorted(p for p in ids if SPDX_ID.fullmatch(p) and not p.startswith('LicenseRef-'))
 def reference(spdx_id,get=None):
  """Words of the SPDX reference text of spdx_id, or None when SPDX has none. Cached per run."""
  if spdx_id not in TEXTS:

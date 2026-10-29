@@ -64,7 +64,7 @@ DEPENDENCY_DEFAULTS={
  'images':{'workers':4,'scan_timeout':900,'max_findings':50,'resolve_limit':30,'max_tag_pages':50},
  'groups':{'aliases':{},'workflow_purposes':{},'default_workflow_group':'ci','by_ecosystem':{}},
  'terraform':{'trusted_registries':[]},
- 'license_aliases':{},'ecosystem_names':{},'image_kinds':{},'default_image_kind':'Application','image_sources':{},'image_licenses':{},
+ 'license_aliases':{},'ecosystem_names':{},'image_kinds':{},'default_image_kind':'Application','image_sources':{},'image_licenses':{},'license_texts':[],
 }
 IMAGE_LIMITS={'workers':(1,16),'scan_timeout':(60,3600),'max_findings':(1,500),'resolve_limit':(0,200),'max_tag_pages':(1,500)}
 def _keys(raw,allowed,where):
@@ -110,7 +110,13 @@ def dependency_settings(raw):
   'image_kinds':_text_map(raw.get('image_kinds',D['image_kinds']),'dependencies.image_kinds',lower_keys=True),
   'default_image_kind':_name(raw.get('default_image_kind',D['default_image_kind']),'dependencies.default_image_kind'),
   'image_sources':_image_sources(raw.get('image_sources',{})),
-  'image_licenses':_image_licenses(raw.get('image_licenses',{}))}
+  'image_licenses':_image_licenses(raw.get('image_licenses',{})),
+  'license_texts':_spdx_ids(raw.get('license_texts',[]))}
+def _spdx_ids(raw):
+ """SPDX ids the license-text match may name besides the policy's own (it classes none of them)."""
+ if not isinstance(raw,list) or not all(isinstance(x,str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.+-]*',x.strip()) for x in raw):
+  raise ConfigError('dependencies.license_texts must be a list of SPDX ids, such as ["PostgreSQL"]')
+ return [x.strip() for x in raw]
 VERSION_RANGE=re.compile(r'\s*(>=|<=|==|>|<)\s*v?\d+(\.\d+)*\s*(,\s*(>=|<=|==|>|<)\s*v?\d+(\.\d+)*\s*)*')
 def _image_licenses(raw):
  """image -> license; a key may be name@range (redis@>=7.4,<8): comparisons joined by commas."""
