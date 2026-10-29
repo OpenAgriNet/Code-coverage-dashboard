@@ -78,18 +78,34 @@ def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
  result=json.loads(p.stdout)
  return {**summarize(items_of(result)),'labels':labels,'main':main_package(result,ref)}
 MAJOR=re.compile(r'/v\d+$')
+# words that name a part of an application, not a program: sunbird-rc-core is not the program "core"
+GENERIC={'core','server','service','api','app','ui','web','worker','base','backend','frontend','client','proxy','db','gateway','adapter',
+ 'admin','agent','cli','sdk','lib','rc','dev','prod','slim','alpine','system','provider'}
+def program_names(ref):
+ """Names the image's own program may go by, most specific first: the image's name, then its trailing words
+ (sunbird-rc-keycloak: sunbird-rc-keycloak, rc-keycloak, keycloak), never a generic word alone."""
+ name=ref.rsplit('/',1)[-1].split('@')[0].split(':')[0].lower();words=name.split('-')
+ return [n for n in dict.fromkeys('-'.join(words[i:]) for i in range(len(words))) if n not in GENERIC]
+def package_names(pkg):
+ """Names a package answers to: an OS package its name; a Go module the last part of its path (github.com/grafana/loki/v3:
+ loki); a Maven artifact its artifact id and its group's last part (org.keycloak:keycloak-core: keycloak-core, keycloak)."""
+ pname=str(pkg.get('name','')).lower();eco=pkg.get('ecosystem')
+ if eco=='Go':return {MAJOR.sub('',pname).rsplit('/',1)[-1]}
+ if eco=='Maven' and ':' in pname:g,a=pname.split(':',1);return {a,g.rsplit('.',1)[-1]}
+ return {pname}
 def main_package(result,ref):
  """(license, package) of the image's own program, found by name among the packages osv-scanner lists: an OS package named like
- the image (minio in minio), or a Go module whose path ends in the image's name (github.com/grafana/loki/v3 in loki). None
- when no package matches or its license is unknown, as for Debian packages, whose database records no license."""
- name=ref.rsplit('/',1)[-1].split('@')[0].split(':')[0].lower()
- for res in result.get('results') or []:
-  for p in res.get('packages') or []:
-   pkg=p.get('package') or {};pname=str(pkg.get('name',''))
-   key=MAJOR.sub('',pname).rsplit('/',1)[-1].lower() if pkg.get('ecosystem')=='Go' else pname.lower()
-   if key!=name:continue
+ the image (minio in minio), a Go module whose path ends in the image's name (github.com/grafana/loki/v3 in loki), or a Maven
+ artifact of the program a longer image name ends with (org.keycloak in sunbird-rc-keycloak). The image's full name is tried
+ before its trailing words. None when no package matches or its license is unknown, as for Debian packages, whose database
+ records no license."""
+ pkgs=[p for res in result.get('results') or [] for p in res.get('packages') or []]
+ for name in program_names(ref):
+  for p in pkgs:
+   pkg=p.get('package') or {}
+   if name not in package_names(pkg):continue
    lics=[l for l in p.get('licenses') or [] if l and l.upper() not in ('UNKNOWN','NOASSERTION','NONE')]
-   if lics:return ', '.join(dict.fromkeys(lics)),f'{pname} {pkg.get("version","")}'.strip()   # all of them apply, as for deps.dev
+   if lics:return ', '.join(dict.fromkeys(lics)),f'{pkg.get("name","")} {pkg.get("version","")}'.strip()   # all of them apply, as for deps.dev
  return None
 def _labels(p):
  """The image's config labels from docker image inspect (read from the pulled image: no extra registry request)."""

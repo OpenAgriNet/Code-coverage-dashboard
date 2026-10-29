@@ -396,3 +396,12 @@ def test_a_license_can_be_set_for_a_version_range(image_config):
     assert im.license_for('redis', {}, None, none, '6') == ('BSD-3-Clause', 'config', None)   # every 6.x is before 7.4
     assert im.license_for('redis', {}, None, none, '7') is None                             # 7 unresolved: 7.2 or 7.4, unknown
     assert im.license_for('redis', {}, None, none, 'alpine') is None
+
+def test_a_longer_image_name_finds_the_program_it_ends_with():
+    kc = {'results': [{'packages': [
+        {'package': {'name': 'org.apache.commons:commons-lang3', 'version': '3.12', 'ecosystem': 'Maven'}, 'licenses': ['Apache-2.0']},
+        {'package': {'name': 'org.keycloak:keycloak-core', 'version': '14.0.0', 'ecosystem': 'Maven'}, 'licenses': ['Apache-2.0']},
+        {'package': {'name': 'core', 'version': '1', 'ecosystem': 'npm'}, 'licenses': ['GPL-3.0']}]}]}
+    assert sc.program_names('ghcr.io/sunbird-rc/sunbird-rc-keycloak:latest') == ['sunbird-rc-keycloak', 'rc-keycloak', 'keycloak']
+    assert sc.main_package(kc, 'ghcr.io/sunbird-rc/sunbird-rc-keycloak:latest') == ('Apache-2.0', 'org.keycloak:keycloak-core 14.0.0')
+    assert sc.main_package(kc, 'ghcr.io/sunbird-rc/sunbird-rc-core:v2.0.0') is None   # "core" is a part of an app, not a program
