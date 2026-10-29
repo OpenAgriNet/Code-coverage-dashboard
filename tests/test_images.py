@@ -334,9 +334,9 @@ LOKI = {'results': [
         {'package': {'name': 'musl', 'version': '1.2', 'ecosystem': 'Alpine'}, 'licenses': ['MIT']}]}]}
 
 def test_the_main_package_is_the_one_named_like_the_image():
-    assert sc.main_package(LOKI, 'docker.io/grafana/loki:3.7.9') == ('AGPL-3.0, Apache-2.0', 'github.com/grafana/loki/v3 3.7.9')
+    assert sc.main_package(LOKI, 'docker.io/grafana/loki:3.7.9') == ('AGPL-3.0, Apache-2.0', 'github.com/grafana/loki/v3 3.7.9', False)
     minio = {'results': [{'packages': [{'package': {'name': 'minio', 'version': '0.2026', 'ecosystem': 'Wolfi'}, 'licenses': ['AGPL-3.0']}]}]}
-    assert sc.main_package(minio, 'cgr.dev/chainguard/minio:latest') == ('AGPL-3.0', 'minio 0.2026')
+    assert sc.main_package(minio, 'cgr.dev/chainguard/minio:latest') == ('AGPL-3.0', 'minio 0.2026', False)
 
 def test_no_main_package_when_nothing_matches_or_the_license_is_unknown():
     debian = {'results': [{'packages': [{'package': {'name': 'postgresql-17', 'version': '17.11', 'ecosystem': 'Debian:13'}, 'licenses': ['UNKNOWN']},
@@ -403,5 +403,13 @@ def test_a_longer_image_name_finds_the_program_it_ends_with():
         {'package': {'name': 'org.keycloak:keycloak-core', 'version': '14.0.0', 'ecosystem': 'Maven'}, 'licenses': ['Apache-2.0']},
         {'package': {'name': 'core', 'version': '1', 'ecosystem': 'npm'}, 'licenses': ['GPL-3.0']}]}]}
     assert sc.program_names('ghcr.io/sunbird-rc/sunbird-rc-keycloak:latest') == ['sunbird-rc-keycloak', 'rc-keycloak', 'keycloak']
-    assert sc.main_package(kc, 'ghcr.io/sunbird-rc/sunbird-rc-keycloak:latest') == ('Apache-2.0', 'org.keycloak:keycloak-core 14.0.0')
+    assert sc.main_package(kc, 'ghcr.io/sunbird-rc/sunbird-rc-keycloak:latest') == ('Apache-2.0', 'org.keycloak:keycloak-core 14.0.0', True)
     assert sc.main_package(kc, 'ghcr.io/sunbird-rc/sunbird-rc-core:v2.0.0') is None   # "core" is a part of an app, not a program
+
+def test_an_image_wrapping_a_program_takes_its_license_and_its_own_repositorys():
+    repo = lambda r: {'sunbird-rc/sunbird-rc-keycloak': 'MIT', 'grafana/loki': 'AGPL-3.0'}.get(r)
+    kc = ('Apache-2.0', 'org.keycloak:keycloak-core 14.0.0', True)
+    assert im.license_for('ghcr.io/sunbird-rc/sunbird-rc-keycloak', {}, kc, repo) == (
+        'Apache-2.0, MIT', 'package', 'org.keycloak:keycloak-core 14.0.0 + github.com/sunbird-rc/sunbird-rc-keycloak')
+    assert im.license_for('ghcr.io/x/y-keycloak', {}, kc, lambda r: 'Apache-2.0') == ('Apache-2.0', 'package', 'org.keycloak:keycloak-core 14.0.0')
+    assert im.license_for('docker.io/x/loki', {}, ('AGPL-3.0', 'loki 3', False), repo) == ('AGPL-3.0', 'package', 'loki 3')

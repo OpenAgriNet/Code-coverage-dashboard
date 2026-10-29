@@ -39,12 +39,12 @@
   function dependencies(deps, labels, ecosystems) {
     const eco = d => d.ecosystem === 'docker' ? d.kind || 'Container' : (ecosystems && ecosystems[d.ecosystem]) || d.ecosystem;
     return [['Repository', 'Package', 'Short name', 'Ecosystem', 'Registry ecosystem', 'Version', 'Installed', 'Resolved', 'Groups', 'Latest', 'License', 'License class', 'License from', 'Stars',
-      'Known vulnerabilities', 'Worst severity', 'Fixed in', 'Fixable', 'No fix released', 'Checked at version', 'Declared in', 'Source project', 'Why a value is missing'],
+      'Known vulnerabilities', 'Worst severity', 'Fixed in', 'Fixable', 'No fix released', 'Checked at version', 'Declared in', 'Source project', 'Source archived', 'Why a value is missing'],
       ...(deps || []).map(d => { const q = d.vulns;
         return [d.repository, d.name, d.short || d.name, eco(d), d.ecosystem, d.version, d.installed, d.resolved, list(d.groups), d.latest, d.license,
           classLabel(d.license_class, labels), d.license_from || d.license_of, num(d.stars),
           q ? q.count : 'Not checked', q && q.count ? String(q.severity || '').toLowerCase() || null : null, q && q.fixed_in, q && num(q.fixable), q && num(q.unfixed),
-          q && q.checked_version, list(d.sources), d.project, why(d)]; })];
+          q && q.checked_version, list(d.sources), d.project, !!d.archived, why(d)]; })];
   }
   // one row per advisory of every listed dependency
   function vulnerabilities(deps) {

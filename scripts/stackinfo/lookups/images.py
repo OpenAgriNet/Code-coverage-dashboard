@@ -46,20 +46,27 @@ def license_for(name,labels,main,license_of,tag=None,resolved=None):
  if labels:
   lic,where=image_license(labels,license_of)
   if lic:return lic,where,None
- if main:return main[0],'package',main[1]
- host,path=split(name)
- if host=='ghcr.io' and path.count('/')>=1:
-  repo='/'.join(path.split('/')[:2]);lic=license_of(repo)   # GHCR namespaces are GitHub accounts
+ repo=same_name_repo(name)
+ if main:
+  # an image that wraps a program (sunbird-rc-keycloak: Keycloak) is also its own repository's code: both licenses apply
+  own=repo and len(main)>2 and main[2] and license_of(repo)
+  if own and own not in main[0].split(', '):return f'{main[0]}, {own}','package',f'{main[1]} + github.com/{repo}'
+  return main[0],'package',main[1]
+ if repo:
+  lic=license_of(repo)
   if lic:return lic,'repo',f'github.com/{repo}'
  return None
+def same_name_repo(name):
+ """owner/repo of the GitHub repository named like an image on ghcr.io (GHCR namespaces are GitHub accounts), else None. It may
+ not exist (knowledge-provider-ui is built by knowledge-provider): a guess, checked by lookups/repostate.py."""
+ host,path=split(name)
+ return '/'.join(path.split('/')[:2]) if host=='ghcr.io' and path.count('/')>=1 else None
 def image_repo(name,labels,main):
  """owner/repo of the image's GitHub repository: the one config/repos.json names, its source label's, its main Go module's, or for
  an image on ghcr.io the repository of the same name (ghcr.io/openagrinet/knowledge-provider -> OpenAgriNet/knowledge-provider)."""
  repo=configured(name,'image_sources') or (labels and source_repo(labels))
  if not repo and main and main[1].startswith('github.com/'):repo='/'.join(main[1].split()[0].split('/')[1:3])
- host,path=split(name)
- if not repo and host=='ghcr.io' and path.count('/')>=1:repo='/'.join(path.split('/')[:2])   # GHCR namespaces are GitHub accounts
- return repo or None
+ return repo or same_name_repo(name) or None
 def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  license_of=license_of or project_license
  out={'latest':None,'latest_of':None,'vulns':None};errors={}
@@ -86,6 +93,8 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  elif res is None and 'license' not in errors:errors['license']=errors['vulns']
  repo=image_repo(name,res and labels,res and main)
  if repo:out['project']=f'github.com/{repo}'   # its GitHub stars, like every other row
+ if repo and repo==same_name_repo(name) and not configured(name,'image_sources') and not (res and source_repo(labels)):
+  out['project_of']='same name'   # a guess: dropped when no such repository exists (lookups/repostate.py)
  if errors:out['errors']=errors
  return out
 def annotate(deps,tags_of=tags_of,scan=scan,cache=CACHE,log=warn,workers=None,is_public=public_host,resolve=version_of,license_of=None):

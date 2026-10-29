@@ -97,15 +97,16 @@ def main_package(result,ref):
  """(license, package) of the image's own program, found by name among the packages osv-scanner lists: an OS package named like
  the image (minio in minio), a Go module whose path ends in the image's name (github.com/grafana/loki/v3 in loki), or a Maven
  artifact of the program a longer image name ends with (org.keycloak in sunbird-rc-keycloak). The image's full name is tried
- before its trailing words. None when no package matches or its license is unknown, as for Debian packages, whose database
- records no license."""
- pkgs=[p for res in result.get('results') or [] for p in res.get('packages') or []]
- for name in program_names(ref):
+ before its trailing words. (license, package, wrapped): wrapped when it was found under a trailing word, so the image is that
+ program with more of its own (Sunbird's plugins around Keycloak). None when no package matches or its license is unknown, as for
+ Debian packages, whose database records no license."""
+ pkgs=[p for res in result.get('results') or [] for p in res.get('packages') or []];names=program_names(ref)
+ for name in names:
   for p in pkgs:
    pkg=p.get('package') or {}
    if name not in package_names(pkg):continue
    lics=[l for l in p.get('licenses') or [] if l and l.upper() not in ('UNKNOWN','NOASSERTION','NONE')]
-   if lics:return ', '.join(dict.fromkeys(lics)),f'{pkg.get("name","")} {pkg.get("version","")}'.strip()   # all of them apply, as for deps.dev
+   if lics:return ', '.join(dict.fromkeys(lics)),f'{pkg.get("name","")} {pkg.get("version","")}'.strip(),name!=names[0]   # all of them apply, as for deps.dev
  return None
 def _labels(p):
  """The image's config labels from docker image inspect (read from the pulled image: no extra registry request)."""
