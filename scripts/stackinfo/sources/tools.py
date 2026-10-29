@@ -1,5 +1,7 @@
 """Tools a repository's GitHub workflows install in their run steps: a release installed with curl ... install.sh | sh
-(Trivy), pip / pipx / uv tool installs, npm -g and npx, and go install. Each is grouped by what its workflow is for."""
+(Trivy), pip / pipx / uv tool installs, npm -g and npx, and go install. Each is grouped by what its workflow is for. Also the
+actions a repository's own composite actions use (.github/actions/*/action.yml): the stack analyser lists the local action
+(./.github/actions/trivy-cache) but not the published actions inside it (actions/cache@v4), which are what actually runs."""
 import os, re
 from stackinfo import settings
 from stackinfo.sources.manifests import add_entry, pep508_name, pep508_version
@@ -11,6 +13,8 @@ PIP=re.compile(r'(?:\bpip3?|python3? -m pip|\buv pip|\bpipx|\buv tool)\s+install
 NPM=re.compile(r'\bnpm\s+(?:install|i|add)\s+(?:-g|--global)\s+([^\n&|;#]+)|\bnpx\s+(?:(?:--yes|-y)\s+)?([^\s&|;#]+)')
 GO=re.compile(r'\bgo\s+install\s+([A-Za-z0-9_./-]+)@(\S+)')
 VERSION=re.compile(r'v?\d+\.\d+(?:\.\d+)?')
+USES=re.compile(r'^[ \t-]{0,40}uses:[ \t]{0,10}["\']?([A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_./-]{1,200})@([A-Za-z0-9_.-]{1,100})',re.M)
+LOCAL_ACTION=re.compile(r'\.github/actions/(?:[^/]+/)*action\.ya?ml')
 TAKES_VALUE={'-r','-c','-e','--requirement','--constraint','--editable','-i','--index-url','--extra-index-url','-f','--find-links','--python','--target','-t'}
 
 def purpose(filename):
@@ -42,6 +46,9 @@ def read(src,texts=None):
  out={}
  for path,text in texts(src,lambda n:n.endswith(('.yml','.yaml'))):
   rel=os.path.relpath(path,src).replace(os.sep,'/')
+  if LOCAL_ACTION.fullmatch(rel):
+   for m in USES.finditer(text):add_entry(out,'githubAction',m.group(1),settings.get('groups','default_workflow_group'),rel,m.group(2))
+   continue
   if not rel.startswith('.github/workflows/'):continue
   g=purpose(rel.rsplit('/',1)[-1])
   for m in CURL.finditer(text):
