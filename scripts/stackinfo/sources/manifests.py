@@ -12,7 +12,7 @@ def group_name(g):
 def key(eco,name):
  return (eco,normal(name) if eco=='python' else name)
 def add_entry(out,eco,name,group,source,declared=None):
- e=out.setdefault(key(eco,name),{'name':name,'groups':set(),'installed':None,'sources':set(),'declared':None})
+ e=out.setdefault(key(eco,name),{'name':name,'groups':set(),'installed':None,'url':None,'sources':set(),'declared':None})
  e['groups'].add(group_name(group));e['sources'].add(source)
  if declared and not e['declared']:e['declared']=str(declared).strip()
 def pep508_name(spec):
@@ -74,11 +74,15 @@ def _gomod(out,rel,text):
   mod=max((r for r in reqs if t==r or t.startswith(r+'/')),key=len,default=t)
   add_entry(out,'golang',mod,'tool',rel,reqs.get(mod))
 def _locks(rel,text,name):
- """{(ecosystem, name): version} of the packages a lockfile installs at top level."""
+ """{(ecosystem, name): (version, url)} of the packages a lockfile installs at top level. url is the https file a Python package
+ is installed from when it comes from no index (uv source.url, poetry type url), else None."""
  if name=='package-lock.json':
   pk=json.loads(text).get('packages') or {}
-  return {('npm',p[len('node_modules/'):]):v.get('version') for p,v in pk.items() if p.startswith('node_modules/') and '/node_modules/' not in p and v.get('version')}
- return {key('python',p.get('name','')):p.get('version') for p in tomllib.loads(text).get('package') or [] if p.get('name') and p.get('version')}
+  return {('npm',p[len('node_modules/'):]):(v.get('version'),None) for p,v in pk.items() if p.startswith('node_modules/') and '/node_modules/' not in p and v.get('version')}
+ def url(p):
+  s=p.get('source') or {};u=s.get('url') if 'url' in s and (name=='uv.lock' or s.get('type')=='url') else None
+  return u if isinstance(u,str) and u.startswith('https://') else None
+ return {key('python',p.get('name','')):(p.get('version'),url(p)) for p in tomllib.loads(text).get('package') or [] if p.get('name') and p.get('version')}
 READERS={'package.json':_npm,'pyproject.toml':_pyproject,'go.mod':_gomod}
 LOCKS=('package-lock.json','uv.lock','poetry.lock')
 def wanted(n):
@@ -100,8 +104,8 @@ def read(src,texts=None):
  for k,e in out.items():
   for s in sorted(e['sources']):
    v=locks.get(os.path.dirname(s),{}).get(k)
-   if v:e['installed']=v;break
- return {k:{'name':e['name'],'declared':e['declared'],'groups':sorted(e['groups']),'installed':e['installed'],'sources':sorted(e['sources'])} for k,e in out.items()}
+   if v:e['installed'],e['url']=v;break
+ return {k:{'name':e['name'],'declared':e['declared'],'groups':sorted(e['groups']),'installed':e['installed'],**({'url':e['url']} if e['url'] else {}),'sources':sorted(e['sources'])} for k,e in out.items()}
 def unlisted(found,rows):
  """[ecosystem, name, version] for every package a manifest names that the stack analyser did not list (it reads neither
  PEP 735 [dependency-groups] nor [build-system] requires, nor tools installed in workflows)."""
@@ -117,4 +121,5 @@ def attach(deps,found):
   d['groups']=e['groups'] if e else []
   if not e:continue
   d['sources']=e['sources']
+  if e.get('url'):d['url']=e['url']   # installed from this file, not an index
   if e['installed'] and not is_exact(d.get('version')) and e['installed']!=d.get('version'):d['installed']=e['installed']

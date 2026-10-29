@@ -7,10 +7,11 @@ from repoconfig import load as load_config, resolve
 from repoconfig.resolve import SourceError
 from stackinfo.sources.analyser import ANALYSER
 from stackinfo import settings
+from stackinfo.lookups import licensetext
 from stackinfo.pipeline import collect
 
 def main():
- cfg=load_config('config/repos.json');settings.configure(cfg['dependencies'])
+ cfg=load_config('config/repos.json');settings.configure(cfg['dependencies']);licensetext.use(cfg['licenses'])
  try:targets=resolve(cfg,github.ORG,github.api,github.PROJECT_TOKEN,search_get=github.SEARCH)
  except SourceError as e:sys.exit(f'ERROR {e}')
  d=collect(targets,policy=cfg['licenses'],stack=cfg['stack'])

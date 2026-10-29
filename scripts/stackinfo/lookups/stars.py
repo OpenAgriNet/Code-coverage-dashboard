@@ -10,6 +10,7 @@ from common.safehttp import get as safe_get
 from stackinfo.lookups.actions import NAME, repo_of
 from stackinfo.lookups import registry
 from stackinfo.lookups.depsdev import D
+from stackinfo.lookups.wheel import wheel_license
 from stackinfo import settings
 from stackinfo.lookups.projects import project_stars, project_license
 from stackinfo.rules.reasons import short_error
@@ -63,15 +64,21 @@ def pypi_license(name,get=None):
   if t.strip().lower() in aliases:return aliases[t.strip().lower()]
  return None
 
-def fill_licenses(deps,license_of=None,pypi=None):
+def fill_licenses(deps,license_of=None,pypi=None,wheel=None):
  """A package whose registry states no license takes its source repository's license (license_of 'source'), e.g. a Go
  submodule deps.dev has no license for. A package deps.dev calls 'non-standard' (it could not match the license text to an SPDX
  id) gets a second opinion: its source repository's license as deps.dev or GitHub's own detection names it (license_of
  'github'; huggingface-hub Apache-2.0, tiktoken MIT), then for a Python package PyPI's own metadata (license_of 'pypi';
- pypdf BSD-3-Clause). When none can name it, it stays 'non-standard'. A failed lookup leaves the license as it was."""
+ pypdf BSD-3-Clause). When none can name it, it stays 'non-standard'. A Python package installed from a wheel URL, which no
+ registry knows, takes the license its wheel's METADATA states (license_of 'wheel'; en-core-web-sm MIT). A failed lookup leaves
+ the license as it was."""
  license_of=license_of or project_license
- pypi=pypi or pypi_license
+ pypi=pypi or pypi_license;wheel=wheel or wheel_license
  for d in deps:
+  if not d.get('license') and d.get('url') and d.get('ecosystem')=='python':
+   try:lic=wheel(d['url'])
+   except Exception as e:d.setdefault('errors',{})['license']=f'wheel: {short_error(e)}';continue
+   if lic:d.update(license=lic,license_of='wheel');continue
   nonstd=d.get('license')=='non-standard'
   if (d.get('license') and not nonstd) or d.get('license_of')=='error' or d.get('ecosystem') not in ('npm','python','golang','terraform','githubRelease'):continue
   repo=source_repo(d)

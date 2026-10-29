@@ -14,7 +14,8 @@ def configured(name,key):
 def license_for(name,labels,main,license_of,tag=None):
  """(license, where, from) for an image, the first that gives one: the license config/repos.json states for it
  (dependencies.image_licenses), its GitHub repository named there (dependencies.image_sources), its own license label, the
- repository its source label names, or the license of its own program inside it (main package). None when none does.
+ repository its source label names, the license of its own program inside it (main package), or for an image on ghcr.io the
+ license of the GitHub repository of the same name (ghcr.io/sunbird-rc/sunbird-rc-core). None when none does.
  labels and main are None when the image could not be scanned; the config still applies then."""
  lic=(tag and configured(f'{name}:{tag}','image_licenses')) or configured(name,'image_licenses')   # name:tag first: redis:7 and redis:alpine differ
  if lic:return lic,'config',None
@@ -26,6 +27,10 @@ def license_for(name,labels,main,license_of,tag=None):
   lic,where=image_license(labels,license_of)
   if lic:return lic,where,None
  if main:return main[0],'package',main[1]
+ host,path=split(name)
+ if host=='ghcr.io' and path.count('/')>=1:
+  repo='/'.join(path.split('/')[:2]);lic=license_of(repo)   # GHCR namespaces are GitHub accounts
+  if lic:return lic,'repo',f'github.com/{repo}'
  return None
 def image_repo(name,labels,main):
  """owner/repo of the image's GitHub repository: the one config/repos.json names, its source label's, its main Go module's, or for
