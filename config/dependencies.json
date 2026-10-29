@@ -119,6 +119,7 @@
     "docker.langfuse.com/langfuse/langfuse": "langfuse/langfuse",
     "docker.langfuse.com/langfuse/langfuse-worker": "langfuse/langfuse",
     "fidedocker/onix-adapter": "beckn/beckn-onix",
+    "fidedocker/sandbox-2.0": "beckn/sandbox",
     "postgres": "postgres/postgres",
     "pgvector/pgvector": "pgvector/pgvector"
   },
