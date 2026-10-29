@@ -110,7 +110,15 @@ def dependency_settings(raw):
   'image_kinds':_text_map(raw.get('image_kinds',D['image_kinds']),'dependencies.image_kinds',lower_keys=True),
   'default_image_kind':_name(raw.get('default_image_kind',D['default_image_kind']),'dependencies.default_image_kind'),
   'image_sources':_image_sources(raw.get('image_sources',{})),
-  'image_licenses':_text_map(raw.get('image_licenses',{}),'dependencies.image_licenses')}
+  'image_licenses':_image_licenses(raw.get('image_licenses',{}))}
+VERSION_RANGE=re.compile(r'\s*(>=|<=|==|>|<)\s*v?\d+(\.\d+)*\s*(,\s*(>=|<=|==|>|<)\s*v?\d+(\.\d+)*\s*)*')
+def _image_licenses(raw):
+ """image -> license; a key may be name@range (redis@>=7.4,<8): comparisons joined by commas."""
+ out=_text_map(raw,'dependencies.image_licenses')
+ for k in out:
+  if '@' in k and not VERSION_RANGE.fullmatch(k.split('@',1)[1]):
+   raise ConfigError(f'dependencies.image_licenses: "{k}" has no readable version range after @ (write it like redis@>=7.4,<8)')
+ return out
 def releases(raw,base,where):
  """Effective release-finding settings: `base` (or the defaults) overridden by `raw`. None when `raw` is false (releases off)."""
  if raw is False:return None

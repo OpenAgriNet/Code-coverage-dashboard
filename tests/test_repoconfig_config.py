@@ -199,7 +199,7 @@ def test_the_mappings_come_from_config_dependencies_json():
     d = config.load('config/repos.json')['dependencies']
     assert d['groups']['aliases']['tests'] == 'test' and d['groups']['by_ecosystem'] == {'docker': 'runtime', 'githubAction': 'ci'}
     assert d['terraform']['trusted_registries'] == ['registry.terraform.io', 'registry.opentofu.org'] and d['ecosystem_names']['golang'] == 'Go'
-    assert d['image_sources']['fidedocker/onix-adapter'] == 'beckn/beckn-onix' and d['image_licenses']['redis:7'] == 'LicenseRef-RSALv2 OR SSPL-1.0'
+    assert d['image_sources']['fidedocker/onix-adapter'] == 'beckn/beckn-onix' and d['image_licenses']['redis@>=7.4,<8'] == 'LicenseRef-RSALv2 OR SSPL-1.0'
     assert '_note' not in d['image_kinds'] and '_note' not in d['checks']   # notes document the file and are dropped
 
 def test_dependencies_in_repos_json_points_to_the_new_file(tmp_path):
@@ -251,3 +251,8 @@ def test_image_sources_and_licenses():
 def test_no_license_can_be_classed():
     assert n(licenses={'no_license': 'red'})['licenses']['no_license'] == 'red'
     assert n()['licenses']['no_license'] is None
+
+def test_an_image_license_version_range_must_be_readable():
+    assert config.dependency_settings({'image_licenses': {'redis@>=7.4, <8': 'X'}})['image_licenses'] == {'redis@>=7.4, <8': 'X'}
+    with pytest.raises(ConfigError, match='version range'):
+        config.dependency_settings({'image_licenses': {'redis@7.4 or later': 'X'}})

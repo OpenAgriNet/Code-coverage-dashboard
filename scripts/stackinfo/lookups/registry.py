@@ -45,11 +45,16 @@ def digest(host,path,ref,get=_get,is_public=public_host,auth=None):
  if r.status_code==401 and auth is None:auth=_authorize(host,r,get,is_public);r=get(url,headers={**h,**auth},method='HEAD')
  return (r.headers.get('Docker-Content-Digest') if r.status_code==200 else None),auth
 def version_of(name,tag,tags,digest=digest,limit=None):
- """The version tag that points at the same image as a floating tag such as latest, or None. Plain version tags are tried
- newest first (12.2.1 before 12.2 before 12), at most dependencies.images.resolve_limit of them."""
+ """The version tag that points at the same image as tag, or None: a floating tag (latest, or alpine among 8.10.3-alpine tags)
+ or a partial version (7, which is 7.4.12 today; 15-alpine). Only tags of the same variant are tried (latest: plain versions;
+ alpine and 15-alpine: -alpine ones; 7: 7.x ones), newest first (12.2.1 before 12.2 before 12), at most
+ dependencies.images.resolve_limit of them."""
+ m=SHAPE.fullmatch(tag)
+ base,suf=(m.group(2)+'.',m.group(3)) if m else ('','' if tag=='latest' else '-'+tag)
+ plain=[t for t in tags for x in [SHAPE.fullmatch(t)] if x and x.group(3)==suf and x.group(2).startswith(base) and t!=tag]
+ if not plain:return None
  host,path=split(name);want,auth=digest(host,path,tag)
  if not want:return None
- plain=[t for t in tags for m in [SHAPE.fullmatch(t)] if m and not m.group(3)]
  plain.sort(key=lambda t:tuple(int(n) for n in SHAPE.fullmatch(t).group(2).split('.')),reverse=True)
  for t in plain[:settings.get('images','resolve_limit') if limit is None else limit]:
   got,auth=digest(host,path,t,auth=auth)
