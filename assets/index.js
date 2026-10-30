@@ -1,4 +1,4 @@
-let data={repositories:[],main:[],releases:[]},view=Branches.initial();   // dev or main, shared with deps.html (assets/branches.js)
+let data={repositories:[],main:[],releases:[]},view=Branches.initial();   // dev or main, remembered across visits (assets/branches.js)
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isNum=v=>v!=null&&v!==''&&Number.isFinite(Number(v));
@@ -96,7 +96,7 @@ function summary(){
 }
 function setView(v){
   view=v;Branches.remember(v);Branches.paint(v,data.repositories,data.main);
-  $('stack-note').innerHTML=`On the ${v==='main'?'default':'development'} branch, as chosen above. <a href="deps.html?branch=${v}">All dependencies →</a>`;
+  $('stack-note').innerHTML=`On the ${v==='main'?'default':'development'} branch, as chosen above. <a href="?tab=deps" data-goto="deps">All dependencies →</a>`;
   if(bar)bar.setItems(repoItems());else{summary();render()}
 }
 let stack=null;
@@ -110,7 +110,7 @@ function stackRow(r){
     :r.license_class?`<span class="lic risk risk-${esc(r.license_class)}" title="${esc('No LICENSE file. '+RISK[r.license_class]+' under the license policy (licenses.no_license).')}"><span class="dot" aria-hidden="true"></span>No LICENSE file</span><span class="sr"> (${esc(RISK[r.license_class])})</span>`:'<span class="lic none">No LICENSE file</span>';
   const vuln=deps.filter(d=>d.vulns&&d.vulns.count).length,known=deps.filter(d=>d.license).length,pkgs=deps.filter(licensable).length;
   const dep=r.error?`<span class="muted">Not analysed</span><div class="sub">${esc(r.error)}</div>`
-    :deps.length?`<a href="deps.html?repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} with a known license`:'Local actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="deps.html?repo=${encodeURIComponent(r.repository)}&vuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
+    :deps.length?`<a href="?tab=deps&repo=${encodeURIComponent(r.repository)}">${num(deps.length)} dependencies</a><div class="sub">${pkgs?`${known} of ${pkgs} with a known license`:'Local actions only'}</div>${vuln?`<div class="sub"><a class="bad" href="?tab=deps&repo=${encodeURIComponent(r.repository)}&dvuln=any">${vuln} with known vulnerabilities</a></div>`:deps.some(d=>d.vulns)?'<div class="sub good">No known vulnerabilities</div>':''}`
     :'<span class="muted">None found</span>';
   return `<tr${r.license_class==='red'||r.license_class==='yellow'?` class="row-risk-${r.license_class}"`:''}><td><a class="repo" href="${esc(url)}/tree/${esc(r.branch)}" target="_blank" rel="noopener">${esc(r.repository)}</a> ${tagChips(r)}<div class="sub">${esc(r.branch)}${devDefault(r)}</div></td>`
     +`<td data-label="License">${lic}</td>`
@@ -120,6 +120,7 @@ function stackRow(r){
 function fillStack(){
   stackCards();
   if(!stack)return;
+  Deps.refresh();Vulns.refresh();
   const a=stackList().filter(shown).sort((x,y)=>x.repository.localeCompare(y.repository));lastShown['stack-rows']=a;
   $('stack-rows').innerHTML=a.length?a.map(stackRow).join(''):`<tr><td colspan="4" class="empty">${visibleSet&&stackList().length?'No repositories match these filters.':'No repositories analysed yet.'}</td></tr>`;
 }
@@ -193,7 +194,7 @@ function render(){
 /* ---- filters: one bar for every table (a repository is shown when it passes all of them) ---- */
 const SECL={passing:'Passing',failing:'Failing','no runs':'No runs','no workflow':'No security workflow','branch not found':'Branch not found',unknown:'Unknown'};
 const COVL={high:'80% or more',mid:'50% to 79%',low:'Under 50%',none:'No report'},RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Restricted use (red)',unclassified:'Unclassified',none:'No LICENSE file'};
-const VULNL={'critical-high':'Critical or high',any:'Any known vulnerability',none:'None known',unchecked:'Not checked'};
+const VULNL={'critical-high':'A dependency has critical or high',any:'A dependency has any known',none:'No dependency has any known',unchecked:'Not checked'};
 const stackList=()=>!stack?[]:(view==='main'?stack.main||stack.repositories:Branches.devOnly(stack.repositories))||[];
 function repoItems(){
   const st=Object.fromEntries(stackList().map(r=>[r.repository,r]));
@@ -212,7 +213,7 @@ const REPO_FACETS=[
   {key:'cov',label:'Coverage',get:i=>i.cov,valueLabel:v=>COVL[v],order:['low','mid','high','none']},
   {key:'risk',label:'License risk',get:i=>i.risk,valueLabel:v=>RISK[v]||v,order:['red','yellow','green','unclassified','none']},
   {key:'license',label:'License',get:i=>i.license},
-  {key:'vuln',label:'Vulnerabilities',get:i=>i.vuln,valueLabel:v=>VULNL[v]||v,order:['critical-high','any','none','unchecked']},
+  {key:'vuln',label:'Vulnerabilities',hint:'Number of repositories, by the vulnerabilities of their dependencies',get:i=>i.vuln,valueLabel:v=>VULNL[v]||v,order:['critical-high','any','none','unchecked']},
   {key:'lang',label:'Language',get:i=>i.langs},
 ];
 function onRepoFilter(list){visibleSet=new Set(list.map(i=>i.repository));summary();render()}
@@ -228,7 +229,8 @@ function initFilters(){
   const want=new URLSearchParams(location.search).get('ver');if(want)relAll=want;
 }
 async function initStack(){
-  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();Object.assign(RISK,withColour((stack.license_policy||{}).labels));if(bar)bar.setItems(repoItems());fillStack();if(data.main.length)render()}   // repo stars come from stack.json
+  try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();Object.assign(RISK,withColour((stack.license_policy||{}).labels));
+    Deps.init({repos:()=>stackList().filter(shown),view:()=>view,org:()=>stack.organization,policy:stack.license_policy,ecosystems:(stack.display||{}).ecosystems});Vulns.init({view:()=>view});if(bar)bar.setItems(repoItems());fillStack();if(data.main.length)render()}   // repo stars come from stack.json
   catch(e){$('stack-rows').innerHTML='<tr><td colspan="4" class="empty">data/stack.json is missing or unreadable.</td></tr>'}
 }
 async function init(){
@@ -255,6 +257,11 @@ const EXPORTS={
   dev:()=>[`openagrinet-coverage-${branchName()}`,[{name:`Coverage (${branchName()})`,rows:Export.coverage(lastShown['dev-rows'])}]],
   release:()=>[`openagrinet-releases`,[{name:'Releases',rows:Export.releases(lastShown['rel-rows'],relPick)}]],
   stack:()=>[`openagrinet-stack-${branchName()}`,[{name:`Stack (${branchName()})`,rows:Export.stack(lastShown['stack-rows'],(stack&&stack.license_policy||{}).labels)}]],
+  vulns:()=>[`openagrinet-vulnerabilities-${branchName()}`,[{name:`Advisories (${branchName()})`,rows:Export.advisories(Vulns.exportRows())},
+    {name:`Where found (${branchName()})`,rows:Export.advisoryPlaces(Vulns.exportRows())}]],
+  deps:()=>{const {kind,rows}=Deps.exportRows(),s=stack||{},labels=(s.license_policy||{}).labels;
+    return [`openagrinet-dependencies-${branchName()}`,[{name:`${kind} (${branchName()})`,rows:Export.dependencies(rows,labels,(s.display||{}).ecosystems)},
+      {name:`Vulnerabilities (${branchName()})`,rows:Export.vulnerabilities(rows)},{name:`Image packages (${branchName()})`,rows:Export.imagePackages(rows)},{name:'License policy',rows:Export.policy(s.license_policy)}]]},
 };
 document.querySelectorAll('[data-export]').forEach(b=>b.addEventListener('click',()=>{const [f,sheets]=EXPORTS[b.dataset.export]();Xlsx.download(Export.filename(f),sheets)}));
 $('export-all').addEventListener('click',()=>{
@@ -271,7 +278,13 @@ $('export-all').addEventListener('click',()=>{
     {name:'Dependencies (main)',rows:Export.dependencies(main,labels,eco)},
     {name:'Vulnerabilities (development)',rows:Export.vulnerabilities(dev)},
     {name:'Vulnerabilities (main)',rows:Export.vulnerabilities(main)},
+    {name:'Advisories (development)',rows:Export.advisories(Vulns.advisories(dev))},
+    {name:'Advisories (main)',rows:Export.advisories(Vulns.advisories(main))},
+    {name:'Image packages (development)',rows:Export.imagePackages(dev)},
+    {name:'Image packages (main)',rows:Export.imagePackages(main)},
     {name:'License policy',rows:Export.policy(s.license_policy)},
   ]);
 });
+// a link to another tab of this page switches tab instead of reloading
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-goto]');if(a){e.preventDefault();document.querySelector(`[role=tab][data-tab="${a.dataset.goto}"]`).click()}});
 init();initStack();

@@ -34,16 +34,27 @@
       ...(repos || []).map(r => [r.repository, r.branch, num(r.stars), r.license, classLabel(r.license_class, labels),
         (r.languages || []).map(l => Array.isArray(l) ? l[0] : l).join(', '), list(r.techs), (r.dependencies || []).length, vulnerable(r), r.error])];
   }
+  // OSV's MODERATE is shown as medium, as on the page
+  const SEV = { CRITICAL: 'critical', HIGH: 'high', MODERATE: 'medium', LOW: 'low', UNKNOWN: 'not rated' };
+  const sevName = s => s ? SEV[s] || String(s).toLowerCase() : null;
+  // advisories of each severity: the collector's counts, or counted from the items when all of them are listed
+  const sevCounts = q => {
+    if (!q || !q.count) return {};
+    if (q.by_severity) return q.by_severity;
+    const n = {}; if ((q.items || []).length >= q.count) q.items.forEach(i => { const k = SEV[i.severity] ? i.severity : 'UNKNOWN'; n[k] = (n[k] || 0) + 1; });
+    return n;
+  };
+  const sevCells = q => { const n = sevCounts(q), any = Object.keys(n).length; return ['CRITICAL', 'HIGH', 'MODERATE', 'LOW', 'UNKNOWN'].map(k => q && q.count && any ? n[k] || 0 : null); };
   const why = d => Object.entries(d.missing || {}).map(([k, m]) => `${k}: ${m.why}`).join(' | ');
   // dependency rows ({...dependency, repository}): one row per package per repository
   function dependencies(deps, labels, ecosystems) {
     const eco = d => d.ecosystem === 'docker' ? d.kind || 'Container' : (ecosystems && ecosystems[d.ecosystem]) || d.ecosystem;
     return [['Repository', 'Package', 'Short name', 'Ecosystem', 'Registry ecosystem', 'Version', 'Installed', 'Resolved', 'Groups', 'Latest', 'License', 'License class', 'License from', 'Stars',
-      'Known vulnerabilities', 'Worst severity', 'Fixed in', 'Fixable', 'No fix released', 'Checked at version', 'Declared in', 'Source project', 'Source archived', 'Why a value is missing'],
+      'Known vulnerabilities', 'Critical', 'High', 'Medium', 'Low', 'Not rated', 'Worst severity', 'Fixed in', 'Fixable', 'No fix released', 'Checked at version', 'Declared in', 'Source project', 'Source archived', 'Why a value is missing'],
       ...(deps || []).map(d => { const q = d.vulns;
         return [d.repository, d.name, d.short || d.name, eco(d), d.ecosystem, d.version, d.installed, d.resolved, list(d.groups), d.latest, d.license,
           classLabel(d.license_class, labels), d.license_from || d.license_of, num(d.stars),
-          q ? q.count : 'Not checked', q && q.count ? String(q.severity || '').toLowerCase() || null : null, q && q.fixed_in, q && num(q.fixable), q && num(q.unfixed),
+          q ? q.count : 'Not checked', ...sevCells(q), q && q.count ? sevName(q.severity) : null, q && q.fixed_in, q && num(q.fixable), q && num(q.unfixed),
           q && q.checked_version, list(d.sources), d.project, !!d.archived, why(d)]; })];
   }
   // one row per advisory of every listed dependency
@@ -52,9 +63,29 @@
     for (const d of deps || []) for (const i of (d.vulns && d.vulns.items) || []) {
       const m = d.ecosystem === 'docker' && /^(\S+) (\S+): (.*)$/.exec(i.summary || '');   // an image finding names the package inside it
       rows.push([d.repository, d.name, d.vulns.checked_version || d.version, m ? m[1] : d.name, m ? m[2] : d.vulns.checked_version || d.version,
-        i.cve || i.id, i.id, String(i.severity || '').toLowerCase(), i.fixed || 'No fix', m ? m[3] : i.summary, i.url]);
+        i.cve || i.id, i.id, sevName(i.severity), i.fixed || 'No fix', m ? m[3] : i.summary, i.url]);
     }
     return [['Repository', 'Dependency', 'Dependency version', 'Affected package', 'Affected version', 'Advisory', 'Advisory id', 'Severity', 'Fixed in', 'Summary', 'Link'], ...rows];
+  }
+  // one row per affected package inside each listed image (images scanned before packages were rolled up have none)
+  function imagePackages(deps) {
+    const rows = [];
+    for (const d of deps || []) for (const p of (d.ecosystem === 'docker' && d.vulns && d.vulns.packages) || [])
+      rows.push([d.repository, d.name, d.version, d.resolved, p.name, p.ecosystem, p.version, p.fixed || 'No fix', p.count, ...sevCells({ count: p.count, by_severity: p.by_severity }), p.unfixed]);
+    return [['Repository', 'Image', 'Tag', 'Tag points to', 'Package inside', 'Package kind', 'Installed version', 'Fixed in', 'Advisories', 'Critical', 'High', 'Medium', 'Low', 'Not rated', 'With no fix'], ...rows];
+  }
+  // the Vulnerabilities tab's rows (assets/vulns.js advisories): one row per advisory
+  function advisories(list) {
+    return [['Advisory', 'Advisory id', 'Severity', 'Fix', 'Fixed in', 'Affected packages', 'Places found', 'Repositories', 'Dependencies or images', 'Summary', 'Link'],
+      ...(list || []).map(r => [r.cve || r.id, r.id, sevName(r.severity), { all: 'Fix released', some: 'Fixed in some places only', none: 'No fix released' }[r.fix],
+        [...r.fixes].join(', ') || 'No fix', r.packages.map(p => `${p.name} ${p.version}`).join(', '), r.places.length, r.repos.join(', '),
+        [...new Set(r.places.map(p => p.dep.name))].join(', '), r.text, r.url])];
+  }
+  // every place each advisory was found: one row per advisory, dependency and repository
+  function advisoryPlaces(list) {
+    const rows = [];
+    for (const r of list || []) for (const p of r.places) rows.push([r.cve || r.id, sevName(r.severity), p.repository, p.dep.name, p.dep.version, p.pkg, p.version, p.fixed || 'No fix']);
+    return [['Advisory', 'Severity', 'Repository', 'Dependency or image', 'Its version', 'Affected package', 'Affected version', 'Fixed in'], ...rows];
   }
   function policy(p) {
     p = p || {};
@@ -64,6 +95,6 @@
   // a dated file name: openagrinet-dependencies-2026-10-29.xlsx
   const filename = what => `${what}-${new Date().toISOString().slice(0, 10)}.xlsx`;
 
-  const lib = { coverage, releases, stack, dependencies, vulnerabilities, policy, filename };
+  const lib = { coverage, releases, stack, dependencies, vulnerabilities, imagePackages, advisories, advisoryPlaces, policy, filename };
   if (typeof module !== 'undefined' && module.exports) module.exports = lib; else root.Export = lib;
 })(typeof window !== 'undefined' ? window : globalThis);

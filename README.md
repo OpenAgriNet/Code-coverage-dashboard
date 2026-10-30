@@ -131,14 +131,14 @@ Both pages share one filter component (`assets/filters.js`).
 - Tick several values in a filter to see any of them (OR). Different filters combine (AND). A filter with nothing ticked is off.
 - Each option shows how many results it would give with your other filters applied. An option that would give none is greyed out, so there are no dead ends.
 - Active filters appear as chips; click one to remove it, or *Clear all*. Escape closes a dropdown.
-- Filters live in the address bar (`?sec=failing&tag=DPG`), so a link shares the view. A link from the main page to `deps.html?repo=network-adapter&vuln=any` opens with that repository ticked and the vulnerability filter on.
+- Filters live in the address bar (`?sec=failing&tag=DPG`), so a link shares the view. A link such as `?tab=deps&repo=network-adapter&dvuln=any` opens the All dependencies tab with that repository ticked and the vulnerability filter on (the dependency filters' parameters start with `d`). Old `deps.html` links redirect there with their filters.
 - **Main page**: one bar filters every table at once (Repository, Tag, Security, Coverage, License risk, License, Vulnerabilities, Language). Security and Coverage follow the Development/Main switch. The release table has its own *Found as* and *Stability* filters and a *Show version* selector.
 - **Dependency page**: Repository, Ecosystem, License, License risk, Vulnerabilities, Group, Update status, and a text search.
 - Tests: `node --test tests/*.test.mjs` (also run in CI before the dashboard is built).
 
 ## Stack, dependencies and vulnerabilities
 
-`scripts/collect_stack.py` writes `data/stack.json` on every refresh. The main page shows each repo's license, languages and technologies; `deps.html` lists every dependency each project names, on its development and its default branch.
+`scripts/collect_stack.py` writes `data/stack.json` on every refresh. The main page shows each repo's license, languages and technologies; its All dependencies tab lists every dependency each project names, on its development and its default branch, split by kind (code packages, Docker Hub / GHCR / other registry images, GitHub Actions, CLI tools). Each shows how many advisories of each severity it has; the Vulnerabilities tab lists every advisory once, with every package and place it was found in; an image's Details card lists the affected packages inside it with their installed version, the version that fixes them, and how they were found.
 
 **What is listed.** Every package a project names itself, in every group: `package.json` dependencies / dev / optional / peer; `pyproject.toml` `[project]` dependencies, optional-dependencies, `[dependency-groups]` (PEP 735), Poetry groups and `[build-system] requires`; `requirements*.txt`; direct `go.mod` requires and `tool` lines; Docker images from compose files and Dockerfiles; GitHub Actions; Terraform/OpenTofu providers; and tools that workflows install in their `run:` steps (`curl … install.sh | sh` from a GitHub repo such as Trivy, `pip`/`pipx`/`uv tool install`, `npm -g`, `npx`, `go install`). Indirect packages from lockfiles are not listed; lockfiles are read only for the exact version a range installs.
 
@@ -161,13 +161,11 @@ Both pages share one filter component (`assets/filters.js`).
 
 ## Configuring the dependency scan
 
-**Every mapping and setting of the dependency scan lives in `config/dependencies.json`**, separate from `config/repos.json` (which says what to track and the license policy). Add an image's repository, state a license, class a new image or rename a group there; no code changes. Keys starting with `_` are notes and are ignored, so an entry can say why it was added:
+**Every mapping and setting of the dependency scan lives in `config/dependencies.json`**, separate from `config/repos.json` (which says what to track and the license policy). Add an image's repository, or rename a group there; no code changes. No license is stated by hand: every license is read from a registry, a repository or a license file. Keys starting with `_` are notes and are ignored, so an entry can say why it was added:
 
 ```json
 {
   "image_sources":  {"_note": "beckn-onix per its Docker Hub page", "fidedocker/onix-adapter": "beckn/beckn-onix"},
-  "image_licenses": {"postgres": "PostgreSQL", "redis:7": "LicenseRef-RSALv2 OR SSPL-1.0"},
-  "image_kinds":    {"postgres": "Database", "redis": "Cache", "grafana": "Observability"},
   "checks":         {"images": true},
   "images":         {"workers": 4, "scan_timeout": 900}
 }
@@ -181,7 +179,7 @@ Every key is optional. A key left out keeps its built-in default, which is only 
 | `checks.*` (dependencies.json) | Turn one kind of lookup off. Its cells then say it is turned off; `workflow_tools: false` stops listing CI tools at all. |
 | `images.workers` | How many images are looked up at once (1–16). |
 | `images.scan_timeout` | Seconds one image may take to pull and scan (60–3600). |
-| `images.max_findings` | How many of an image's findings are kept for the card (the counts stay exact). |
+| `images.max_findings` | How many of an image's findings are kept (1–5000; shipped 2000, so the Vulnerabilities tab lists every one). The counts stay exact either way. |
 | `images.resolve_limit` | How many version tags are compared by digest to find the version behind `latest`. |
 | `images.max_tag_pages` | Pages of 1000 tags read per image; more is an error rather than a partial list. |
 | `groups.aliases` | Group names read as another (`tests` → `test`), compared ignoring case. |
@@ -191,10 +189,8 @@ Every key is optional. A key left out keeps its built-in default, which is only 
 | `terraform.trusted_registries` | Registries whose providers take the license and stars of `<namespace>/terraform-provider-<type>`. |
 | `license_aliases` | License texts in image labels and the SPDX id they mean. The defaults cover the usual spellings of Apache, MIT, BSD, GPL, AGPL and MPL; giving this key replaces them. |
 | `ecosystem_names` | Names shown for each ecosystem, merged over the built-in ones: Node.js, Python, Go, GitHub Actions, Terraform, CLI tool, Container for (`npm`, `python`, `golang`, `docker`, `githubAction`, `terraform`, `githubRelease`). |
-| `image_kinds` | What each Docker image is, shown as its ecosystem: the first keyword its full name contains decides (`postgres` → Database, `redis` → Cache, `grafana` → Observability, `langfuse` → Observability). Giving this map replaces the built-in one. |
-| `default_image_kind` | The kind of an image no keyword matches (default *Application*: usually the project's own images). |
-| `image_sources` | An image's GitHub repository, written `owner/repo`, whose license is then looked up: `{"jaegertracing/all-in-one": "jaegertracing/jaeger"}`. Any spelling of the image matches (`postgres`, `docker.io/postgres`). |
-| `image_licenses` | The license the team states for an image when nothing machine-readable gives one: `{"postgres": "PostgreSQL"}`. A key may carry a tag when the license depends on the version (`"redis:7"`, `"redis:alpine"`); `name:tag` is tried before `name`. It wins over every other source and applies even when the image cannot be pulled. |
+| `default_image_kind` | The kind of an image when Docker Hub files it under no category and its source repository has no GitHub topic (default *Container*). Otherwise the kind is read, never mapped: the first Docker Hub category as Docker Hub writes it (*Databases & storage*), else the first topic. |
+| `image_sources` | An image's GitHub repository, written `owner/repo`, whose license is then read: `{"jaegertracing/all-in-one": "jaegertracing/jaeger"}`. Any spelling of the image matches (`postgres`, `docker.io/postgres`). When the tag names a release (or `latest`/`7` resolves to one) the license file at that release tag is read, so `redis:7` (7.4.12) reads RSALv2 or SSPL and `redis:7.2.5` reads BSD-3-Clause. A license file GitHub cannot name is matched against SPDX's texts, section by section when it holds several (Redis: `LicenseRef-RSALv2 OR SSPL-1.0`). |
 
 An image named like its own repository (a `docker-compose.yml` with `build: .` and `image: <repo>`) is that repository built locally: it takes the repository's license and stars, and its latest version is N/A because it is never published.
 
@@ -205,7 +201,7 @@ A mistake (an unknown key, a wrong type, a number out of range) stops the refres
 ```
 config/repos.json          what to track and how (see the sections above)
 config/dependencies.json   every mapping and setting of the dependency scan (image sources and licenses, kinds, names, groups)
-index.html, deps.html      the two pages (markup only)
+index.html                 the page (markup only); deps.html redirects old links to its All dependencies tab
 assets/                    style.css and filters.js, tabs.js (shared); index.js, deps.js, deps.css (one page each)
 data/                      coverage.json and stack.json, written by the workflow
 scripts/

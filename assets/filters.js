@@ -1,10 +1,11 @@
-/* Multi-select filter bar shared by index.html and deps.html. No dependencies.
+/* Multi-select filter bar used by index.html (one for the repositories, one per tab that needs its own). No dependencies.
  *
  * Logic: a filter with nothing ticked is off; ticked values within one filter are OR-ed; different filters are AND-ed.
  * Every option shows how many items it would give with the other filters as they are now (faceted counts), so an option
  * that would empty the result is greyed out instead of being a dead end. State lives in the URL query string.
  *
- * A facet is { key, label, get(item) -> value | [values], valueLabel?(value), order?: [values], param?: url parameter }. */
+ * A facet is { key, label, get(item) -> value | [values], valueLabel?(value), order?: [values], param?: url parameter,
+ * hint?: a line above the options saying what the counts count }. */
 (function (root) {
   'use strict';
   const arr = v => (v == null ? [] : Array.isArray(v) ? v : [v]);
@@ -81,7 +82,7 @@
     function fillPop(f) {
       const opts = optionList(items, f, facets, selected, text, textOf), p = pop(f.key);
       const search = opts.length > 8 ? `<input type="search" class="fb-find" placeholder="Find ${esc(f.label.toLowerCase())}" aria-label="Find in ${esc(f.label)}">` : '';
-      p.innerHTML = `<div class="fb-pop-head">${search}<button type="button" class="fb-link" data-act="clear">Clear</button></div><ul>` +
+      p.innerHTML = `<div class="fb-pop-head">${search}<button type="button" class="fb-link" data-act="clear">Clear</button></div>${f.hint ? `<p class="fb-hint">${esc(f.hint)}</p>` : ''}<ul>` +
         opts.map(o => `<li data-value="${esc(o.value)}"><label><input type="checkbox" value="${esc(o.value)}"${o.selected ? ' checked' : ''}${!o.count && !o.selected ? ' disabled' : ''}>` +
           `<span class="fb-lab">${esc(o.label)}</span><span class="fb-count">${o.count}</span></label></li>`).join('') + `</ul>`;
     }

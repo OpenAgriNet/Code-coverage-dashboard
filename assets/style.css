@@ -154,3 +154,36 @@ tr.row-risk-red>td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
 .kpi-bar{height:6px;border-radius:999px;background:var(--track);margin-top:10px;overflow:hidden}
 .kpi-bar span{display:block;height:100%;border-radius:999px;background:var(--good)}
 .kpi-sub{font-size:13px;color:var(--muted);margin-top:8px;overflow-wrap:anywhere}
+/* Excel buttons: a spreadsheet icon instead of the word */
+.btn-xl{display:inline-flex;align-items:center;gap:6px}.btn-sm.btn-xl{padding:4px 7px}
+.xl-icon{flex:none;display:block}
+/* Pager under a long table (pager.js): the branch switch's look for the page buttons */
+.pager{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:14px 0 0}.pager[hidden]{display:none}
+.pager-info{font-size:14px;color:var(--muted);min-width:9em}
+.pager .switch button{padding:5px 11px;min-width:2.4em}.pager .switch button:disabled{opacity:.4;cursor:default}
+.pager-gap{align-self:center;padding:0 4px;color:var(--muted)}
+.pager-size{display:inline-flex;align-items:center;gap:8px;margin-left:auto}.pager-size .ver{margin-top:0}
+/* methodology.html: a document page, contents beside the text */
+.page-foot{margin-top:48px;font-size:12px}
+.page-foot a{color:var(--muted)}.page-foot a:hover{color:var(--link)}
+main.doc{max-width:1100px}
+.doc-head{display:block;margin:18px 0 28px;max-width:72ch}
+.doc-kicker{margin:0 0 6px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--good)}
+.doc-lede{font-size:17px;color:var(--muted);margin:12px 0 0}
+.doc-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;align-items:start}
+.doc-toc{position:sticky;top:24px;font-size:14px}
+.doc-toc-h{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.doc-toc ol{margin:0;padding-left:18px}.doc-toc li{margin:6px 0}
+.doc-body{max-width:76ch}
+.doc-body section{margin:0 0 40px;scroll-margin-top:20px}
+.doc-body h2{font-size:21px;font-weight:800;letter-spacing:-.01em;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.doc-body p,.doc-body li,.doc-body dd{color:var(--ink)}
+.doc-body ul,.doc-steps{padding-left:20px}.doc-body li{margin:6px 0}
+.doc-dl{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px 20px;margin:12px 0}
+.doc-dl dt{font-weight:600}.doc-dl dd{margin:0}
+.doc-table{min-width:0;table-layout:auto;font-size:14px}.doc-table th:first-child{width:auto}.doc-table th:nth-child(2){width:auto}
+.doc-table td{vertical-align:top}
+.conf{display:inline-block;font-size:12px;font-weight:700;padding:1px 9px;border-radius:999px;white-space:nowrap}
+.conf-high{background:color-mix(in srgb,var(--good) 16%,var(--surface));color:var(--good)}
+.conf-med{background:color-mix(in srgb,var(--warn) 16%,var(--surface));color:var(--warn)}
+@media (max-width:820px){.doc-grid{grid-template-columns:1fr}.doc-toc{position:static}.doc-dl{grid-template-columns:1fr;gap:2px}.doc-dl dd{margin-bottom:10px}}
