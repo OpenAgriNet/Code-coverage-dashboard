@@ -4,7 +4,7 @@ from common.log import warn
 from common.proc import child_env
 from common.versions import normal
 from stackinfo import settings
-from stackinfo.lookups.osv import SEVERITIES, severity as osv_severity
+from stackinfo.lookups.osv import SEVERITIES, by_severity, severity as osv_severity
 
 def loose(v):
  """Sort key from every number in a version, so OS package revisions compare (2.44-r10 < 2.44-r11, 1:2.3-4 < 1:2.3-5)."""
@@ -35,16 +35,33 @@ def items_of(result):
     if (vid,name,ver) in seen:continue   # the same package can be listed once per layer or sub-package
     seen.add((vid,name,ver))
     out.append({'id':vid,'cve':next((a for a in g.get('aliases') or [] if a.startswith('CVE-')),None),'summary':f'{name} {ver}: {text}',
-     'severity':sev,'fixed':min(fixes,key=loose) if fixes else None,'url':f'https://osv.dev/vulnerability/{vid}'})
+     'severity':sev,'fixed':min(fixes,key=loose) if fixes else None,'url':f'https://osv.dev/vulnerability/{vid}',
+     'package':name,'version':ver,'ecosystem':eco})
  return out
 def summarize(items):
  """Like osv.summarize, but no single fixed_in: the fixes belong to different packages inside the image.
  items keeps the worst dependencies.images.max_findings (fixable first within a severity; postgres alone has hundreds);
- count, fixable and unfixed cover all of them."""
+ count, fixable, unfixed, by_severity and packages cover all of them."""
  rank=lambda i:SEVERITIES.index(i['severity']) if i['severity'] in SEVERITIES else -1
  fixable=sum(1 for i in items if i['fixed'])
  worst=sorted(items,key=lambda i:(-rank(i),i['fixed'] is None,i['summary']))
- return {'count':len(items),'severity':worst[0]['severity'] if items else None,'fixed_in':None,'fixable':fixable,'unfixed':len(items)-fixable,'items':worst[:settings.get('images','max_findings')]}
+ return {'count':len(items),'severity':worst[0]['severity'] if items else None,'fixed_in':None,'fixable':fixable,'unfixed':len(items)-fixable,
+  'by_severity':by_severity(items),'packages':packages(worst)[:settings.get('images','max_findings')],'items':worst[:settings.get('images','max_findings')]}
+def packages(worst):
+ """The affected packages inside the image, worst first: each with its installed version, how many advisories of each severity,
+ and fixed, the lowest version that fixes all of its fixable ones (the highest of their fixes). Covers every item, not only the listed ones."""
+ out={}
+ for i in worst:
+  if 'package' not in i:continue   # items written before packages were named
+  p=out.setdefault((i['package'],i['version'],i.get('ecosystem','')),{'name':i['package'],'version':i['version'],'ecosystem':i.get('ecosystem',''),
+   'severity':i['severity'],'count':0,'unfixed':0,'fixed':None,'items':[]})
+  p['count']+=1;p['items'].append(i)
+  if not i['fixed']:p['unfixed']+=1
+  elif p['fixed'] is None or loose(i['fixed'])>loose(p['fixed']):p['fixed']=i['fixed']
+ res=[]
+ for p in out.values():
+  p['by_severity']=by_severity(p.pop('items'));res.append(p)
+ return res   # in order of each package's worst item, as worst is sorted
 DOCKER_TIMEOUT=60
 def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
  """Pull the image, then let osv-scanner read it. Pulling first matters: osv-scanner uses a copy that is already on the machine,

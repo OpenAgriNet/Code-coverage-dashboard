@@ -24,7 +24,7 @@ def repo_license(repo):
  return lic.get('spdx_id') if lic.get('spdx_id') not in (None,'NOASSERTION') else 'Other'
 def repo_stars(repo):
  return github_stars(f'{github.ORG}/{repo}')
-def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=annotate_actions,images=annotate_images,stars=None,licenses=None,repo_state=None,providers=None,tools=None,policy=None,stack=None):
+def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=annotate_actions,images=annotate_images,stars=None,licenses=None,repo_state=None,kinds=None,providers=None,tools=None,policy=None,stack=None):
  """Never raises: any failure becomes an `error` on the record, and the repo license is kept when it was read.
  `policy` is the green/yellow/red license lists; every license gets a license_class from it."""
  repo=t['name'];policy=policy or {}
@@ -42,7 +42,7 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   raw=analyse(repo,branch);s=summarize(raw,stack);found=raw.get('manifests') or {}
   rows=s['dependencies']+unlisted(found,s['dependencies'])   # what the analyser misses: dependency-groups, build requires, CI tools
   out.update(languages=s['languages'],techs=s['techs'],dependencies=[info(*d) for d in rows])
-  attach_groups(out['dependencies'],found);add_short(out['dependencies']);add_kinds(out['dependencies'])
+  attach_groups(out['dependencies'],found);add_short(out['dependencies'])
   deps=out['dependencies']
   # each lookup can be turned off under dependencies.checks; explain() then says so in the empty cells
   if settings.check('vulnerabilities'):vulns(deps)
@@ -61,6 +61,7 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   (tools or annotate_releases)(deps)   # rows exist only when dependencies.checks.workflow_tools listed them
   if settings.check('stars'):(stars or annotate_stars)(deps)
   (repo_state or annotate_repo_state)(deps)   # archived source repositories; guessed ones that do not exist
+  (kinds or add_kinds)(deps)   # what each image is: its Docker Hub categories, else its source repository's topics
   (licenses or fill_licenses)(out['dependencies'])
   for d in out['dependencies']:d['license_class']=classify(d.get('license'),policy)
   explain(out['dependencies'])   # every empty latest, license and vulns gets a reason

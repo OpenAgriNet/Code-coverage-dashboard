@@ -5,42 +5,26 @@ from common.safehttp import public_host
 from stackinfo.rules.reasons import short_error
 from stackinfo.lookups.registry import NAME, TAG, SHAPE, split, canonical, latest_like, tags_of, version_of, gone_from_docker_hub, GONE
 from stackinfo.lookups.imagescan import scan, image_license, source_repo
-from stackinfo.lookups.projects import project_license
+from stackinfo.lookups.projects import project_license, license_at as project_license_at
 from stackinfo import settings
 CACHE={}
 def configured(name,key):
- """The value config/repos.json gives this image under dependencies.<key>, whichever way the image is spelled there."""
- return {canonical(k):v for k,v in settings.get(key).items() if '@' not in k}.get(canonical(name))
-def _numbers(v):
- m=SHAPE.fullmatch(str(v or ''));return tuple(int(n) for n in m.group(2).split('.')) if m else None
-CMP={'>=':lambda a,b:a>=b,'<=':lambda a,b:a<=b,'>':lambda a,b:a>b,'<':lambda a,b:a<b,'==':lambda a,b:a==b}
-def in_range(version,spec):
- """Whether every release version names lies in spec ('>=7.4,<8'): 7 is in '>=7,<8' but not in '>=7.4,<8', which only 7.4 and
- later 7s are. None when version is not a version (alpine, latest)."""
- v=_numbers(version)
- if v is None:return None
- lo,hi=v+(0,)*(4-len(v)),v+(10**9,)*(4-len(v))
- for c in [c.strip() for c in spec.split(',') if c.strip()]:
-  op=next((o for o in ('>=','<=','==','>','<') if c.startswith(o)),None);b=_numbers(c[len(op):].strip()) if op else None
-  if b is None:raise ValueError(f'image_licenses: cannot read the version range {spec!r}')
-  b=b+(0,)*(4-len(b))
-  if not (CMP[op](lo,b) and CMP[op](hi,b)):return False
- return True
-def by_version(name,version):
- """The license config/dependencies.json image_licenses gives this image for a version range (redis@>=7.4,<8), or None."""
- for k,lic in settings.get('image_licenses').items():
-  if '@' in k and canonical(k.split('@',1)[0])==canonical(name) and in_range(version,k.split('@',1)[1]):return lic
- return None
-def license_for(name,labels,main,license_of,tag=None,resolved=None):
- """(license, where, from) for an image, the first that gives one: the license config/repos.json states for it
- (dependencies.image_licenses: name:tag, then a version range the version it points at lies in, then name), its GitHub repository named there (dependencies.image_sources), its own license label, the
- repository its source label names, the license of its own program inside it (main package), or for an image on ghcr.io the
- license of the GitHub repository of the same name (ghcr.io/sunbird-rc/sunbird-rc-core). None when none does.
- labels and main are None when the image could not be scanned; the config still applies then."""
- lic=(tag and configured(f'{name}:{tag}','image_licenses')) or by_version(name,resolved or tag) or configured(name,'image_licenses')   # redis 7.2 and 8 differ
- if lic:return lic,'config',None
- repo=configured(name,'image_sources')
+ """The value config/dependencies.json gives this image under dependencies.<key>, whichever way the image is spelled there."""
+ return {canonical(k):v for k,v in settings.get(key).items()}.get(canonical(name))
+def release(version):
+ """The release a tag or the version it points at names (7.4.12 of 7.4.12-alpine), or None for latest, alpine, ..."""
+ m=SHAPE.fullmatch(str(version or ''))
+ return m.group(2) if m else None
+def license_for(name,labels,main,license_of,tag=None,resolved=None,at=None):
+ """(license, where, from) for an image, the first that gives one: its GitHub repository (dependencies.image_sources names it)
+ read at the image's own release when the tag names one (redis 7 is 7.4.12 today: RSALv2 or SSPL, not 7.2's BSD-3-Clause), else
+ as it is now; its own license label; the repository its source label names; the license of its own program inside it (main
+ package); or for an image on ghcr.io the license of the GitHub repository of the same name (ghcr.io/sunbird-rc/sunbird-rc-core).
+ None when none does. labels and main are None when the image could not be scanned. Every license is read, none is stated in config."""
+ repo=configured(name,'image_sources');ver=release(resolved) or release(tag)
  if repo:
+  lic=ver and at and at(repo,ver)
+  if lic:return lic,'repo',f'github.com/{repo} at {ver}'
   lic=license_of(repo)
   if lic:return lic,'repo',f'github.com/{repo}'
  if labels:
@@ -67,8 +51,8 @@ def image_repo(name,labels,main):
  repo=configured(name,'image_sources') or (labels and source_repo(labels))
  if not repo and main and main[1].startswith('github.com/'):repo='/'.join(main[1].split()[0].split('/')[1:3])
  return repo or same_name_repo(name) or None
-def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
- license_of=license_of or project_license
+def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None,license_at=None):
+ license_of=license_of or project_license;at=license_at or (project_license_at if license_of is project_license else None)
  out={'latest':None,'latest_of':None,'vulns':None};errors={}
  try:
   if SHAPE.fullmatch(tag):
@@ -87,7 +71,7 @@ def lookup(name,tag,tags_of,scan,log,resolve=version_of,license_of=None):
  else:
   labels,main=res.pop('labels',{}),res.pop('main',None)
   out['vulns']={'checked_version':tag,'exact':True,**res}
- try:lic=license_for(name,res and labels,res and main,license_of,tag,out.get('resolved'))
+ try:lic=license_for(name,res and labels,res and main,license_of,tag,out.get('resolved'),at)
  except Exception as e:lic=None;errors['license']=short_error(e);log(f'WARN license lookup failed for {name}:{tag}: {e}')
  if lic:out.update(license=lic[0],license_of=lic[1],**({'license_from':lic[2]} if lic[2] else {}))
  elif res is None and 'license' not in errors:errors['license']=errors['vulns']

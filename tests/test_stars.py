@@ -94,7 +94,7 @@ def test_a_sponsors_page_is_not_a_source_repository():
 def test_ghcr_images_take_the_repository_of_the_same_name():
     from stackinfo.lookups import images as im
     assert im.image_repo('ghcr.io/openagrinet/knowledge-provider', None, None) == 'openagrinet/knowledge-provider'
-    assert im.image_repo('docker.io/library/redis', None, None) is None
+    assert im.image_repo('docker.io/library/memcached', None, None) is None
 
 def test_a_non_standard_license_gets_a_second_opinion_from_the_source_repository():
     deps = [{'ecosystem': 'python', 'name': 'huggingface-hub', 'project': 'github.com/huggingface/huggingface_hub', 'license': 'non-standard'},

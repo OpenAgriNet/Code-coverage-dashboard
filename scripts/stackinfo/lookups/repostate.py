@@ -1,11 +1,12 @@
-"""Whether each dependency's GitHub repository is archived (read-only, no longer maintained: minio/minio) or does not exist, asked
-in one GraphQL request per 50 repositories and cached for the run. A repository only guessed from an image's name
+"""Whether each dependency's GitHub repository is archived (read-only, no longer maintained: minio/minio) or does not exist, and its
+topics (what the image kinds read), asked in one GraphQL request per 50 repositories and cached for the run. A repository only guessed from an image's name
 (project_of 'same name') that does not exist is dropped, so the row links nowhere wrong. A failed lookup changes nothing."""
 import json
 from common import github
 from common.log import warn
 from stackinfo.lookups.stars import source_repo
 STATE={}   # owner/repo (lower case) -> 'archived' | 'active' | 'missing'
+TOPICS={}  # owner/repo (lower case) -> [topic, ...]
 BATCH=50
 
 def graphql(query):
@@ -16,11 +17,12 @@ def lookup(repos,post=graphql):
  todo=sorted({r.lower() for r in repos}-set(STATE))
  for i in range(0,len(todo),BATCH):
   part=todo[i:i+BATCH]
-  q='query{'+' '.join(f'r{j}:repository(owner:{json.dumps(r.split("/")[0])},name:{json.dumps(r.split("/")[1])}){{isArchived}}' for j,r in enumerate(part))+'}'
+  q='query{'+' '.join(f'r{j}:repository(owner:{json.dumps(r.split("/")[0])},name:{json.dumps(r.split("/")[1])}){{isArchived repositoryTopics(first:20){{nodes{{topic{{name}}}}}}}}' for j,r in enumerate(part))+'}'
   data=(post(q) or {}).get('data') or {}
   for j,r in enumerate(part):
    got=data.get(f'r{j}')
    STATE[r]='missing' if got is None else 'archived' if got.get('isArchived') else 'active'
+   TOPICS[r]=[n['topic']['name'] for n in ((got or {}).get('repositoryTopics') or {}).get('nodes') or [] if (n.get('topic') or {}).get('name')]
 def annotate(deps,post=graphql,log=warn):
  """Add archived: true to every dependency whose repository is archived; drop a guessed project that does not exist."""
  repo_of={id(d):source_repo(d) for d in deps}
@@ -31,3 +33,6 @@ def annotate(deps,post=graphql,log=warn):
   if st=='archived':d['archived']=True
   elif st=='missing' and d.get('project_of')=='same name':d.pop('project',None);d.pop('stars',None);d.pop('stars_of',None)
   d.pop('project_of',None)
+def topics(repo):
+ """GitHub topics of a repository looked up by annotate; [] when unknown."""
+ return TOPICS.get((repo or '').lower(),[])
