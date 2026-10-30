@@ -73,6 +73,7 @@ def test_scan_items_one_per_package_and_advisory_group():
     items = sc.items_of(SCAN)
     assert [(i['id'], i['cve'], i['severity'], i['fixed']) for i in items] == [('CGA-1', 'CVE-2026-1', 'CRITICAL', '2.44-r11'), ('CGA-3', None, 'LOW', None)]
     assert items[0]['summary'] == 'glibc 2.44-r10: heap overflow' and items[1]['summary'] == 'glibc 2.44-r10: no fix yet'
+    assert (items[0]['package'], items[0]['version']) == ('glibc', '2.44-r10') and items[0]['ecosystem']
 
 def test_scan_runs_osv_scanner_without_secrets(monkeypatch):
     monkeypatch.setenv('GH_TOKEN', 'secret')
@@ -115,7 +116,7 @@ def test_annotate_failures_stay_unchecked():
     def boom(*a):
         raise RuntimeError('denied')
     logs = []
-    im.annotate(deps, tags_of=boom, scan=boom, cache={}, log=logs.append, is_public=lambda h: True)
+    im.annotate(deps, tags_of=boom, scan=boom, cache={}, log=logs.append, is_public=lambda h: True, license_of=lambda r: None)   # no network
     assert deps[0]['vulns'] is None and deps[0]['latest'] is None and len(logs) == 2
 
 def test_malformed_image_names_are_not_fetched():
@@ -334,9 +335,9 @@ LOKI = {'results': [
         {'package': {'name': 'musl', 'version': '1.2', 'ecosystem': 'Alpine'}, 'licenses': ['MIT']}]}]}
 
 def test_the_main_package_is_the_one_named_like_the_image():
-    assert sc.main_package(LOKI, 'docker.io/grafana/loki:3.7.9') == ('AGPL-3.0, Apache-2.0', 'github.com/grafana/loki/v3 3.7.9')
+    assert sc.main_package(LOKI, 'docker.io/grafana/loki:3.7.9') == ('AGPL-3.0, Apache-2.0', 'github.com/grafana/loki/v3 3.7.9', False)
     minio = {'results': [{'packages': [{'package': {'name': 'minio', 'version': '0.2026', 'ecosystem': 'Wolfi'}, 'licenses': ['AGPL-3.0']}]}]}
-    assert sc.main_package(minio, 'cgr.dev/chainguard/minio:latest') == ('AGPL-3.0', 'minio 0.2026')
+    assert sc.main_package(minio, 'cgr.dev/chainguard/minio:latest') == ('AGPL-3.0', 'minio 0.2026', False)
 
 def test_no_main_package_when_nothing_matches_or_the_license_is_unknown():
     debian = {'results': [{'packages': [{'package': {'name': 'postgresql-17', 'version': '17.11', 'ecosystem': 'Debian:13'}, 'licenses': ['UNKNOWN']},
@@ -352,22 +353,23 @@ def image_config():
     yield apply
     settings.reset()   # back to config/dependencies.json
 
-def test_license_order_config_first_then_labels_then_the_main_package(image_config):
+def test_license_order_source_repository_then_labels_then_the_main_package(image_config):
     repo = lambda r: {'jaegertracing/jaeger': 'Apache-2.0', 'o/labelled': 'MIT'}.get(r)
-    image_config(image_licenses={'postgres': 'PostgreSQL'}, image_sources={'jaegertracing/all-in-one': 'jaegertracing/jaeger'})
-    assert im.license_for('docker.io/library/postgres', None, None, repo) == ('PostgreSQL', 'config', None)   # any spelling, even unscanned
+    image_config(image_sources={'jaegertracing/all-in-one': 'jaegertracing/jaeger'})
     assert im.license_for('docker.io/jaegertracing/all-in-one', {}, None, repo) == ('Apache-2.0', 'repo', 'github.com/jaegertracing/jaeger')
+    assert im.license_for('jaegertracing/all-in-one', None, None, repo) == ('Apache-2.0', 'repo', 'github.com/jaegertracing/jaeger')   # unscanned too
     labels = {'org.opencontainers.image.licenses': 'MIT'}
     assert im.license_for('docker.io/x/y', labels, ('AGPL-3.0', 'y 1'), repo) == ('MIT', 'label', None)
     assert im.license_for('docker.io/x/y', {}, ('AGPL-3.0', 'y 1'), repo) == ('AGPL-3.0', 'package', 'y 1')
     assert im.license_for('docker.io/x/y', {}, None, repo) is None
 
-def test_a_configured_license_survives_a_failed_scan(image_config):
-    image_config(image_licenses={'postgres': 'PostgreSQL'})
+def test_a_source_repository_license_survives_a_failed_scan(image_config):
+    image_config(image_sources={'postgres': 'postgres/postgres'})
     def boom(ref):
         raise RuntimeError('docker pull failed: denied')
-    got = im.lookup('docker.io/library/postgres', '17', lambda n: ['17'], boom, lambda m: None, resolve=lambda *a: None, license_of=lambda r: None)
-    assert got['license'] == 'PostgreSQL' and got['license_of'] == 'config' and got['vulns'] is None and set(got['errors']) == {'vulns'}
+    got = im.lookup('docker.io/library/postgres', '17', lambda n: ['17'], boom, lambda m: None, resolve=lambda *a: None,
+                    license_of=lambda r: 'PostgreSQL', license_at=lambda r, v: None)
+    assert got['license'] == 'PostgreSQL' and got['license_of'] == 'repo' and got['vulns'] is None and set(got['errors']) == {'vulns'}
 
 def test_the_image_repository_comes_from_config_then_its_label_then_its_go_module(image_config):
     image_config(image_sources={'docker.langfuse.com/langfuse/langfuse': 'langfuse/langfuse'})
@@ -388,11 +390,46 @@ def test_a_partial_or_variant_tag_resolves_among_tags_of_its_own_kind():
     assert rg.version_of('redis', 'alpine', tags, digest=digest) == '8.10.3-alpine'
     assert rg.version_of('redis', '7.4.12', tags, digest=digest) is None   # nothing more precise to find
 
-def test_a_license_can_be_set_for_a_version_range(image_config):
-    image_config(image_licenses={'redis@<7.4': 'BSD-3-Clause', 'redis@>=7.4,<8': 'RSAL OR SSPL', 'redis@>=8': 'RSAL OR SSPL OR AGPL'})
-    none = lambda r: None
-    assert im.license_for('docker.io/library/redis', {}, None, none, '7', '7.4.12') == ('RSAL OR SSPL', 'config', None)
-    assert im.license_for('redis', {}, None, none, 'alpine', '8.10.3-alpine') == ('RSAL OR SSPL OR AGPL', 'config', None)
-    assert im.license_for('redis', {}, None, none, '6') == ('BSD-3-Clause', 'config', None)   # every 6.x is before 7.4
-    assert im.license_for('redis', {}, None, none, '7') is None                             # 7 unresolved: 7.2 or 7.4, unknown
-    assert im.license_for('redis', {}, None, none, 'alpine') is None
+def test_the_source_repository_is_read_at_the_release_the_image_is(image_config):
+    image_config(image_sources={'redis': 'redis/redis'})
+    asked = []
+    at = lambda r, v: asked.append(v) or {'7.2.5': 'BSD-3-Clause', '7.4.12': 'LicenseRef-RSALv2 OR SSPL-1.0'}.get(v)
+    now = lambda r: 'LicenseRef-RSALv2 OR SSPL-1.0 OR AGPL-3.0-only'
+    assert im.license_for('docker.io/library/redis', {}, None, now, '7', '7.4.12', at) == ('LicenseRef-RSALv2 OR SSPL-1.0', 'repo', 'github.com/redis/redis at 7.4.12')
+    assert im.license_for('redis', {}, None, now, '7.2.5-alpine', None, at) == ('BSD-3-Clause', 'repo', 'github.com/redis/redis at 7.2.5')
+    assert im.license_for('redis', {}, None, now, 'alpine', None, at)[0] == now('')   # no release named: the license as it is now
+    assert asked == ['7.4.12', '7.2.5']
+
+def test_license_at_tries_the_tag_with_and_without_v(monkeypatch):
+    monkeypatch.setattr(pj, 'AT', {})
+    asked = []
+    api = lambda path: asked.append(path) or ({'license': {'spdx_id': 'BSD-3-Clause'}} if 'ref=v1.2.0' in path else None)
+    assert pj.license_at('o/r', '1.2.0', api=api) == 'BSD-3-Clause' and asked == ['/repos/o/r/license?ref=1.2.0', '/repos/o/r/license?ref=v1.2.0']
+    assert pj.license_at('o/r', '9.9.9', api=lambda p: None) is None
+def test_a_longer_image_name_finds_the_program_it_ends_with():
+    kc = {'results': [{'packages': [
+        {'package': {'name': 'org.apache.commons:commons-lang3', 'version': '3.12', 'ecosystem': 'Maven'}, 'licenses': ['Apache-2.0']},
+        {'package': {'name': 'org.keycloak:keycloak-core', 'version': '14.0.0', 'ecosystem': 'Maven'}, 'licenses': ['Apache-2.0']},
+        {'package': {'name': 'core', 'version': '1', 'ecosystem': 'npm'}, 'licenses': ['GPL-3.0']}]}]}
+    assert sc.program_names('ghcr.io/sunbird-rc/sunbird-rc-keycloak:latest') == ['sunbird-rc-keycloak', 'rc-keycloak', 'keycloak']
+    assert sc.main_package(kc, 'ghcr.io/sunbird-rc/sunbird-rc-keycloak:latest') == ('Apache-2.0', 'org.keycloak:keycloak-core 14.0.0', True)
+    assert sc.main_package(kc, 'ghcr.io/sunbird-rc/sunbird-rc-core:v2.0.0') is None   # "core" is a part of an app, not a program
+
+def test_an_image_wrapping_a_program_takes_its_license_and_its_own_repositorys():
+    repo = lambda r: {'sunbird-rc/sunbird-rc-keycloak': 'MIT', 'grafana/loki': 'AGPL-3.0'}.get(r)
+    kc = ('Apache-2.0', 'org.keycloak:keycloak-core 14.0.0', True)
+    assert im.license_for('ghcr.io/sunbird-rc/sunbird-rc-keycloak', {}, kc, repo) == (
+        'Apache-2.0, MIT', 'package', 'org.keycloak:keycloak-core 14.0.0 + github.com/sunbird-rc/sunbird-rc-keycloak')
+    assert im.license_for('ghcr.io/x/y-keycloak', {}, kc, lambda r: 'Apache-2.0') == ('Apache-2.0', 'package', 'org.keycloak:keycloak-core 14.0.0')
+    assert im.license_for('docker.io/x/loki', {}, ('AGPL-3.0', 'loki 3', False), repo) == ('AGPL-3.0', 'package', 'loki 3')
+
+
+def test_counts_by_severity_and_packages_cover_every_item(monkeypatch):
+    monkeypatch.setitem(settings.CURRENT['images'], 'max_findings', 1)
+    it = lambda n, s, f, pkg: {'id': n, 'severity': s, 'fixed': f, 'summary': f'{pkg} 1: x', 'package': pkg, 'version': '1', 'ecosystem': 'Debian:12'}
+    got = sc.summarize([it('1', 'HIGH', '1.2', 'zlib'), it('2', 'CRITICAL', None, 'glibc'), it('3', 'HIGH', '1.10', 'zlib'), it('4', 'weird', None, 'zlib')])
+    assert got['by_severity'] == {'CRITICAL': 1, 'HIGH': 2, 'UNKNOWN': 1} and len(got['items']) == 1
+    assert [(p['name'], p['count'], p['fixed'], p['unfixed']) for p in got['packages']] == [('glibc', 1, None, 1)]
+    monkeypatch.setitem(settings.CURRENT['images'], 'max_findings', 5)
+    zlib = sc.summarize([it('1', 'HIGH', '1.2', 'zlib'), it('3', 'HIGH', '1.10', 'zlib'), it('4', 'LOW', None, 'zlib')])['packages'][0]
+    assert zlib['fixed'] == '1.10' and zlib['by_severity'] == {'HIGH': 2, 'LOW': 1} and zlib['severity'] == 'HIGH' and zlib['ecosystem'] == 'Debian:12'

@@ -41,11 +41,16 @@ def item(vuln,eco,name,version):
 def details(vid,fetch):
  if vid not in DETAILS:DETAILS[vid]=fetch(f'/vulns/{vid}')
  return DETAILS[vid]
+def by_severity(items):
+ """How many items of each severity, worst first, only those that occur: {'CRITICAL': 2, 'HIGH': 5, 'UNKNOWN': 1}."""
+ n={}
+ for i in items:k=i['severity'] if i['severity'] in SEVERITIES else 'UNKNOWN';n[k]=n.get(k,0)+1
+ return {k:n[k] for k in (*reversed(SEVERITIES),'UNKNOWN') if k in n}
 def summarize(items):
  fixes=[i['fixed'] for i in items if i['fixed']]
  rank=lambda i:SEVERITIES.index(i['severity']) if i['severity'] in SEVERITIES else -1
  return {'count':len(items),'severity':max(items,key=rank)['severity'] if items else None,'fixed_in':max(fixes,key=vkey) if fixes else None,
-  'unfixed':sum(1 for i in items if not i['fixed']),'items':items}
+  'unfixed':sum(1 for i in items if not i['fixed']),'by_severity':by_severity(items),'items':items}
 def annotate(deps,post=post,fetch=get,log=warn):
  """Add 'vulns' to every dependency dict. None means not checked (Docker image, Action, unknown version, or the lookup failed);
  otherwise {checked_version, exact, count, severity, fixed_in, unfixed, items}. fixed_in is the one version that fixes every fixable item."""

@@ -9,13 +9,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/deps.css">
 </head>
 <body>
 <main>
   <header>
     <h1>OpenAgriNet DPG repositories code coverage</h1>
     <div class="refresh">
-      <button type="button" class="btn" id="export-all" title="One Excel workbook with everything on this dashboard: coverage on both branches, every release version, stack, every dependency and vulnerability, and the license policy. Filters are not applied.">Download all (Excel)</button>
+      <button type="button" class="btn btn-xl" id="export-all" title="One Excel workbook with everything on this dashboard: coverage on both branches, every release version, stack, every dependency and vulnerability, and the license policy. Filters are not applied."><svg class="xl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="3" fill="#1D6F42"/><path d="M2 8.5h20M2 13h20M2 17.5h20M9 3v18M15.5 3v18" stroke="#fff" stroke-opacity=".55" stroke-width="1"/><rect x="2" y="3" width="7" height="18" rx="3" fill="#185C37"/><path d="M3.6 8.2l3.8 7.6M7.4 8.2l-3.8 7.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>Download all</button>
       <span class="updated" id="updated">Loading data…</span>
       <a class="btn" href="https://github.com/OpenAgriNet/Code-coverage-dashboard/actions/workflows/deploy.yml" target="_blank" rel="noopener" title="Opens GitHub Actions. Click “Run workflow” there (needs write access). The page updates about two minutes after the run finishes.">Refresh data</a>
     </div>
@@ -35,14 +36,15 @@
     <button type="button" role="tab" id="tab-dev" data-tab="dev" aria-controls="sec-dev" aria-selected="true">Coverage and security</button>
     <button type="button" role="tab" id="tab-release" data-tab="release" aria-controls="sec-release" aria-selected="false" tabindex="-1">Latest release</button>
     <button type="button" role="tab" id="tab-stack" data-tab="stack" aria-controls="sec-stack" aria-selected="false" tabindex="-1">Stack and licenses</button>
-    <button type="button" role="tab" id="tab-about" data-tab="about" aria-controls="sec-about" aria-selected="false" tabindex="-1">How this is measured</button>
+    <button type="button" role="tab" id="tab-deps" data-tab="deps" aria-controls="sec-deps" aria-selected="false" tabindex="-1">All dependencies</button>
+    <button type="button" role="tab" id="tab-vulns" data-tab="vulns" aria-controls="sec-vulns" aria-selected="false" tabindex="-1">Vulnerabilities</button>
   </div>
 
   <section id="sec-dev" role="tabpanel" aria-labelledby="tab-dev">
     <div class="sec-head"><div>
       <h2 id="dev-title">Coverage and security</h2>
       <p class="sub" id="dev-note">On the branch chosen above. A repository's development branch is its <code>dev_branch</code>, else the first branch matching <code>branches.development</code>.</p>
-    </div><button type="button" class="btn btn-sm" data-export="dev" title="Download the rows this table shows (branch and filters applied) as an Excel sheet">Excel</button></div>
+    </div><button type="button" class="btn btn-sm btn-xl" data-export="dev" title="Download the rows this table shows (branch and filters applied) as an Excel sheet" aria-label="Download as Excel"><svg class="xl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="3" fill="#1D6F42"/><path d="M2 8.5h20M2 13h20M2 17.5h20M9 3v18M15.5 3v18" stroke="#fff" stroke-opacity=".55" stroke-width="1"/><rect x="2" y="3" width="7" height="18" rx="3" fill="#185C37"/><path d="M3.6 8.2l3.8 7.6M7.4 8.2l-3.8 7.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg><span class="sr">Excel</span></button></div>
     <div class="kpis" id="kpi-dev" aria-label="Coverage and security at a glance"></div>
     <div class="table-wrap"><table>
       <thead><tr><th scope="col">Repository</th><th scope="col">Code coverage</th><th scope="col">Security</th></tr></thead>
@@ -56,7 +58,7 @@
       <p class="sub">Each repository's newest stable version, or the tags of a named release (when the config defines release sets). Choose a release or one version for every repository here, or change a single repository in its row. Found from release branches, tags and GitHub Releases, as set in <code>config/repos.json</code>.</p>
     </div>
       <div class="controls"><label class="sub" for="rel-set" id="rel-set-label" hidden>Release</label><select class="ver" id="rel-set" hidden><option value="">Each repo's latest</option></select>
-        <label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select><button type="button" class="btn btn-sm" data-export="release" title="Download the rows this table shows (branch and filters applied) as an Excel sheet">Excel</button></div>
+        <label class="sub" for="rel-all">Show version</label><select class="ver" id="rel-all"><option value="">Latest</option></select><button type="button" class="btn btn-sm btn-xl" data-export="release" title="Download the rows this table shows (branch and filters applied) as an Excel sheet" aria-label="Download as Excel"><svg class="xl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="3" fill="#1D6F42"/><path d="M2 8.5h20M2 13h20M2 17.5h20M9 3v18M15.5 3v18" stroke="#fff" stroke-opacity=".55" stroke-width="1"/><rect x="2" y="3" width="7" height="18" rx="3" fill="#185C37"/><path d="M3.6 8.2l3.8 7.6M7.4 8.2l-3.8 7.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg><span class="sr">Excel</span></button></div>
     </div>
     <div class="kpis" id="kpi-release" aria-label="Releases at a glance"></div>
     <div id="rel-filters"></div>
@@ -69,8 +71,8 @@
   <section id="sec-stack" role="tabpanel" aria-labelledby="tab-stack" hidden>
     <div class="sec-head"><div>
       <h2 id="stack-title">Stack and licenses</h2>
-      <p class="sub" id="stack-note">Each repository's development branch. <a href="deps.html">All dependencies →</a></p>
-    </div><button type="button" class="btn btn-sm" data-export="stack" title="Download the rows this table shows (branch and filters applied) as an Excel sheet">Excel</button></div>
+      <p class="sub" id="stack-note">Each repository's development branch.</p>
+    </div><button type="button" class="btn btn-sm btn-xl" data-export="stack" title="Download the rows this table shows (branch and filters applied) as an Excel sheet" aria-label="Download as Excel"><svg class="xl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="3" fill="#1D6F42"/><path d="M2 8.5h20M2 13h20M2 17.5h20M9 3v18M15.5 3v18" stroke="#fff" stroke-opacity=".55" stroke-width="1"/><rect x="2" y="3" width="7" height="18" rx="3" fill="#185C37"/><path d="M3.6 8.2l3.8 7.6M7.4 8.2l-3.8 7.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg><span class="sr">Excel</span></button></div>
     <div class="kpis" id="kpi-stack" aria-label="Stack, dependencies and licenses at a glance"></div>
     <div class="table-wrap"><table class="wide">
       <thead><tr><th scope="col">Repository</th><th scope="col">License</th><th scope="col">Stack</th><th scope="col">Dependencies</th></tr></thead>
@@ -78,28 +80,66 @@
     </table></div>
   </section>
 
-  <section id="sec-about" role="tabpanel" aria-labelledby="tab-about" hidden>
-  <details class="how" open>
-    <summary>How this is measured</summary>
-    <ul>
-      <li><b>Branch.</b> Set per repository in <code>config/repos.json</code> (the <code>dev_branch</code> in the config, else the first branch matching <code>branches.development</code>, else the default branch).</li>
-      <li><b>Releases.</b> Versions come from release branches (<code>release-1.2.0</code>), git tags (<code>v1.2.0</code>) and GitHub Releases, as set under <code>releases</code> in the config. <code>v1.2.0</code> and <code>1.2.0</code> are one version; names that are not versions (such as <code>fork-point</code>) are ignored. A branch is measured as it is now and has live badges. A tag or release is measured at its tagged commit, so it shows plain numbers and the date of the last run.</li>
-      <li><b>Code coverage.</b> The badge is Codecov's live badge for that branch. The line count underneath comes from the last refresh: Codecov first, otherwise the coverage file saved by the latest <code>CI</code> run on that branch. Partially covered lines count as not covered.</li>
-      <li><b>Security.</b> The latest completed run of the repo's <code>security.yml</code> on that branch. <i>No runs on this branch</i> means the workflow does not run there; it is not a failure.</li>
-      <li><b>Refresh data</b> opens the refresh workflow on GitHub; click <i>Run workflow</i> there (needs write access to this repo). The badges are always live; line counts and run links update when the run finishes.</li>
-      <li><b>Stale coverage.</b> A <i>Measured</i> date more than 14 days old is shown in amber: that branch has had no coverage upload for two weeks.</li>
-      <li><b>Dates.</b> <i>Measured</i> is the commit time of the commit whose coverage is shown (or the CI run time). <i>Last run</i> is when the latest security run on that branch finished.</li>
-      <li><b>Stack and licenses.</b> <a href="https://github.com/specfy/stack-analyser" target="_blank" rel="noopener">specfy/stack-analyser</a> reads a fresh clone of the development branch for languages, technologies and dependencies. The repo license is GitHub's reading of its <code>LICENSE</code> file. Each npm, PyPI and Go dependency's license and latest version come from <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a>; Docker images and GitHub Actions are listed but not looked up.</li>
-      <li><b>No report</b> or an <i>unknown</i> badge means nothing was uploaded for that branch. It does not mean 0%. This dashboard never reruns tests.</li>
-    </ul>
-  </details>
+  <section id="sec-deps" role="tabpanel" aria-labelledby="tab-deps" hidden>
+    <div class="sec-head"><div><h2 id="dep-title">All dependencies</h2><p class="sub" id="dep-note"></p></div>
+      <div class="sortby"><label class="sub" for="dep-sort">Sort by</label>
+        <select class="ver" id="dep-sort">
+          <option value="repo">Repository</option>
+          <option value="severe">Most severe first (critical, then high, ...)</option>
+          <option value="vulns">Most vulnerabilities first</option>
+          <option value="unfixed">Most with no fix first</option>
+          <option value="name">Package name</option>
+          <option value="stars">Stars (most first)</option>
+          <option value="stars_least">Stars (least first)</option>
+        </select><button type="button" class="btn btn-sm btn-xl" data-export="deps" title="Download the rows this table shows (branch, kind and filters applied) as Excel: the dependencies, every advisory, and for images the packages inside them" aria-label="Download as Excel"><svg class="xl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="3" fill="#1D6F42"/><path d="M2 8.5h20M2 13h20M2 17.5h20M9 3v18M15.5 3v18" stroke="#fff" stroke-opacity=".55" stroke-width="1"/><rect x="2" y="3" width="7" height="18" rx="3" fill="#185C37"/><path d="M3.6 8.2l3.8 7.6M7.4 8.2l-3.8 7.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg><span class="sr">Excel</span></button></div>
+    </div>
+    <div class="subtabs" id="dep-kinds" role="tablist" aria-label="Kind of dependency"></div>
+    <div id="dep-filters"></div>
+    <p class="dep-summary" id="dep-summary">Reading the dependency list.</p>
+    <div class="kpis" id="kpi-deps" aria-label="Dependencies at a glance"></div>
+    <div class="table-wrap"><table class="deps" id="dep-table">
+      <thead id="dep-head"></thead>
+      <tbody id="dep-rows"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+    <nav id="dep-pager" aria-label="Pages of dependencies"></nav>
+    <h3 class="policy-h">License policy</h3>
+    <div id="policy"></div>
   </section>
+
+  <section id="sec-vulns" role="tabpanel" aria-labelledby="tab-vulns" hidden>
+    <div class="sec-head"><div><h2>Vulnerabilities</h2><p class="sub" id="vuln-note"></p></div>
+      <div class="sortby"><label class="sub" for="vuln-sort">Sort by</label>
+        <select class="ver" id="vuln-sort">
+          <option value="severe">Most severe first</option>
+          <option value="places">Found in the most places</option>
+          <option value="nofix">No fix released first</option>
+          <option value="pkg">Affected package</option>
+          <option value="id">Advisory id</option>
+        </select><button type="button" class="btn btn-sm btn-xl" data-export="vulns" title="Download the advisories this table shows (branch and filters applied) as Excel: one sheet of advisories, one of every place each was found" aria-label="Download as Excel"><svg class="xl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="3" fill="#1D6F42"/><path d="M2 8.5h20M2 13h20M2 17.5h20M9 3v18M15.5 3v18" stroke="#fff" stroke-opacity=".55" stroke-width="1"/><rect x="2" y="3" width="7" height="18" rx="3" fill="#185C37"/><path d="M3.6 8.2l3.8 7.6M7.4 8.2l-3.8 7.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg><span class="sr">Excel</span></button></div>
+    </div>
+    <div class="kpis" id="kpi-vulns" aria-label="Vulnerabilities at a glance"></div>
+    <div id="vuln-filters"></div>
+    <div class="table-wrap"><table class="vulns">
+      <thead><tr><th scope="col">Advisory</th><th scope="col">Severity</th><th scope="col">Affected package</th><th scope="col">Found in</th><th scope="col">Fixed in</th><th scope="col">Summary</th></tr></thead>
+      <tbody id="vuln-rows"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+    <nav id="vuln-pager" aria-label="Pages of advisories"></nav>
+  </section>
+
+  <dialog id="vuln-card" class="card" aria-labelledby="vc-title">
+    <div class="card-head"><div><h2 id="vc-title"></h2><div class="sub" id="vc-sub"></div></div><button type="button" class="card-close" id="vc-close" aria-label="Close">&times;</button></div>
+    <div class="card-body" id="vc-body"></div>
+  </dialog>
+  <footer class="page-foot"><a href="methodology.html" title="Sources, calculations, confidence and limitations of every figure">Methodology</a></footer>
 </main>
 <script src="assets/filters.js"></script>
 <script src="assets/tabs.js"></script>
 <script src="assets/branches.js"></script>
 <script src="assets/xlsx.js"></script>
 <script src="assets/export.js"></script>
+<script src="assets/pager.js"></script>
+<script src="assets/deps.js"></script>
+<script src="assets/vulns.js"></script>
 <script src="assets/index.js"></script>
 </body>
 </html>

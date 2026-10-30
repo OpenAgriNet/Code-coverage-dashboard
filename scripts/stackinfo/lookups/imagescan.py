@@ -4,7 +4,7 @@ from common.log import warn
 from common.proc import child_env
 from common.versions import normal
 from stackinfo import settings
-from stackinfo.lookups.osv import SEVERITIES, severity as osv_severity
+from stackinfo.lookups.osv import SEVERITIES, by_severity, severity as osv_severity
 
 def loose(v):
  """Sort key from every number in a version, so OS package revisions compare (2.44-r10 < 2.44-r11, 1:2.3-4 < 1:2.3-5)."""
@@ -35,16 +35,33 @@ def items_of(result):
     if (vid,name,ver) in seen:continue   # the same package can be listed once per layer or sub-package
     seen.add((vid,name,ver))
     out.append({'id':vid,'cve':next((a for a in g.get('aliases') or [] if a.startswith('CVE-')),None),'summary':f'{name} {ver}: {text}',
-     'severity':sev,'fixed':min(fixes,key=loose) if fixes else None,'url':f'https://osv.dev/vulnerability/{vid}'})
+     'severity':sev,'fixed':min(fixes,key=loose) if fixes else None,'url':f'https://osv.dev/vulnerability/{vid}',
+     'package':name,'version':ver,'ecosystem':eco})
  return out
 def summarize(items):
  """Like osv.summarize, but no single fixed_in: the fixes belong to different packages inside the image.
  items keeps the worst dependencies.images.max_findings (fixable first within a severity; postgres alone has hundreds);
- count, fixable and unfixed cover all of them."""
+ count, fixable, unfixed, by_severity and packages cover all of them."""
  rank=lambda i:SEVERITIES.index(i['severity']) if i['severity'] in SEVERITIES else -1
  fixable=sum(1 for i in items if i['fixed'])
  worst=sorted(items,key=lambda i:(-rank(i),i['fixed'] is None,i['summary']))
- return {'count':len(items),'severity':worst[0]['severity'] if items else None,'fixed_in':None,'fixable':fixable,'unfixed':len(items)-fixable,'items':worst[:settings.get('images','max_findings')]}
+ return {'count':len(items),'severity':worst[0]['severity'] if items else None,'fixed_in':None,'fixable':fixable,'unfixed':len(items)-fixable,
+  'by_severity':by_severity(items),'packages':packages(worst)[:settings.get('images','max_findings')],'items':worst[:settings.get('images','max_findings')]}
+def packages(worst):
+ """The affected packages inside the image, worst first: each with its installed version, how many advisories of each severity,
+ and fixed, the lowest version that fixes all of its fixable ones (the highest of their fixes). Covers every item, not only the listed ones."""
+ out={}
+ for i in worst:
+  if 'package' not in i:continue   # items written before packages were named
+  p=out.setdefault((i['package'],i['version'],i.get('ecosystem','')),{'name':i['package'],'version':i['version'],'ecosystem':i.get('ecosystem',''),
+   'severity':i['severity'],'count':0,'unfixed':0,'fixed':None,'items':[]})
+  p['count']+=1;p['items'].append(i)
+  if not i['fixed']:p['unfixed']+=1
+  elif p['fixed'] is None or loose(i['fixed'])>loose(p['fixed']):p['fixed']=i['fixed']
+ res=[]
+ for p in out.values():
+  p['by_severity']=by_severity(p.pop('items'));res.append(p)
+ return res   # in order of each package's worst item, as worst is sorted
 DOCKER_TIMEOUT=60
 def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
  """Pull the image, then let osv-scanner read it. Pulling first matters: osv-scanner uses a copy that is already on the machine,
@@ -78,18 +95,35 @@ def scan(ref,run=subprocess.run,binary=None,docker=shutil.which('docker')):
  result=json.loads(p.stdout)
  return {**summarize(items_of(result)),'labels':labels,'main':main_package(result,ref)}
 MAJOR=re.compile(r'/v\d+$')
+# words that name a part of an application, not a program: sunbird-rc-core is not the program "core"
+GENERIC={'core','server','service','api','app','ui','web','worker','base','backend','frontend','client','proxy','db','gateway','adapter',
+ 'admin','agent','cli','sdk','lib','rc','dev','prod','slim','alpine','system','provider'}
+def program_names(ref):
+ """Names the image's own program may go by, most specific first: the image's name, then its trailing words
+ (sunbird-rc-keycloak: sunbird-rc-keycloak, rc-keycloak, keycloak), never a generic word alone."""
+ name=ref.rsplit('/',1)[-1].split('@')[0].split(':')[0].lower();words=name.split('-')
+ return [n for n in dict.fromkeys('-'.join(words[i:]) for i in range(len(words))) if n not in GENERIC]
+def package_names(pkg):
+ """Names a package answers to: an OS package its name; a Go module the last part of its path (github.com/grafana/loki/v3:
+ loki); a Maven artifact its artifact id and its group's last part (org.keycloak:keycloak-core: keycloak-core, keycloak)."""
+ pname=str(pkg.get('name','')).lower();eco=pkg.get('ecosystem')
+ if eco=='Go':return {MAJOR.sub('',pname).rsplit('/',1)[-1]}
+ if eco=='Maven' and ':' in pname:g,a=pname.split(':',1);return {a,g.rsplit('.',1)[-1]}
+ return {pname}
 def main_package(result,ref):
  """(license, package) of the image's own program, found by name among the packages osv-scanner lists: an OS package named like
- the image (minio in minio), or a Go module whose path ends in the image's name (github.com/grafana/loki/v3 in loki). None
- when no package matches or its license is unknown, as for Debian packages, whose database records no license."""
- name=ref.rsplit('/',1)[-1].split('@')[0].split(':')[0].lower()
- for res in result.get('results') or []:
-  for p in res.get('packages') or []:
-   pkg=p.get('package') or {};pname=str(pkg.get('name',''))
-   key=MAJOR.sub('',pname).rsplit('/',1)[-1].lower() if pkg.get('ecosystem')=='Go' else pname.lower()
-   if key!=name:continue
+ the image (minio in minio), a Go module whose path ends in the image's name (github.com/grafana/loki/v3 in loki), or a Maven
+ artifact of the program a longer image name ends with (org.keycloak in sunbird-rc-keycloak). The image's full name is tried
+ before its trailing words. (license, package, wrapped): wrapped when it was found under a trailing word, so the image is that
+ program with more of its own (Sunbird's plugins around Keycloak). None when no package matches or its license is unknown, as for
+ Debian packages, whose database records no license."""
+ pkgs=[p for res in result.get('results') or [] for p in res.get('packages') or []];names=program_names(ref)
+ for name in names:
+  for p in pkgs:
+   pkg=p.get('package') or {}
+   if name not in package_names(pkg):continue
    lics=[l for l in p.get('licenses') or [] if l and l.upper() not in ('UNKNOWN','NOASSERTION','NONE')]
-   if lics:return ', '.join(dict.fromkeys(lics)),f'{pname} {pkg.get("version","")}'.strip()   # all of them apply, as for deps.dev
+   if lics:return ', '.join(dict.fromkeys(lics)),f'{pkg.get("name","")} {pkg.get("version","")}'.strip(),name!=names[0]   # all of them apply, as for deps.dev
  return None
 def _labels(p):
  """The image's config labels from docker image inspect (read from the pulled image: no extra registry request)."""

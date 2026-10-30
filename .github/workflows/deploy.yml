@@ -5,7 +5,7 @@ on:
     - cron: '17 */24 * * *'
   push:
     branches: [main]
-    paths: ['index.html', 'deps.html', 'assets/**', 'config/**', 'scripts/**', '.github/workflows/deploy.yml']
+    paths: ['index.html', 'deps.html', 'methodology.html', 'assets/**', 'config/**', 'scripts/**', '.github/workflows/deploy.yml']
 permissions:
   contents: read
   pages: write

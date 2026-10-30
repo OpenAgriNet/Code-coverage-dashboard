@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Methodology · OpenAgriNet DPG dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%232E7A3A%22/%3E%3Cpath d=%22M4 8.5l2.5 2.5L12 5.5%22 stroke=%22white%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="doc">
+  <a class="back" href="./">← Back to the dashboard</a>
+  <header class="doc-head">
+    <p class="doc-kicker">Methodology</p>
+    <h1>How this dashboard is measured</h1>
+    <p class="doc-lede">Where every number on the dashboard comes from, how it is calculated, how much confidence it deserves, and what it does not cover. Every value is read from a public source or from the repositories themselves on each refresh; nothing is entered by hand except the list of repositories to track and the license policy.</p>
+  </header>
+
+  <div class="doc-grid">
+  <nav class="doc-toc" aria-label="Contents">
+    <p class="doc-toc-h">Contents</p>
+    <ol>
+      <li><a href="#scope">Scope and refresh</a></li>
+      <li><a href="#coverage">Code coverage</a></li>
+      <li><a href="#security">Security workflow</a></li>
+      <li><a href="#releases">Releases</a></li>
+      <li><a href="#dependencies">Dependencies</a></li>
+      <li><a href="#licenses">Licenses</a></li>
+      <li><a href="#vulnerabilities">Vulnerabilities</a></li>
+      <li><a href="#confidence">Confidence and limitations</a></li>
+      <li><a href="#reading">Reading the dashboard</a></li>
+    </ol>
+  </nav>
+
+  <article class="doc-body">
+  <section id="scope">
+    <h2>1. Scope and refresh</h2>
+    <p>The dashboard tracks the repositories listed in <code>config/repos.json</code>. Each repository is shown on two branches:</p>
+    <ul>
+      <li><b>Development</b>: the repository's <code>dev_branch</code> in the config, else the first branch matching <code>branches.development</code>. Repositories without one appear only under Main.</li>
+      <li><b>Main</b>: the repository's default branch on GitHub.</li>
+    </ul>
+    <p>Data is collected by the <a href="https://github.com/OpenAgriNet/Code-coverage-dashboard/actions/workflows/deploy.yml" target="_blank" rel="noopener">refresh workflow</a> and published as <code>data/coverage.json</code> and <code>data/stack.json</code>. <b>Refresh data</b> on the dashboard opens that workflow; running it requires write access to this repository. Badges are live; every other figure reflects the last completed run, whose time is shown as <i>Updated</i>.</p>
+  </section>
+
+  <section id="coverage">
+    <h2>2. Code coverage</h2>
+    <dl class="doc-dl">
+      <dt>Source</dt><dd>Codecov's report for the branch. When Codecov has none, the coverage file saved by the latest <code>CI</code> workflow run on that branch.</dd>
+      <dt>Calculation</dt><dd>Covered lines divided by measured lines. Partially covered lines count as not covered.</dd>
+      <dt>Measured</dt><dd>The commit time of the commit the coverage belongs to, or the CI run time. A date more than 14 days old is shown in amber as stale.</dd>
+      <dt>No report</dt><dd>Nothing was uploaded for that branch. It does not mean 0%. The dashboard never runs tests itself.</dd>
+    </dl>
+  </section>
+
+  <section id="security">
+    <h2>3. Security workflow</h2>
+    <p>The result of the latest completed run of the repository's <code>security.yml</code> on the branch, with the time it finished (<i>Last run</i>). <i>No runs on this branch</i> means the workflow does not run there; it is not a failure.</p>
+  </section>
+
+  <section id="releases">
+    <h2>4. Releases</h2>
+    <p>Versions are found from release branches (<code>release-1.2.0</code>), git tags (<code>v1.2.0</code>) and GitHub Releases, as configured under <code>releases</code>. <code>v1.2.0</code> and <code>1.2.0</code> are one version; names that are not versions are ignored. A release branch is measured as it is now, with live badges; a tag or GitHub Release is measured at its tagged commit, so it shows fixed figures and the date of the last run.</p>
+  </section>
+
+  <section id="dependencies">
+    <h2>5. Dependencies</h2>
+    <dl class="doc-dl">
+      <dt>What is listed</dt><dd>The dependencies each repository declares directly, read from a fresh clone of each branch by <a href="https://github.com/specfy/stack-analyser" target="_blank" rel="noopener">specfy/stack-analyser</a> and the repository's own manifests: <code>package.json</code>, <code>go.mod</code>, <code>requirements*.txt</code>, <code>pyproject.toml</code>, Dockerfiles and compose files, GitHub workflows (including the actions that local actions use), and tools downloaded from GitHub Releases. Indirect dependencies from lockfiles are not listed.</dd>
+      <dt>Version</dt><dd>The version the manifest declares. When it declares a range (<code>^5.0.0</code>) and a lockfile is present (<code>package-lock.json</code>, <code>uv.lock</code>, <code>poetry.lock</code>), the installed version from the lockfile is shown and used for every lookup.</dd>
+      <dt>Group</dt><dd>Where the project declares the package: main, dev, test, optional, peer or a named group, as the repository names it. Docker images are <i>runtime</i>; GitHub Actions are <i>ci</i>.</dd>
+      <dt>Latest</dt><dd>Packages: the newest release on <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a>. Actions: the latest GitHub Release. Images: the newest tag of the same shape in the image's registry (<code>17</code> → <code>18</code>, <code>25.7-alpine</code> → <code>25.12-alpine</code>). For a floating tag such as <code>latest</code>, the version it points to today is found by comparing image digests, and its newest version is compared with that.</dd>
+      <dt>Image kind</dt><dd>The first category Docker Hub files the image under, as Docker Hub writes it; otherwise the first GitHub topic of the image's source repository; otherwise <i>Container</i>.</dd>
+      <dt>Stars and archived</dt><dd>GitHub stars of the dependency's source repository (from deps.dev, else GitHub), or Docker Hub stars for an image with no known repository. A repository archived on GitHub is marked <i>archived</i>.</dd>
+    </dl>
+  </section>
+
+  <section id="licenses">
+    <h2>6. Licenses</h2>
+    <p>Each license is read, in this order, from the first source that states one:</p>
+    <ol class="doc-steps">
+      <li><b>Packages</b>: deps.dev for the exact version; GitHub's license detection on the source repository when deps.dev reports a non-standard license; the wheel's own metadata for packages installed from a wheel file; PyPI's metadata.</li>
+      <li><b>Images</b>: the license file of the image's source repository at the release tag the image's version names (so <code>redis:7</code>, today 7.4.12, is read at Redis 7.4.12); the image's <code>org.opencontainers.image.licenses</code> label; the repository its source label names; the license of the image's own program found inside it.</li>
+      <li><b>Actions</b>: the license of the action's repository.</li>
+    </ol>
+    <p>When GitHub cannot name a license file, its text is compared word by word with the official <a href="https://github.com/spdx/license-list-data" target="_blank" rel="noopener">SPDX license texts</a>; a name is given only for a clear match. A file holding several licenses is read section by section and joined with <code>OR</code> when it offers a choice. A license that is not on the SPDX list keeps the short name its own heading gives it (<code>LicenseRef-RSALv2</code>).</p>
+    <p><b>License risk</b> classes each license against the Preferred (green), Not recommended (yellow) and Restricted use (red) lists in <code>config/repos.json</code>. For <code>A OR B</code> the better class counts; for <code>A AND B</code>, or several licenses listed together, the worse. A license on no list is <i>Unclassified</i>.</p>
+  </section>
+
+  <section id="vulnerabilities">
+    <h2>7. Vulnerabilities</h2>
+    <p>A vulnerability is one published advisory about one flaw (for example <code>CVE-2024-1234</code>), naming the affected package, the affected versions, a severity and, where one exists, the version that fixes it. The Vulnerabilities tab lists each advisory once, with every place it was found.</p>
+    <div class="table-wrap"><table class="doc-table">
+      <thead><tr><th scope="col">Kind</th><th scope="col">Source</th><th scope="col">Checked at</th></tr></thead>
+      <tbody>
+        <tr><td>npm, PyPI, Go packages</td><td><a href="https://osv.dev" target="_blank" rel="noopener">OSV.dev</a> (GitHub Security Advisories, PyPI, Go and other databases). Only names and versions are sent; no key is used.</td><td>The installed version from the lockfile, else the lowest version the declared range allows.</td></tr>
+        <tr><td>GitHub Actions</td><td><a href="https://github.com/advisories?query=ecosystem%3Aactions" target="_blank" rel="noopener">GitHub Advisory Database</a></td><td>The release the pinned tag or commit points to today.</td></tr>
+        <tr><td>Docker images</td><td><a href="https://github.com/google/osv-scanner" target="_blank" rel="noopener">osv-scanner</a> pulls the image anonymously, reads the operating-system packages and the program binaries installed inside it, and matches them against OSV. Nothing in the image is run.</td><td>The exact tag, as published at the time of the run.</td></tr>
+        <tr><td>CLI tools</td><td>OSV.dev, by the tool's Go module or package.</td><td>The released version the workflow downloads.</td></tr>
+      </tbody>
+    </table></div>
+    <dl class="doc-dl">
+      <dt>Severity</dt><dd>The severity the advisory states, or its CVSS score banded as critical (9.0+), high (7.0–8.9), medium (4.0–6.9) and low. Advisories with neither are <i>not rated</i>.</dd>
+      <dt>Fixed in</dt><dd>For a package, the lowest version that fixes every fixable advisory. For an image, each fix belongs to a package inside it; a newer image tag usually includes them.</dd>
+      <dt>Not checked</dt><dd>Shown as <i>nil</i> with its reason: an unresolved <code>${VAR}</code> tag, a private or locally built image, an unpinned version, or a failed lookup. A failed lookup is never shown as “None known”.</dd>
+    </dl>
+  </section>
+
+  <section id="confidence">
+    <h2>8. Confidence and limitations</h2>
+    <p>No scanner is complete or free of false positives. Independent scanners commonly disagree by 10–30% on the same image. The table states how far each figure can be relied on.</p>
+    <div class="table-wrap"><table class="doc-table">
+      <thead><tr><th scope="col">Figure</th><th scope="col">Confidence</th><th scope="col">Why</th></tr></thead>
+      <tbody>
+        <tr><td>Image identity and version</td><td><span class="conf conf-high">High</span></td><td>The exact tag is scanned; the version behind a partial or floating tag is matched by image digest, not inferred from its name. A floating tag can move between the run and the time of reading.</td></tr>
+        <tr><td>Packages inside an image</td><td><span class="conf conf-high">High</span></td><td>Read from the image's own package database (dpkg, apk) and from build information compiled into Go and Java programs.</td></tr>
+        <tr><td>Image vulnerabilities</td><td><span class="conf conf-med">Medium</span></td><td>Every advisory matching an installed version is reported, including ones the distribution marks as disputed, minor or “will not fix”. Counts are therefore likely higher than those of scanners that apply distribution status (Trivy, Grype). Whether the vulnerable code is reachable is not assessed.</td></tr>
+        <tr><td>Package vulnerabilities, with a lockfile</td><td><span class="conf conf-high">High</span></td><td>Checked at the exact installed version against OSV.dev.</td></tr>
+        <tr><td>Package vulnerabilities, without a lockfile</td><td><span class="conf conf-med">Medium</span></td><td>Checked at the lowest version the range allows, so advisories already fixed in the installed version may be reported. Such rows say so.</td></tr>
+        <tr><td>GitHub Actions vulnerabilities</td><td><span class="conf conf-med">Medium</span></td><td>Matches are exact, but few actions have published advisories, so “None known” carries little weight.</td></tr>
+        <tr><td>Severity</td><td><span class="conf conf-med">Medium</span></td><td>Taken from the advisory; many distribution advisories carry none (<i>not rated</i>).</td></tr>
+        <tr><td>Fixed version inside images</td><td><span class="conf conf-med">Medium</span></td><td>Derived from each advisory's affected ranges; operating-system version strings (epochs, revisions) are compared by their numbers.</td></tr>
+        <tr><td>Licenses</td><td><span class="conf conf-high">High</span></td><td>Read from registries and license files. A license file is named from its text only on a clear match to the SPDX text; otherwise it is left unnamed rather than guessed.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Not covered: indirect (transitive) dependencies, private registries, runtime configuration, and whether a vulnerable function is actually called.</p>
+  </section>
+
+  <section id="reading">
+    <h2>9. Reading the dashboard</h2>
+    <dl class="doc-dl">
+      <dt>nil and N/A</dt><dd><i>nil</i>: the value exists but could not be obtained; the tooltip gives the reason. <i>N/A</i>: there is no such value (a local action has no releases).</dd>
+      <dt>Filters</dt><dd>Within one filter the selected values are combined with OR; separate filters with AND. Each option shows how many items it would leave. The repository filters at the top apply to every tab. Filters are kept in the address, so a link shares the view.</dd>
+      <dt>Excel</dt><dd>Each table's spreadsheet button downloads the rows it shows, with filters applied. <b>Download all</b> exports everything on both branches without filters.</dd>
+    </dl>
+  </section>
+  </article>
+  </div>
+</main>
+</body>
+</html>

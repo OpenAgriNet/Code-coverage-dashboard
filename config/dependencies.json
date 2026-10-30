@@ -10,10 +10,10 @@
     "stars": true
   },
   "images": {
-    "_note": "Limits for Docker image lookups: images looked up at once, seconds to pull and scan one, findings kept per image, version tags compared to find the version behind latest, pages of 1000 tags read.",
+    "_note": "Limits for Docker image lookups: images looked up at once, seconds to pull and scan one, findings kept per image (all of them, for the Vulnerabilities tab), version tags compared to find the version behind latest, pages of 1000 tags read.",
     "workers": 4,
     "scan_timeout": 900,
-    "max_findings": 50,
+    "max_findings": 2000,
     "resolve_limit": 30,
     "max_tag_pages": 50
   },
@@ -63,46 +63,7 @@
     "terraform": "Terraform",
     "githubRelease": "CLI tool"
   },
-  "image_kinds": {
-    "_note": "What a Docker image is, shown as its ecosystem: the first keyword its full name contains (in this order). Add a keyword to class a new image.",
-    "pgvector": "Database",
-    "postgres": "Database",
-    "mysql": "Database",
-    "mariadb": "Database",
-    "mongo": "Database",
-    "clickhouse-server": "Database",
-    "cassandra": "Database",
-    "redis": "Cache",
-    "valkey": "Cache",
-    "memcached": "Cache",
-    "qdrant": "Vector / search",
-    "weaviate": "Vector / search",
-    "milvus": "Vector / search",
-    "elasticsearch": "Vector / search",
-    "opensearch": "Vector / search",
-    "minio": "Object storage",
-    "minio/mc": "Object storage",
-    "grafana": "Observability",
-    "loki": "Observability",
-    "prometheus": "Observability",
-    "jaeger": "Observability",
-    "zipkin": "Observability",
-    "opentelemetry": "Observability",
-    "otel/": "Observability",
-    "clickstack": "Observability",
-    "hyperdx": "Observability",
-    "langfuse": "Observability",
-    "ollama": "AI / LLM",
-    "temporal": "Workflow",
-    "nginx": "Proxy",
-    "traefik": "Proxy",
-    "envoy": "Proxy",
-    "keycloak": "Identity",
-    "kafka": "Messaging",
-    "rabbitmq": "Messaging",
-    "nats": "Messaging"
-  },
-  "default_image_kind": "Application",
+  "default_image_kind": "Container",
   "image_sources": {
     "_note": "An image's GitHub repository (owner/repo): its license is looked up there and its stars counted. Any spelling of the image matches.",
     "clickhouse/clickhouse-server": "ClickHouse/ClickHouse",
@@ -121,15 +82,9 @@
     "fidedocker/onix-adapter": "beckn/beckn-onix",
     "fidedocker/sandbox-2.0": "beckn/sandbox",
     "postgres": "postgres/postgres",
-    "pgvector/pgvector": "pgvector/pgvector"
+    "pgvector/pgvector": "pgvector/pgvector",
+    "redis": "redis/redis"
   },
-  "image_licenses": {
-    "_note": "A license stated for an image when nothing machine-readable gives one. Tried in order: name:tag, name@range for the version the tag points at today (>=7.4,<8; a partial tag such as 7 counts only when all its versions are in range), then name. Wins over every other source.",
-    "redis@<7.4": "BSD-3-Clause",
-    "redis@>=7.4,<8": "LicenseRef-RSALv2 OR SSPL-1.0",
-    "redis@>=8": "LicenseRef-RSALv2 OR SSPL-1.0 OR AGPL-3.0-only"
-  },
-  "license_texts": ["PostgreSQL"],
   "license_aliases": {
     "_note": "License texts found in image labels and in PyPI metadata (license text or classifier), and the license id they mean. LGPL with no version stated stays LGPL.",
     "apache license 2.0": "Apache-2.0",

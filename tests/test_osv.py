@@ -42,6 +42,7 @@ def test_annotate_summarises_items_fixed_in_and_severity():
           'GHSA-3': vuln('GHSA-3', severity='LOW')}
     d = run([dep()], db, ['GHSA-1', 'GHSA-2', 'GHSA-3'])[0]['vulns']
     assert d['count'] == 3 and d['severity'] == 'CRITICAL' and d['fixed_in'] == '3.1.5' and d['unfixed'] == 1
+    assert d['by_severity'] == {'CRITICAL': 1, 'MODERATE': 1, 'LOW': 1}
     assert d['checked_version'] == '3.1.0' and d['exact'] is True
     assert [i['id'] for i in d['items']] == ['GHSA-1', 'GHSA-2', 'GHSA-3'] and d['items'][0]['cve'] == 'CVE-1'
     assert d['items'][0]['url'] == 'https://osv.dev/vulnerability/GHSA-1'

@@ -9,6 +9,7 @@ from stackinfo.lookups.depsdev import D
 from stackinfo.lookups import licensetext
 PROJECTS={}
 LICENSES={}
+AT={}
 
 def project(repo):
  """deps.dev's record of github.com/<repo>, or None when it has none. Cached per run."""
@@ -25,8 +26,22 @@ def project_license(repo,api=None):
  if repo in LICENSES:return LICENSES[repo]
  lic=(project(repo) or {}).get('license')
  if not lic or lic in ('non-standard','NOASSERTION'):
-  file=(api or github.api)(f'/repos/{repo}/license') or {};got=file.get('license') or {}
-  lic=got.get('spdx_id') if got.get('spdx_id') not in (None,'NOASSERTION') else None
-  if not lic and file.get('content'):lic=licensetext.identify(base64.b64decode(file['content']).decode('utf-8','replace'))
+  lic=file_license((api or github.api)(f'/repos/{repo}/license'))
  LICENSES[repo]=lic
  return lic
+def file_license(file):
+ """SPDX license of a GitHub license-file answer: GitHub's detection, else the file's text matched to SPDX's."""
+ got=(file or {}).get('license') or {}
+ lic=got.get('spdx_id') if got.get('spdx_id') not in (None,'NOASSERTION') else None
+ if not lic and (file or {}).get('content'):lic=licensetext.identify(base64.b64decode(file['content']).decode('utf-8','replace'))
+ return lic
+def license_at(repo,version,api=None):
+ """License of owner/repo at the release tag of version (7.4.12 or v7.4.12), so an image is read at its own version: Redis 7.2
+ is BSD-3-Clause, 7.4 RSALv2 or SSPL. None when there is no such tag or no license file there. Cached per run."""
+ key=(repo,version)
+ if key not in AT:
+  AT[key]=None
+  for ref in (version,'v'+version):
+   file=(api or github.api)(f'/repos/{repo}/license?ref={quote(ref,safe="")}')
+   if file:AT[key]=file_license(file);break
+ return AT[key]

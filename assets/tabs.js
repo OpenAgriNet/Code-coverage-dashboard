@@ -31,7 +31,9 @@
       var j = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i + tabs.length - 1) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
       if (j >= 0) { e.preventDefault(); show(tabs[j].dataset.tab, true); }
     });
-    show(new URLSearchParams(location.search).get('tab') || tabs[0].dataset.tab);
+    var want = new URLSearchParams(location.search).get('tab');
+    if (want === 'about') { location.replace('methodology.html'); return; }   // the old How this is measured tab is now its own page
+    show(want || tabs[0].dataset.tab);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
