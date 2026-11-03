@@ -47,8 +47,8 @@
   const sevCells = q => { const n = sevCounts(q), any = Object.keys(n).length; return ['CRITICAL', 'HIGH', 'MODERATE', 'LOW', 'UNKNOWN'].map(k => q && q.count && any ? n[k] || 0 : null); };
   const why = d => Object.entries(d.missing || {}).map(([k, m]) => `${k}: ${m.why}`).join(' | ');
   // dependency rows ({...dependency, repository}): one row per package per repository
-  function dependencies(deps, labels, ecosystems) {
-    const eco = d => d.ecosystem === 'docker' ? d.kind || 'Container' : (ecosystems && ecosystems[d.ecosystem]) || d.ecosystem;
+  function dependencies(deps, labels) {
+    const eco = d => d.ecosystem === 'docker' && d.kind || d.ecosystem;   // an image's Docker Hub category, as on the page
     return [['Repository', 'Package', 'Short name', 'Ecosystem', 'Registry ecosystem', 'Version', 'Installed', 'Resolved', 'Groups', 'Latest', 'License', 'License class', 'License from', 'Stars',
       'Known vulnerabilities', 'Critical', 'High', 'Medium', 'Low', 'Not rated', 'Worst severity', 'Fixed in', 'Fixable', 'No fix released', 'Checked at version', 'Declared in', 'Source project', 'Source archived', 'Why a value is missing'],
       ...(deps || []).map(d => { const q = d.vulns;
@@ -74,18 +74,18 @@
       rows.push([d.repository, d.name, d.version, d.resolved, p.name, p.ecosystem, p.version, p.fixed || 'No fix', p.count, ...sevCells({ count: p.count, by_severity: p.by_severity }), p.unfixed]);
     return [['Repository', 'Image', 'Tag', 'Tag points to', 'Package inside', 'Package kind', 'Installed version', 'Fixed in', 'Advisories', 'Critical', 'High', 'Medium', 'Low', 'Not rated', 'With no fix'], ...rows];
   }
-  // the Vulnerabilities tab's rows (assets/vulns.js advisories): one row per advisory
+  // the Vulnerabilities tab's rows (assets/vulns.js advisories): one row per vulnerability (CVE, else advisory id)
   function advisories(list) {
-    return [['Advisory', 'Advisory id', 'Severity', 'Fix', 'Fixed in', 'Affected packages', 'Places found', 'Repositories', 'Dependencies or images', 'Summary', 'Link'],
-      ...(list || []).map(r => [r.cve || r.id, r.id, sevName(r.severity), { all: 'Fix released', some: 'Fixed in some places only', none: 'No fix released' }[r.fix],
+    return [['Vulnerability', 'Advisory ids', 'Severity', 'Distribution rating', 'Fix', 'Fixed in', 'Affected packages', 'Places found', 'Repositories', 'Dependencies or images', 'Summary', 'Link'],
+      ...(list || []).map(r => [r.id, (r.ids || []).map(x => x.id).join(', '), sevName(r.severity), (r.ratings || []).join(', ') || null, { all: 'Fix released', some: 'Fixed in some places only', none: 'No fix released' }[r.fix],
         [...r.fixes].join(', ') || 'No fix', r.packages.map(p => `${p.name} ${p.version}`).join(', '), r.places.length, r.repos.join(', '),
         [...new Set(r.places.map(p => p.dep.name))].join(', '), r.text, r.url])];
   }
   // every place each advisory was found: one row per advisory, dependency and repository
   function advisoryPlaces(list) {
     const rows = [];
-    for (const r of list || []) for (const p of r.places) rows.push([r.cve || r.id, sevName(r.severity), p.repository, p.dep.name, p.dep.version, p.pkg, p.version, p.fixed || 'No fix']);
-    return [['Advisory', 'Severity', 'Repository', 'Dependency or image', 'Its version', 'Affected package', 'Affected version', 'Fixed in'], ...rows];
+    for (const r of list || []) for (const p of r.places) rows.push([r.id, sevName(r.severity), p.repository, p.dep.name, p.dep.version, p.pkg, p.version, p.fixed || 'No fix']);
+    return [['Vulnerability', 'Severity', 'Repository', 'Dependency or image', 'Its version', 'Affected package', 'Affected version', 'Fixed in'], ...rows];
   }
   function policy(p) {
     p = p || {};

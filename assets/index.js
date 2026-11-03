@@ -230,7 +230,7 @@ function initFilters(){
 }
 async function initStack(){
   try{const res=await fetch('./data/stack.json',{cache:'no-store'});if(!res.ok)throw Error(res.status);stack=await res.json();Object.assign(RISK,withColour((stack.license_policy||{}).labels));
-    Deps.init({repos:()=>stackList().filter(shown),view:()=>view,org:()=>stack.organization,policy:stack.license_policy,ecosystems:(stack.display||{}).ecosystems});Vulns.init({view:()=>view});if(bar)bar.setItems(repoItems());fillStack();if(data.main.length)render()}   // repo stars come from stack.json
+    Deps.init({repos:()=>stackList().filter(shown),view:()=>view,org:()=>stack.organization,policy:stack.license_policy});Vulns.init({view:()=>view});if(bar)bar.setItems(repoItems());fillStack();if(data.main.length)render()}   // repo stars come from stack.json
   catch(e){$('stack-rows').innerHTML='<tr><td colspan="4" class="empty">data/stack.json is missing or unreadable.</td></tr>'}
 }
 async function init(){
@@ -257,15 +257,15 @@ const EXPORTS={
   dev:()=>[`openagrinet-coverage-${branchName()}`,[{name:`Coverage (${branchName()})`,rows:Export.coverage(lastShown['dev-rows'])}]],
   release:()=>[`openagrinet-releases`,[{name:'Releases',rows:Export.releases(lastShown['rel-rows'],relPick)}]],
   stack:()=>[`openagrinet-stack-${branchName()}`,[{name:`Stack (${branchName()})`,rows:Export.stack(lastShown['stack-rows'],(stack&&stack.license_policy||{}).labels)}]],
-  vulns:()=>[`openagrinet-vulnerabilities-${branchName()}`,[{name:`Advisories (${branchName()})`,rows:Export.advisories(Vulns.exportRows())},
+  vulns:()=>[`openagrinet-vulnerabilities-${branchName()}`,[{name:`Vulnerabilities (${branchName()})`,rows:Export.advisories(Vulns.exportRows())},
     {name:`Where found (${branchName()})`,rows:Export.advisoryPlaces(Vulns.exportRows())}]],
   deps:()=>{const {kind,rows}=Deps.exportRows(),s=stack||{},labels=(s.license_policy||{}).labels;
-    return [`openagrinet-dependencies-${branchName()}`,[{name:`${kind} (${branchName()})`,rows:Export.dependencies(rows,labels,(s.display||{}).ecosystems)},
+    return [`openagrinet-dependencies-${branchName()}`,[{name:`${kind} (${branchName()})`,rows:Export.dependencies(rows,labels)},
       {name:`Vulnerabilities (${branchName()})`,rows:Export.vulnerabilities(rows)},{name:`Image packages (${branchName()})`,rows:Export.imagePackages(rows)},{name:'License policy',rows:Export.policy(s.license_policy)}]]},
 };
 document.querySelectorAll('[data-export]').forEach(b=>b.addEventListener('click',()=>{const [f,sheets]=EXPORTS[b.dataset.export]();Xlsx.download(Export.filename(f),sheets)}));
 $('export-all').addEventListener('click',()=>{
-  const s=stack||{},labels=(s.license_policy||{}).labels,eco=(s.display||{}).ecosystems,dev=deps(s.repositories),main=deps(s.main||s.repositories);
+  const s=stack||{},labels=(s.license_policy||{}).labels,dev=deps(s.repositories),main=deps(s.main||s.repositories);
   Xlsx.download(Export.filename('openagrinet-dashboard'),[
     {name:'About',rows:[['Item','Value'],['Organization',data.organization||s.organization],['Coverage data updated',data.generated_at],['Stack data updated',s.generated_at],['Exported',new Date().toISOString()],
       ['Note','Everything on the dashboard, both branches, with no filters. Development is each repository\'s development branch, or its default branch when none was found.']]},
@@ -274,12 +274,12 @@ $('export-all').addEventListener('click',()=>{
     {name:'Releases (all versions)',rows:Export.releases(data.releases)},
     {name:'Stack (development)',rows:Export.stack(s.repositories,labels)},
     {name:'Stack (main)',rows:Export.stack(s.main||s.repositories,labels)},
-    {name:'Dependencies (development)',rows:Export.dependencies(dev,labels,eco)},
-    {name:'Dependencies (main)',rows:Export.dependencies(main,labels,eco)},
+    {name:'Dependencies (development)',rows:Export.dependencies(dev,labels)},
+    {name:'Dependencies (main)',rows:Export.dependencies(main,labels)},
     {name:'Vulnerabilities (development)',rows:Export.vulnerabilities(dev)},
     {name:'Vulnerabilities (main)',rows:Export.vulnerabilities(main)},
-    {name:'Advisories (development)',rows:Export.advisories(Vulns.advisories(dev))},
-    {name:'Advisories (main)',rows:Export.advisories(Vulns.advisories(main))},
+    {name:'Unique vulns (development)',rows:Export.advisories(Vulns.advisories(dev))},
+    {name:'Unique vulns (main)',rows:Export.advisories(Vulns.advisories(main))},
     {name:'Image packages (development)',rows:Export.imagePackages(dev)},
     {name:'Image packages (main)',rows:Export.imagePackages(main)},
     {name:'License policy',rows:Export.policy(s.license_policy)},

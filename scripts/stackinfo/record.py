@@ -61,7 +61,7 @@ def stack_record(t,analyse=run_analyser,info=dep_info,vulns=annotate,actions=ann
   (tools or annotate_releases)(deps)   # rows exist only when dependencies.checks.workflow_tools listed them
   if settings.check('stars'):(stars or annotate_stars)(deps)
   (repo_state or annotate_repo_state)(deps)   # archived source repositories; guessed ones that do not exist
-  (kinds or add_kinds)(deps)   # what each image is: its Docker Hub categories, else its source repository's topics
+  (kinds or add_kinds)(deps)   # what each image is: its first Docker Hub category
   (licenses or fill_licenses)(out['dependencies'])
   for d in out['dependencies']:d['license_class']=classify(d.get('license'),policy)
   explain(out['dependencies'])   # every empty latest, license and vulns gets a reason

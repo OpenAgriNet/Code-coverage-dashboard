@@ -82,7 +82,7 @@
 
   <section id="sec-deps" role="tabpanel" aria-labelledby="tab-deps" hidden>
     <div class="sec-head"><div><h2 id="dep-title">All dependencies</h2><p class="sub" id="dep-note"></p></div>
-      <div class="sortby"><label class="sub" for="dep-sort">Sort by</label>
+      <div class="sortby"><label class="sub minor-label" title="Debian rates some findings unimportant (Ubuntu: negligible): it does not consider them security problems in practice and will not fix them. They are left out of every count unless this is ticked."><input type="checkbox" class="minor-switch"> Include minor</label><label class="sub" for="dep-sort">Sort by</label>
         <select class="ver" id="dep-sort">
           <option value="repo">Repository</option>
           <option value="severe">Most severe first (critical, then high, ...)</option>
@@ -108,19 +108,19 @@
 
   <section id="sec-vulns" role="tabpanel" aria-labelledby="tab-vulns" hidden>
     <div class="sec-head"><div><h2>Vulnerabilities</h2><p class="sub" id="vuln-note"></p></div>
-      <div class="sortby"><label class="sub" for="vuln-sort">Sort by</label>
+      <div class="sortby"><label class="sub minor-label" title="Debian rates some findings unimportant (Ubuntu: negligible): it does not consider them security problems in practice and will not fix them. They are left out of every count unless this is ticked."><input type="checkbox" class="minor-switch"> Include minor</label><label class="sub" for="vuln-sort">Sort by</label>
         <select class="ver" id="vuln-sort">
           <option value="severe">Most severe first</option>
           <option value="places">Found in the most places</option>
           <option value="nofix">No fix released first</option>
           <option value="pkg">Affected package</option>
-          <option value="id">Advisory id</option>
+          <option value="id">CVE or advisory id</option>
         </select><button type="button" class="btn btn-sm btn-xl" data-export="vulns" title="Download the advisories this table shows (branch and filters applied) as Excel: one sheet of advisories, one of every place each was found" aria-label="Download as Excel"><svg class="xl-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="3" fill="#1D6F42"/><path d="M2 8.5h20M2 13h20M2 17.5h20M9 3v18M15.5 3v18" stroke="#fff" stroke-opacity=".55" stroke-width="1"/><rect x="2" y="3" width="7" height="18" rx="3" fill="#185C37"/><path d="M3.6 8.2l3.8 7.6M7.4 8.2l-3.8 7.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg><span class="sr">Excel</span></button></div>
     </div>
     <div class="kpis" id="kpi-vulns" aria-label="Vulnerabilities at a glance"></div>
     <div id="vuln-filters"></div>
     <div class="table-wrap"><table class="vulns">
-      <thead><tr><th scope="col">Advisory</th><th scope="col">Severity</th><th scope="col">Affected package</th><th scope="col">Found in</th><th scope="col">Fixed in</th><th scope="col">Summary</th></tr></thead>
+      <thead><tr><th scope="col">Vulnerability</th><th scope="col">Severity</th><th scope="col">Affected package</th><th scope="col">Found in</th><th scope="col">Fixed in</th><th scope="col">Summary</th></tr></thead>
       <tbody id="vuln-rows"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
     </table></div>
     <nav id="vuln-pager" aria-label="Pages of advisories"></nav>

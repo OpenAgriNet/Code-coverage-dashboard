@@ -38,3 +38,5 @@ table.deps.images th:first-child{width:24%}table.deps.images th:nth-child(2){wid
 .policy-h{font-size:16px;margin:28px 0 10px}
 table.vulns{min-width:980px}table.vulns th:first-child{width:15%}table.vulns th:nth-child(2){width:9%}table.vulns th:nth-child(3){width:19%}table.vulns th:nth-child(4){width:22%}table.vulns th:nth-child(5){width:12%}
 .vsum{font-size:13px;color:var(--muted)}
+.minor-label{display:inline-flex;align-items:center;gap:6px;margin-right:6px;cursor:pointer}.minor-label input{accent-color:var(--link)}
+tr.row-minor>td{opacity:.6}

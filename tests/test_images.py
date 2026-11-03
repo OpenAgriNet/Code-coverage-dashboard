@@ -433,3 +433,16 @@ def test_counts_by_severity_and_packages_cover_every_item(monkeypatch):
     monkeypatch.setitem(settings.CURRENT['images'], 'max_findings', 5)
     zlib = sc.summarize([it('1', 'HIGH', '1.2', 'zlib'), it('3', 'HIGH', '1.10', 'zlib'), it('4', 'LOW', None, 'zlib')])['packages'][0]
     assert zlib['fixed'] == '1.10' and zlib['by_severity'] == {'HIGH': 2, 'LOW': 1} and zlib['severity'] == 'HIGH' and zlib['ecosystem'] == 'Debian:12'
+
+
+def test_the_distributions_own_rating_marks_minor_findings():
+    deb = {'id': 'DEBIAN-CVE-1', 'affected': [{'package': {'ecosystem': 'Debian:12', 'name': 'glibc'}, 'ecosystem_specific': {'urgency': 'unimportant'}}]}
+    ubu = {'id': 'UBUNTU-CVE-2', 'severity': [{'type': 'CVSS_V3', 'score': 'CVSS:3.1/AV:N'}, {'type': 'Ubuntu', 'score': 'negligible'}]}
+    assert sc.distro_rating(deb, 'Debian:12', 'glibc') == 'unimportant' and sc.distro_rating(deb, 'Debian:12', 'zlib') is None
+    assert sc.distro_rating(ubu, 'Ubuntu:22.04:LTS', 'glibc') == 'negligible' and sc.distro_rating(deb, 'Alpine:v3.20', 'glibc') is None
+    scan = {'results': [{'packages': [{'package': {'name': 'glibc', 'version': '2.36-9', 'ecosystem': 'Debian:12'},
+             'vulnerabilities': [deb], 'groups': [{'ids': ['DEBIAN-CVE-1'], 'aliases': ['CVE-1'], 'max_severity': '9.8'}]}]}]}
+    items = sc.items_of(scan)
+    assert items[0]['minor'] is True and items[0]['distro_rating'] == 'unimportant' and items[0]['severity'] == 'CRITICAL'
+    got = sc.summarize(items)
+    assert got['minor'] == 1 and got['count'] == 1 and got['packages'][0]['minor'] == 1   # still counted by the collector; the page decides

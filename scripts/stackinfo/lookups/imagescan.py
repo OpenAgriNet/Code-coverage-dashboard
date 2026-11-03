@@ -19,6 +19,21 @@ def _score(s):
  try:x=float(s)
  except (TypeError,ValueError):return None
  return 'CRITICAL' if x>=9 else 'HIGH' if x>=7 else 'MODERATE' if x>=4 else 'LOW' if x>0 else None
+# what a distribution calls a flaw it will not fix because it does not matter in practice
+MINOR={'unimportant','negligible'}
+def distro_rating(rec,eco,name):
+ """The distribution's own rating of an advisory for this package: Debian's urgency (unimportant, low, medium, high, not yet
+ assigned) or Ubuntu's priority (negligible, low, medium, high, critical), as OSV records them; None for other sources."""
+ base=eco.split(':')[0]
+ if base=='Debian':
+  for a in rec.get('affected') or []:
+   p=a.get('package') or {}
+   if p.get('ecosystem','').split(':')[0]=='Debian' and normal(p.get('name',''))==normal(name):
+    u=(a.get('ecosystem_specific') or {}).get('urgency')
+    if u:return str(u).lower()
+ if base=='Ubuntu':
+  return next((str(x.get('score')).lower() for x in rec.get('severity') or [] if x.get('type')=='Ubuntu' and x.get('score')),None)
+ return None
 def items_of(result):
  """One vulnerability item per package and advisory group in osv-scanner's JSON, in the shape osv.py gives OSV advisories."""
  out=[];seen=set()
@@ -34,19 +49,20 @@ def items_of(result):
     vid=ids[0] if ids else '?'
     if (vid,name,ver) in seen:continue   # the same package can be listed once per layer or sub-package
     seen.add((vid,name,ver))
+    rating=distro_rating(rec,eco,name)
     out.append({'id':vid,'cve':next((a for a in g.get('aliases') or [] if a.startswith('CVE-')),None),'summary':f'{name} {ver}: {text}',
      'severity':sev,'fixed':min(fixes,key=loose) if fixes else None,'url':f'https://osv.dev/vulnerability/{vid}',
-     'package':name,'version':ver,'ecosystem':eco})
+     'package':name,'version':ver,'ecosystem':eco,**({'distro_rating':rating} if rating else {}),**({'minor':True} if rating in MINOR else {})})
  return out
 def summarize(items):
  """Like osv.summarize, but no single fixed_in: the fixes belong to different packages inside the image.
  items keeps the worst dependencies.images.max_findings (fixable first within a severity; postgres alone has hundreds);
- count, fixable, unfixed, by_severity and packages cover all of them."""
+ count, fixable, unfixed, by_severity, minor (rated unimportant or negligible by the distribution) and packages cover all of them."""
  rank=lambda i:SEVERITIES.index(i['severity']) if i['severity'] in SEVERITIES else -1
  fixable=sum(1 for i in items if i['fixed'])
  worst=sorted(items,key=lambda i:(-rank(i),i['fixed'] is None,i['summary']))
  return {'count':len(items),'severity':worst[0]['severity'] if items else None,'fixed_in':None,'fixable':fixable,'unfixed':len(items)-fixable,
-  'by_severity':by_severity(items),'packages':packages(worst)[:settings.get('images','max_findings')],'items':worst[:settings.get('images','max_findings')]}
+  'by_severity':by_severity(items),'minor':sum(1 for i in items if i.get('minor')),'packages':packages(worst)[:settings.get('images','max_findings')],'items':worst[:settings.get('images','max_findings')]}
 def packages(worst):
  """The affected packages inside the image, worst first: each with its installed version, how many advisories of each severity,
  and fixed, the lowest version that fixes all of its fixable ones (the highest of their fixes). Covers every item, not only the listed ones."""
@@ -54,8 +70,8 @@ def packages(worst):
  for i in worst:
   if 'package' not in i:continue   # items written before packages were named
   p=out.setdefault((i['package'],i['version'],i.get('ecosystem','')),{'name':i['package'],'version':i['version'],'ecosystem':i.get('ecosystem',''),
-   'severity':i['severity'],'count':0,'unfixed':0,'fixed':None,'items':[]})
-  p['count']+=1;p['items'].append(i)
+   'severity':i['severity'],'count':0,'unfixed':0,'minor':0,'fixed':None,'items':[]})
+  p['count']+=1;p['items'].append(i);p['minor']+=bool(i.get('minor'))
   if not i['fixed']:p['unfixed']+=1
   elif p['fixed'] is None or loose(i['fixed'])>loose(p['fixed']):p['fixed']=i['fixed']
  res=[]
