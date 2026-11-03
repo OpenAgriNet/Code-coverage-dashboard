@@ -53,17 +53,6 @@
       "registry.opentofu.org"
     ]
   },
-  "ecosystem_names": {
-    "_note": "Names shown in the Ecosystem column and filter.",
-    "npm": "Node.js",
-    "python": "Python",
-    "golang": "Go",
-    "docker": "Container",
-    "githubAction": "GitHub Actions",
-    "terraform": "Terraform",
-    "githubRelease": "CLI tool"
-  },
-  "default_image_kind": "Container",
   "image_sources": {
     "_note": "An image's GitHub repository (owner/repo): its license is looked up there and its stars counted. Any spelling of the image matches.",
     "clickhouse/clickhouse-server": "ClickHouse/ClickHouse",

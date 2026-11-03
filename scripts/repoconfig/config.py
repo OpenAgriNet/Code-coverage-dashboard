@@ -57,14 +57,14 @@ def license_policy(raw):
  out['no_license']=raw.get('no_license')
  if out['no_license'] not in (None,*LICENSE_CLASSES):raise ConfigError(f'licenses.no_license must be one of {", ".join(LICENSE_CLASSES)} (or left out)')
  return out
-# The dependency scan's settings live in config/dependencies.json (every mapping: image sources and licenses, image kinds, names,
+# The dependency scan's settings live in config/dependencies.json (every mapping: image sources, license spellings,
 # group aliases, ...). The built-in defaults are only switches and limits, so a missing file means 'everything on, nothing mapped'.
 DEPENDENCY_DEFAULTS={
  'checks':{'vulnerabilities':True,'actions':True,'images':True,'terraform':True,'workflow_tools':True,'stars':True},
  'images':{'workers':4,'scan_timeout':900,'max_findings':50,'resolve_limit':30,'max_tag_pages':50},
  'groups':{'aliases':{},'workflow_purposes':{},'default_workflow_group':'ci','by_ecosystem':{}},
  'terraform':{'trusted_registries':[]},
- 'license_aliases':{},'ecosystem_names':{},'default_image_kind':'Container','image_sources':{},
+ 'license_aliases':{},'image_sources':{},
 }
 IMAGE_LIMITS={'workers':(1,16),'scan_timeout':(60,3600),'max_findings':(1,5000),'resolve_limit':(0,200),'max_tag_pages':(1,500)}
 def _keys(raw,allowed,where):
@@ -83,11 +83,8 @@ def _image_sources(raw):
  bad=[f'{k}: {v}' for k,v in out.items() if not GITHUB_REPO.fullmatch(v)]
  if bad:raise ConfigError(f'dependencies.image_sources must map an image to a GitHub repository written owner/repo; not: {", ".join(bad)}')
  return out
-def _name(v,where):
- if not isinstance(v,str) or not v.strip():raise ConfigError(f'{where} must be a name')
- return v.strip()
 def dependency_settings(raw):
- """The dependency scan's switches, limits and names: config/repos.json's "dependencies" block over DEPENDENCY_DEFAULTS."""
+ """The dependency scan's switches, limits and mappings: config/repos.json's "dependencies" block over DEPENDENCY_DEFAULTS."""
  D=DEPENDENCY_DEFAULTS;raw=_keys(raw,D,'dependencies')
  checks={**D['checks'],**_keys(raw.get('checks'),D['checks'],'dependencies.checks')}
  for k,v in checks.items():
@@ -106,8 +103,6 @@ def dependency_settings(raw):
  tf['trusted_registries']=name_list(tf,'trusted_registries','dependencies.terraform')
  return {'checks':checks,'images':images,'groups':groups,'terraform':tf,
   'license_aliases':_text_map(raw.get('license_aliases',D['license_aliases']),'dependencies.license_aliases',lower_keys=True),
-  'ecosystem_names':{**D['ecosystem_names'],**_text_map(raw.get('ecosystem_names',{}),'dependencies.ecosystem_names')},
-  'default_image_kind':_name(raw.get('default_image_kind',D['default_image_kind']),'dependencies.default_image_kind'),
   'image_sources':_image_sources(raw.get('image_sources',{}))}
 def releases(raw,base,where):
  """Effective release-finding settings: `base` (or the defaults) overridden by `raw`. None when `raw` is false (releases off)."""

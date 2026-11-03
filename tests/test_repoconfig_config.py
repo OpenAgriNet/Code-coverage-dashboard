@@ -193,12 +193,12 @@ def test_license_labels_default_and_can_be_renamed_one_at_a_time():
 def test_built_in_dependency_defaults_are_switches_and_limits_only():
     d = n()['dependencies']
     assert all(d['checks'].values()) and d['images']['workers'] == 4 and d['groups']['default_workflow_group'] == 'ci'
-    assert d['groups']['aliases'] == {} and d['terraform']['trusted_registries'] == [] and d['ecosystem_names'] == {}
+    assert d['groups']['aliases'] == {} and d['terraform']['trusted_registries'] == []
 
 def test_the_mappings_come_from_config_dependencies_json():
     d = config.load('config/repos.json')['dependencies']
     assert d['groups']['aliases']['tests'] == 'test' and d['groups']['by_ecosystem'] == {'docker': 'runtime', 'githubAction': 'ci'}
-    assert d['terraform']['trusted_registries'] == ['registry.terraform.io', 'registry.opentofu.org'] and d['ecosystem_names']['golang'] == 'Go'
+    assert d['terraform']['trusted_registries'] == ['registry.terraform.io', 'registry.opentofu.org'] and 'ecosystem_names' not in d
     assert d['image_sources']['fidedocker/onix-adapter'] == 'beckn/beckn-onix' and d['image_sources']['redis'] == 'redis/redis' and 'image_licenses' not in d
     assert '_note' not in d['checks']   # notes document the file and are dropped
 
@@ -215,11 +215,9 @@ def test_a_missing_or_broken_dependencies_file(tmp_path):
         config.load(str(tmp_path / 'repos.json'))
 
 def test_dependency_settings_override_one_key_at_a_time():
-    d = n(dependencies={'checks': {'images': False}, 'images': {'workers': 2}, 'groups': {'aliases': {'Specs': 'test'}},
-                        'ecosystem_names': {'golang': 'Go Modules'}})['dependencies']
+    d = n(dependencies={'checks': {'images': False}, 'images': {'workers': 2}, 'groups': {'aliases': {'Specs': 'test'}}})['dependencies']
     assert d['checks']['images'] is False and d['checks']['actions'] is True and d['images']['workers'] == 2 and d['images']['scan_timeout'] == 900
     assert d['groups']['aliases'] == {'specs': 'test'}   # a map given replaces the default, keys compared in lower case
-    assert d['ecosystem_names'] == {'golang': 'Go Modules'}
 
 @pytest.mark.parametrize('bad,msg', [
     ({'scan': True}, 'unknown key'),

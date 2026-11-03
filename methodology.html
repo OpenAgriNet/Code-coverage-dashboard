@@ -16,7 +16,7 @@
   <header class="doc-head">
     <p class="doc-kicker">Methodology</p>
     <h1>How this dashboard is measured</h1>
-    <p class="doc-lede">Where every number on the dashboard comes from, how it is calculated, how much confidence it deserves, and what it does not cover. Every value is read from a public source or from the repositories themselves on each refresh; nothing is entered by hand except the list of repositories to track and the license policy.</p>
+    <p class="doc-lede">Where every number on the dashboard comes from, how it is calculated, how much confidence it deserves, and what it does not cover. Every value is read from a public source or from the repositories themselves on each refresh. Entered by hand, in <code>config/repos.json</code> and <code>config/dependencies.json</code>: the repositories to track, the license policy, the GitHub repository of some images (<code>image_sources</code>), spellings of license names (<code>license_aliases</code>), group names, and limits.</p>
   </header>
 
   <div class="doc-grid">
@@ -73,8 +73,8 @@
       <dt>Version</dt><dd>The version the manifest declares. When it declares a range (<code>^5.0.0</code>) and a lockfile is present (<code>package-lock.json</code>, <code>uv.lock</code>, <code>poetry.lock</code>), the installed version from the lockfile is shown and used for every lookup.</dd>
       <dt>Group</dt><dd>Where the project declares the package: main, dev, test, optional, peer or a named group, as the repository names it. Docker images are <i>runtime</i>; GitHub Actions are <i>ci</i>.</dd>
       <dt>Latest</dt><dd>Packages: the newest release on <a href="https://deps.dev" target="_blank" rel="noopener">deps.dev</a>. Actions: the latest GitHub Release. Images: the newest tag of the same shape in the image's registry (<code>17</code> → <code>18</code>, <code>25.7-alpine</code> → <code>25.12-alpine</code>). For a floating tag such as <code>latest</code>, the version it points to today is found by comparing image digests, and its newest version is compared with that.</dd>
-      <dt>Image kind</dt><dd>The first category Docker Hub files the image under, as Docker Hub writes it; otherwise the first GitHub topic of the image's source repository; otherwise <i>Container</i>.</dd>
-      <dt>Stars and archived</dt><dd>GitHub stars of the dependency's source repository (from deps.dev, else GitHub), or Docker Hub stars for an image with no known repository. A repository archived on GitHub is marked <i>archived</i>.</dd>
+      <dt>Ecosystem</dt><dd>The ecosystem id the scan found the dependency under (<code>npm</code>, <code>python</code>, <code>golang</code>, <code>githubAction</code>), not renamed. For a Docker image, the first category Docker Hub files it under, as Docker Hub writes it; an image with no Docker Hub category shows <code>docker</code>. Packages inside an image show the ecosystem osv-scanner reports (<i>Debian 12</i>, <i>Maven</i>).</dd>
+      <dt>Stars and archived</dt><dd>GitHub stars of the dependency's source repository as deps.dev records them, or Docker Hub stars for an image with no known repository. The tracked repositories' own stars come from GitHub. A repository archived on GitHub is marked <i>archived</i>.</dd>
     </dl>
   </section>
 
@@ -92,7 +92,7 @@
 
   <section id="vulnerabilities">
     <h2>7. Vulnerabilities</h2>
-    <p>A vulnerability is one published advisory about one flaw (for example <code>CVE-2024-1234</code>), naming the affected package, the affected versions, a severity and, where one exists, the version that fixes it. The Vulnerabilities tab lists each advisory once, with every place it was found.</p>
+    <p>An advisory is a published notice about a flaw, naming the affected package, the affected versions, a severity and, where one exists, the version that fixes it. One flaw often has several advisories: its CVE, and one each from Debian, Ubuntu, Red Hat or Chainguard for their own packages. The Vulnerabilities tab shows one row per flaw, by its CVE where it has one, listing the advisories and every place it was found; a dependency's own count is of advisories as its source reports them.</p>
     <div class="table-wrap"><table class="doc-table">
       <thead><tr><th scope="col">Kind</th><th scope="col">Source</th><th scope="col">Checked at</th></tr></thead>
       <tbody>
@@ -103,7 +103,8 @@
       </tbody>
     </table></div>
     <dl class="doc-dl">
-      <dt>Severity</dt><dd>The severity the advisory states, or its CVSS score banded as critical (9.0+), high (7.0–8.9), medium (4.0–6.9) and low. Advisories with neither are <i>not rated</i>.</dd>
+      <dt>Severity</dt><dd>Packages and actions: the severity the advisory states (GitHub's rating); an advisory without one is <i>not rated</i>, even when it carries a CVSS score. Images: the highest CVSS score of the advisory group as osv-scanner reports it, banded as critical (9.0+), high (7.0–8.9), medium (4.0–6.9) and low, else the advisory's stated severity, else <i>not rated</i>.</dd>
+      <dt>Minor findings</dt><dd>Debian rates some flaws in its packages <i>unimportant</i> and Ubuntu <i>negligible</i>: the distribution does not consider them security problems in practice and will not fix them. The rating is read from the advisory itself. Such findings are left out of every count by default; <b>Include minor</b> on the dependency and vulnerability tabs counts them, shown faded.</dd>
       <dt>Fixed in</dt><dd>For a package, the lowest version that fixes every fixable advisory. For an image, each fix belongs to a package inside it; a newer image tag usually includes them.</dd>
       <dt>Not checked</dt><dd>Shown as <i>nil</i> with its reason: an unresolved <code>${VAR}</code> tag, a private or locally built image, an unpinned version, or a failed lookup. A failed lookup is never shown as “None known”.</dd>
     </dl>
@@ -117,13 +118,15 @@
       <tbody>
         <tr><td>Image identity and version</td><td><span class="conf conf-high">High</span></td><td>The exact tag is scanned; the version behind a partial or floating tag is matched by image digest, not inferred from its name. A floating tag can move between the run and the time of reading.</td></tr>
         <tr><td>Packages inside an image</td><td><span class="conf conf-high">High</span></td><td>Read from the image's own package database (dpkg, apk) and from build information compiled into Go and Java programs.</td></tr>
-        <tr><td>Image vulnerabilities</td><td><span class="conf conf-med">Medium</span></td><td>Every advisory matching an installed version is reported, including ones the distribution marks as disputed, minor or “will not fix”. Counts are therefore likely higher than those of scanners that apply distribution status (Trivy, Grype). Whether the vulnerable code is reachable is not assessed.</td></tr>
+        <tr><td>Image vulnerabilities</td><td><span class="conf conf-med">Medium</span></td><td>Every advisory matching an installed version is found. Findings Debian or Ubuntu rate unimportant or negligible are left out of the counts; other distribution statuses (disputed, postponed) are not read, so counts may still be higher than those of Trivy or Grype. Whether the vulnerable code is reachable is not assessed.</td></tr>
         <tr><td>Package vulnerabilities, with a lockfile</td><td><span class="conf conf-high">High</span></td><td>Checked at the exact installed version against OSV.dev.</td></tr>
         <tr><td>Package vulnerabilities, without a lockfile</td><td><span class="conf conf-med">Medium</span></td><td>Checked at the lowest version the range allows, so advisories already fixed in the installed version may be reported. Such rows say so.</td></tr>
         <tr><td>GitHub Actions vulnerabilities</td><td><span class="conf conf-med">Medium</span></td><td>Matches are exact, but few actions have published advisories, so “None known” carries little weight.</td></tr>
         <tr><td>Severity</td><td><span class="conf conf-med">Medium</span></td><td>Taken from the advisory; many distribution advisories carry none (<i>not rated</i>).</td></tr>
         <tr><td>Fixed version inside images</td><td><span class="conf conf-med">Medium</span></td><td>Derived from each advisory's affected ranges; operating-system version strings (epochs, revisions) are compared by their numbers.</td></tr>
         <tr><td>Licenses</td><td><span class="conf conf-high">High</span></td><td>Read from registries and license files. A license file is named from its text only on a clear match to the SPDX text; otherwise it is left unnamed rather than guessed.</td></tr>
+        <tr><td>License marked <i>(latest)</i> or <i>(main package)</i></td><td><span class="conf conf-low">Low</span></td><td><i>(latest)</i>: the listed version is unknown to deps.dev, so the latest release's license is shown. <i>(main package)</i>: the program inside an image is found by matching package names to the image name, which can pick the wrong package.</td></tr>
+        <tr><td>Image kind</td><td><span class="conf conf-med">Medium</span></td><td>The first Docker Hub category as listed, which is not always the image's main purpose. Images outside Docker Hub have none.</td></tr>
       </tbody>
     </table></div>
     <p>Not covered: indirect (transitive) dependencies, private registries, runtime configuration, and whether a vulnerable function is actually called.</p>

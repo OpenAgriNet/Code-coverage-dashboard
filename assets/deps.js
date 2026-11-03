@@ -4,8 +4,6 @@
 (function (root) {
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-// built-in names for data written before dependencies.ecosystem_names and image kinds; the data's own names replace them
-const ECO={npm:'Node.js',python:'Python',golang:'Go',docker:'Container',githubAction:'GitHub Actions',terraform:'Terraform',githubRelease:'CLI tool'};
 // a Docker image reference split into its registry (Docker Hub when none is named) and its repository path
 function image(n){const p=n.split('/'),host=p.length>1&&/[.:]|^localhost$/.test(p[0]);return {registry:host?p[0]:'docker.io',path:(host?p.slice(1):p).join('/')}}
 const LINK={npm:n=>`https://www.npmjs.com/package/${n}`,python:n=>`https://pypi.org/project/${n}/`,golang:n=>`https://pkg.go.dev/${n}`,
@@ -21,10 +19,11 @@ const starCount=n=>!Number.isFinite(n)||n<0?'':n>=1e6?(n/1e6).toFixed(1).replace
 const STAR='<svg class="star-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Zm0 2.445L6.615 5.5a.75.75 0 0 1-.564.41l-3.097.45 2.24 2.184a.75.75 0 0 1 .216.664l-.528 3.084 2.769-1.456a.75.75 0 0 1 .698 0l2.77 1.456-.53-3.084a.75.75 0 0 1 .216-.664l2.24-2.183-3.096-.45a.75.75 0 0 1-.564-.41L8 2.694Z"/></svg>';
 const starChip=(n,of)=>!Number.isFinite(n)?'':` <span class="stars" title="${esc(n.toLocaleString()+' stars on '+of)}">${STAR}${starCount(n)}<span class="sr"> stars</span></span>`;
 // an image's ecosystem is what it is (Database, Cache, Observability, ...) as the collector classed it
-const ecoOf=d=>d.ecosystem==='docker'?d.kind||'docker':d.ecosystem;
+// what a dependency is: the ecosystem id the scan found it under, or an image's first Docker Hub category; never renamed
+const ecoOf=d=>d.ecosystem==='docker'&&d.kind||d.ecosystem;
 const LOOKED=['npm','python','golang','githubAction'];
 // where an image's kind was read: its Docker Hub category or its source repository's GitHub topic
-const kindTitle=d=>d.ecosystem!=='docker'?'':` title="${esc(d.kind_of==='docker hub'?'The first category Docker Hub files this image under':d.kind_of==='github topic'?'The first GitHub topic of its source repository (Docker Hub gives no category)':'Neither Docker Hub nor its source repository says what this image is')}"`;
+const kindTitle=d=>d.ecosystem!=='docker'?'':` title="${esc(d.kind?'The first category Docker Hub files this image under':'Docker Hub files this image under no category')}"`;
 const RISK={green:'Preferred (green)',yellow:'Not recommended (yellow)',red:'Restricted use (red)',unclassified:'Unclassified',none:'No license',na:'Not looked up'};
 const GROUP={main:'main (installed with the app)',dev:'dev',test:'test',security:'security',optional:'optional',peer:'peer',runtime:'runtime (Docker image)',ci:'ci (GitHub Action)',tool:'tool','(not found)':'not found in a manifest'};
 const UPDATE={behind:'Update available',current:'Up to date',unknown:'Unknown'};
@@ -78,7 +77,7 @@ const sevOf=d=>{const q=d.vulns;if(!q||!q.count)return [];const n=sevCounts(q);r
 
 // parameters start with d, so they do not clash with the page's repository filters (repo, vuln, risk, license, q)
 const FACETS=[
-  {key:'ecosystem',param:'deco',label:'Ecosystem',get:ecoOf,valueLabel:v=>ECO[v]||v},
+  {key:'ecosystem',param:'deco',label:'Ecosystem',get:ecoOf},
   {key:'license',param:'dlicense',label:'License',get:d=>d.license||'(none)'},
   {key:'risk',param:'drisk',label:'License risk',get:riskOf,valueLabel:v=>RISK[v]||v,order:['red','yellow','green','unclassified','none','na']},
   {key:'vuln',param:'dvuln',label:'Vulnerabilities',hint:'Number of dependencies',get:vulnOf,
@@ -98,9 +97,8 @@ const NIL=why=>`<span class="muted" title="${esc(why)}">nil</span>`,NA=why=>`<sp
 const missingCell=(d,col)=>{const m=d.missing&&d.missing[col];return m?(m.state==='na'?NA(m.why):NIL(m.why)):null};
 
 /* ---- packages inside an image: what osv-scanner found them as ---- */
-const OS=/^(Debian|Ubuntu|Alpine|Wolfi|Chainguard|Red Hat|Rocky Linux|AlmaLinux|SUSE|openSUSE|Amazon Linux|Photon OS|Mariner|Azure Linux|CentOS|Oracle Linux)/i;
-const INNER={Go:'Go module, compiled into a program',Maven:'Java library (Maven)',npm:'Node.js package',PyPI:'Python package','crates.io':'Rust crate',RubyGems:'Ruby gem',NuGet:'.NET package',Packagist:'PHP package'};
-function innerKind(e){const [n,v]=String(e||'').split(':');return !n?'Package':OS.test(n)?`${n}${v?' '+v.replace(/^v/,''):''} system package`:INNER[n]||n}
+// an image package's ecosystem as osv-scanner reports it (Debian:12, Alpine:v3.24, Go, Maven), shown with a space for the colon
+function innerKind(e){return String(e||'').replace(':',' ')||'not stated'}
 // each affected package in the image with its installed version and the version that fixes it; from the collector's
 // rollup, or (older data) from the listed advisories, whose summaries read "glibc 2.36-9: ..."
 function innerPackages(q){
@@ -161,11 +159,11 @@ function vulnCell(d){
   if(local(d))return NA('An action in this repository, not a published package');
   if(!q&&missingCell(d,'vulns'))return missingCell(d,'vulns');
   if(!q)return NIL(d.ecosystem==='docker'?'Not scanned: the tag is an unresolved ${VAR}, the image could not be pulled anonymously (private, or built locally), or the scan failed':d.ecosystem==='githubAction'?'Not checked: pinned to a branch or a commit no release tag points at, or the GitHub lookup failed':LOOKED.includes(d.ecosystem)?'Not checked: the version is not exact or the lookup failed':'Not checked: vulnerability lookup does not cover this ecosystem yet');
-  if(!q.count)return '<span class="good">None known</span>';
+  if(!q.count)return '<span class="good">None known</span>'+hiddenNote(q);
   const n=sevCounts(q),img=d.ecosystem==='docker';
   const where=img?` <span class="sub">${q.packages?`in ${q.packages.length} ${q.packages.length===1?'package':'packages'} inside the image`:'inside the image'}</span>`:'';
   const note=q.exact===false?`<div class="sub">Checked at ${esc(q.checked_version)}, the lowest version the range allows</div>`:'';
-  return `<span class="${SEVCLASS[q.severity]||'warn'} vcount">${q.count} known</span>${where}<div>${n?sevChips(n):`<span class="sub">worst ${esc(SEVNAME[q.severity]||q.severity)}; breakdown after the next refresh</span>`}</div>${note}`;
+  return `<span class="${SEVCLASS[q.severity]||'warn'} vcount">${q.count} known</span>${where}<div>${n?sevChips(n):`<span class="sub">worst ${esc(SEVNAME[q.severity]||q.severity)}; breakdown after the next refresh</span>`}</div>${note}${hiddenNote(q)}`;
 }
 function fixCell(d){
   const q=d.vulns;
@@ -207,11 +205,11 @@ const opener=(d,i,c)=>d.vulns&&d.vulns.count?`<button type="button" class="fix-o
 const groupsSub=d=>d.groups&&d.groups.length?`<div class="sub" title="${esc((d.sources||[]).join(', ')||'Declared in')}">${d.groups.map(esc).join(' · ')}</div>`:'';
 function rowClass(d){const rk=riskOf(d);return rk==='red'||rk==='yellow'?` class="row-risk-${rk}"`:''}   // licenses to avoid or use with care stand out
 function row(d,single,i){
-  return `<tr${rowClass(d)}><td>${nameCell(d,single)}</td><td data-label="Ecosystem"${kindTitle(d)}>${esc(ECO[ecoOf(d)]||ecoOf(d))}${d.ecosystem==='docker'?`<div class="sub" title="Container image from this registry">image · ${esc(image(d.name).registry)}</div>`:''}</td><td data-label="Current version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${groupsSub(d)}${d.resolved?`<div class="sub" title="The version this tag points to today">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latestCell(d)}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${opener(d,i,vulnCell(d))}</td><td data-label="Fixed in">${opener(d,i,fixCell(d))}</td></tr>`;
+  return `<tr${rowClass(d)}><td>${nameCell(d,single)}</td><td data-label="Ecosystem"${kindTitle(d)}>${esc(ecoOf(d))}${d.ecosystem==='docker'?`<div class="sub" title="Container image from this registry">image · ${esc(image(d.name).registry)}</div>`:''}</td><td data-label="Current version"><code>${esc(d.version)}</code>${d.installed?`<div class="sub" title="The version the lockfile installs; vulnerabilities are checked at this version">installed ${esc(d.installed)}</div>`:''}${groupsSub(d)}${d.resolved?`<div class="sub" title="The version this tag points to today">${esc(d.resolved)}</div>`:''}</td><td data-label="Latest">${latestCell(d)}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities">${opener(d,i,vulnCell(d))}</td><td data-label="Fixed in">${opener(d,i,fixCell(d))}</td></tr>`;
 }
 // an image: its tag now and what it points to, the newest tag, and the vulnerabilities of the packages inside it
 function imageRow(d,single,i){
-  return `<tr${rowClass(d)}><td>${nameCell(d,single)}<div class="sub"${kindTitle(d)}>${esc(ECO[ecoOf(d)]||ecoOf(d))}</div></td><td data-label="Current tag"><code>${esc(d.version)}</code>${d.resolved?`<div class="sub" title="The version this tag points to today">version ${esc(d.resolved)}</div>`:''}${groupsSub(d)}</td><td data-label="Latest tag">${latestCell(d)}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities inside the image">${opener(d,i,vulnCell(d))}</td><td data-label="Fixable">${opener(d,i,fixCell(d))}</td></tr>`;
+  return `<tr${rowClass(d)}><td>${nameCell(d,single)}<div class="sub"${kindTitle(d)}>${esc(ecoOf(d))}</div></td><td data-label="Current tag"><code>${esc(d.version)}</code>${d.resolved?`<div class="sub" title="The version this tag points to today">version ${esc(d.resolved)}</div>`:''}${groupsSub(d)}</td><td data-label="Latest tag">${latestCell(d)}</td><td data-label="License">${licCell(d)}</td><td data-label="Vulnerabilities inside the image">${opener(d,i,vulnCell(d))}</td><td data-label="Fixable">${opener(d,i,fixCell(d))}</td></tr>`;
 }
 const HEAD='<tr><th scope="col">Package</th><th scope="col">Ecosystem</th><th scope="col">Current version</th><th scope="col">Latest</th><th scope="col">License</th><th scope="col">Vulnerabilities</th><th scope="col">Fixed in</th></tr>';
 const IMAGE_HEAD='<tr><th scope="col">Image</th><th scope="col">Current tag</th><th scope="col">Latest tag</th><th scope="col">License</th><th scope="col">Vulnerabilities inside the image</th><th scope="col">Fixable</th></tr>';
@@ -286,17 +284,38 @@ function renderPolicy(){
 }
 // each license list's name with its colour, e.g. Restricted use (red); the names come from licenses.labels
 const withColour=l=>Object.fromEntries(Object.entries(l||{}).filter(([k])=>['green','yellow','red'].includes(k)).map(([k,v])=>[k,`${v} (${k})`]));
-const load=()=>opts.repos().flatMap(r=>(r.dependencies||[]).map(d=>({...d,repository:r.repository}))).sort((a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name));
+/* ---- findings the distribution itself rates unimportant (Debian) or negligible (Ubuntu): left out unless asked for ---- */
+let showMinor=new URLSearchParams(location.search).get('minor')==='1';
+// the same vulnerability summary without the minor findings, recounted from the findings themselves (every one is kept)
+function withoutMinor(q){
+  if(showMinor||!q||!q.minor||!q.items||q.items.length<q.count)return q;
+  const items=q.items.filter(i=>!i.minor),n={},pk=new Map();
+  for(const i of items){
+    const k=SEVS.includes(i.severity)?i.severity:'UNKNOWN';n[k]=(n[k]||0)+1;
+    if(!i.package)continue;
+    const key=i.package+' '+i.version+' '+(i.ecosystem||''),p=pk.get(key)||{name:i.package,version:i.version,ecosystem:i.ecosystem||'',severity:i.severity,count:0,unfixed:0,minor:0,fixed:null,by_severity:{}};
+    p.count++;p.by_severity[k]=(p.by_severity[k]||0)+1;
+    if(SEVS.indexOf(k)<SEVS.indexOf(SEVS.includes(p.severity)?p.severity:'UNKNOWN'))p.severity=i.severity;
+    if(!i.fixed)p.unfixed++;else if(!p.fixed||newer(i.fixed,p.fixed))p.fixed=i.fixed;
+    pk.set(key,p);
+  }
+  const fixable=items.filter(i=>i.fixed).length;
+  return {...q,items,count:items.length,by_severity:n,severity:SEVS.find(k=>n[k])||null,fixable,unfixed:items.length-fixable,
+    packages:q.packages?[...pk.values()]:q.packages,minor:0,hidden:q.minor};
+}
+const hiddenNote=q=>q&&q.hidden?`<div class="sub" title="Debian rates these unimportant (Ubuntu: negligible): it does not consider them security problems in practice and will not fix them. Tick Include minor to count them.">${q.hidden} rated unimportant by the distribution, not counted</div>`:'';
+const load=()=>opts.repos().flatMap(r=>(r.dependencies||[]).map(d=>({...d,vulns:withoutMinor(d.vulns),repository:r.repository}))).sort((a,b)=>a.repository.localeCompare(b.repository)||a.name.localeCompare(b.name));
 
 /* o: { repos() -> the repository records shown (branch and page filters applied), view() -> 'dev' | 'main', org() -> organization,
- *      policy, ecosystems } */
+ *      policy } */
 function init(o){
   opts=o;policy=o.policy||policy;
-  Object.assign(RISK,withColour(policy.labels));Object.assign(ECO,o.ecosystems||{});
+  Object.assign(RISK,withColour(policy.labels));
   const q=new URLSearchParams(location.search);
   kind=KINDS.some(([k])=>k===q.get('kind'))?q.get('kind'):'packages';
   sortBy=SORTS[q.get('dsort')]?q.get('dsort'):'repo';$('dep-sort').value=sortBy;
   renderPolicy();
+  document.querySelectorAll('input.minor-switch').forEach(c=>{c.checked=showMinor;c.addEventListener('change',()=>setMinor(c.checked))});
   all=load();
   pager=Pager.createPager($('dep-pager'),{size:50,param:'dper',onChange:()=>render(bar.visible())});
   bar=Filters.createFilterBar($('dep-filters'),{facets:FACETS,items:all,noun:'dependencies',text:{param:'dq',placeholder:'Find a package or license',of:d=>d.name+' '+(d.license||'')},onChange:list=>{pager.reset();render(list)}});
@@ -312,10 +331,19 @@ function init(o){
   $('vc-close').addEventListener('click',()=>$('vuln-card').close());
   $('vuln-card').addEventListener('click',e=>{if(e.target===e.currentTarget)$('vuln-card').close()});   // a click on the backdrop
 }
-function refresh(){if(bar){all=load();bar.setItems(all)}}   // re-renders through the filter bar, which keeps the filters
+function refresh(){if(bar){all=load();bar.setItems(all)}}
+// one switch for every count on the page; each tab has a checkbox for it
+const minorListeners=[];
+function setMinor(on){
+  showMinor=on;
+  try{const q=new URLSearchParams(location.search);on?q.set('minor','1'):q.delete('minor');history.replaceState(null,'',q.toString()?'?'+q:location.pathname)}catch(_){}
+  document.querySelectorAll('input.minor-switch').forEach(c=>{c.checked=on});
+  refresh();minorListeners.forEach(f=>f());
+}
+const minorCount=()=>opts?opts.repos().reduce((s,r)=>s+(r.dependencies||[]).reduce((t,d)=>t+((d.vulns&&d.vulns.minor)||0),0),0):0;   // re-renders through the filter bar, which keeps the filters
 const exportRows=()=>({kind:(KINDS.find(([k])=>k===kind)||[])[1],rows:current});
 
 // shared with the Vulnerabilities tab (assets/vulns.js)
-const lib={init,refresh,exportRows,sevCounts,kindOf,innerKind,sevChips,sevBadge,KINDS,SEVS,SEVNAME,ECO,ecoOf,displayName,image,load:()=>opts?load():[]};
+const lib={init,refresh,setMinor,minorCount,onMinor:f=>minorListeners.push(f),showMinor:()=>showMinor,exportRows,sevCounts,kindOf,innerKind,sevChips,sevBadge,KINDS,SEVS,SEVNAME,ecoOf,displayName,image,load:()=>opts?load():[]};
 root.Deps=lib;
 })(window);

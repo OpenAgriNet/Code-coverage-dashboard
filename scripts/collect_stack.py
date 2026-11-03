@@ -16,7 +16,7 @@ def main():
  except SourceError as e:sys.exit(f'ERROR {e}')
  d=collect(targets,policy=cfg['licenses'],stack=cfg['stack'])
  os.makedirs('data',exist_ok=True)
- with open('data/stack.json','w',encoding='utf-8') as f:json.dump({'organization':github.ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'analyser':ANALYSER,'license_policy':cfg['licenses'],'display':{'ecosystems':cfg['dependencies']['ecosystem_names']},**d},f,indent=2);f.write('\n')
+ with open('data/stack.json','w',encoding='utf-8') as f:json.dump({'organization':github.ORG,'generated_at':datetime.now(timezone.utc).isoformat(),'analyser':ANALYSER,'license_policy':cfg['licenses'],**d},f,indent=2);f.write('\n')
  rows=d['repositories']
  print(f"Wrote data/stack.json for {len(rows)} repos ({sum(r['branch']!=m['branch'] for r,m in zip(rows,d['main']))} also analysed on their default branch); {sum(len(r['dependencies']) for r in rows)} dependencies.")
 if __name__=='__main__':main()
